@@ -2034,7 +2034,7 @@ body {
 <!-- ========== 每日英语（英语学习中心） ========== -->
 <div class="page" id="page-english">
   <style>
-    .eng-decks{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+    .eng-decks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
     .eng-deck{padding:8px 14px;border-radius:20px;background:#f2f3f7;font-size:13px;cursor:pointer;border:1px solid transparent}
     .eng-deck.active{background:var(--primary);color:#fff}
     .flashcard{perspective:1000px;height:200px;margin:12px 0;cursor:pointer}
@@ -2140,7 +2140,6 @@ body {
     <button class="subtab" onclick="switchSub('en',this,'en-grammar')">学语法</button>
     <button class="subtab" onclick="switchSub('en',this,'en-phonics')">音标发音</button>
     <button class="subtab" onclick="switchSub('en',this,'en-plan')">学习计划</button>
-    <button class="subtab" onclick="switchSub('en',this,'en-check')">打卡</button>
   </div>
 
   <!-- 背单词 -->
@@ -5700,7 +5699,7 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 137;                         // v137：英语句子音频播放修复——speakEng 非缓存音频改为直接用 SCF URL 设 audio.src 并在用户手势内 play()（之前 fetch→blob→play 在异步回调中调 play()，iOS/微信因脱离手势上下文拒绝播放）；去掉 _engUnlock 后立即 pause() 的破坏性调用
+const WB_VERSION = 138;                         // v138：删除英语"打卡"子tab；背单词分类标签从 flex-wrap 两列改为 grid repeat(3,1fr) 三列
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
