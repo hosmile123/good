@@ -1777,7 +1777,7 @@ body {
 
 <!-- ========== 作息习惯 HUB ========== -->
 <div class="page" id="page-routine">
-  <div class="page-header"><div><div class="page-title">作息习惯</div><div class="page-subtitle">早睡早起 · 经期 · 体重 全面管理</div></div><button class="badge-btn" onclick="openRoutineSettings()">设置</button></div>
+  <div class="page-header"><div><div class="page-title">作息习惯</div></div><button class="badge-btn" onclick="openRoutineSettings()">设置</button></div>
 
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('rt',this,'rt-sleeprise')">早睡早起</button>
@@ -5699,7 +5699,7 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 138;                         // v138：删除英语"打卡"子tab；背单词分类标签从 flex-wrap 两列改为 grid repeat(3,1fr) 三列
+const WB_VERSION = 139;                         // v139：删除"作息习惯"页标题下副标题"早睡早起 · 经期 · 体重 全面管理"
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
