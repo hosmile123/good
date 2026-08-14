@@ -1127,7 +1127,7 @@ body {
     </div>
     <div style="border-top:1px dashed var(--border);margin:14px 0 10px"></div>
     <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text-primary)">👥 已注册账号（共 <span id="accCount">0</span> 个）</div>
-    <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;line-height:1.5">勾选「工作 / 生活」决定该账号可见的功能模块。未勾选的分区，对应功能对该账号隐藏（侧边栏、首页快捷入口同步过滤）。</div>
+    <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;line-height:1.5">勾选「工作 / 生活 / 娱乐」决定该账号可见的功能模块。未勾选的分区，对应功能对该账号隐藏（侧边栏、首页快捷入口同步过滤）。</div>
     <div id="accList" style="max-height:220px;overflow:auto;margin-bottom:12px"></div>
     <div class="login-msg" id="rcMsg" style="min-height:16px"></div>
     <button class="login-btn" onclick="refreshResetCodes()">刷新</button>
@@ -3350,26 +3350,27 @@ body {
 </script>
 <script>
 // Page switching
-/* ========== 账号分区（工作 / 生活） ==========
-   管理员在「找回码 / 账号管理」里给每个注册账号勾选工作、生活分区。
+/* ========== 账号分区（工作 / 生活 / 娱乐） ==========
+   管理员在「找回码 / 账号管理」里给每个注册账号勾选工作、生活、娱乐分区。
    工作分区功能：工作(业绩)、客户、待办、笔记
-   生活分区功能：笔记、英语、娱乐、日记、作息、运动旅行、记账
-   笔记同时属于两个分区。未勾选的分区，对应功能对该账号隐藏（侧边栏 / 底部导航 / 首页快捷入口均过滤）。
-   默认新账号两个分区都勾选（全部可见），管理员可逐步收窄。 */
+   生活分区功能：笔记、英语、日记、作息、运动旅行、记账
+   娱乐分区功能：娱乐（游戏台 + 读书）
+   笔记同时属于工作/生活两个分区。未勾选的分区，对应功能对该账号隐藏（侧边栏 / 底部导航 / 首页快捷入口均过滤）。
+   默认新账号三个分区都勾选（全部可见），管理员可逐步收窄。 */
 const PAGE_PARTITION = {
   performance: ['work'],   // 工作(业绩)
   client: ['work'],        // 客户
   todo: ['work'],          // 待办
   notes: ['work','life'],  // 笔记（同属两区）
   english: ['life'],       // 英语
-  fun: ['life'],           // 娱乐
+  fun: ['fun'],            // 娱乐（v142：独立分区，不再隶属生活）
   diary: ['life'],         // 日记
   routine: ['life'],       // 作息
   fitness: ['life'],       // 运动旅行
   money: ['life']          // 记账
 };
-var _accountPartition = { work: true, life: true }; // 当前登录账号的分区（默认全开）
-var _accParts = {}; // 管理端编辑态：email -> {work, life}
+var _accountPartition = { work: true, life: true, fun: true }; // 当前登录账号的分区（默认全开）
+var _accParts = {}; // 管理端编辑态：email -> {work, life, fun}
 
 // 某页面是否对当前账号可见
 function pageVisible(pageId){
@@ -3449,21 +3450,26 @@ function applyAccountPartition(){
 }
 // 登录后拉取当前账号分区（后端不可用时不收窄，避免误隐藏）
 async function loadAccountPartition(){
-  if(!API_TOKEN){ _accountPartition = { work: true, life: true }; return; }
+  if(!API_TOKEN){ _accountPartition = { work: true, life: true, fun: true }; return; }
   try {
     var r = await api('/api/account/partition', 'GET');
-    if(r && r.ok && r.partition) _accountPartition = r.partition;
-    else _accountPartition = { work: true, life: true };
+    if(r && r.ok && r.partition) _accountPartition = Object.assign({work:true,life:true,fun:true}, r.partition);
+    else _accountPartition = { work: true, life: true, fun: true };
   } catch(e){
-    _accountPartition = { work: true, life: true };
+    _accountPartition = { work: true, life: true, fun: true };
   }
 }
 // 管理端：切换某账号的某分区
 async function setAccPartition(email, part, val){
-  if(!_accParts[email]) _accParts[email] = { work: true, life: true };
+  if(!_accParts[email]) _accParts[email] = { work: true, life: true, fun: true };
   _accParts[email][part] = val;
   try {
-    await api('/api/admin/accounts/partition', 'POST', { email: email, work: _accParts[email].work, life: _accParts[email].life });
+    await api('/api/admin/accounts/partition', 'POST', {
+      email: email,
+      work: _accParts[email].work,
+      life: _accParts[email].life,
+      fun: _accParts[email].fun
+    });
     toast('已更新「' + email + '」的分区');
   } catch(e){
     toast('分区更新失败：' + (e.message || '未知错误'));
@@ -3478,7 +3484,7 @@ async function switchPage(pageId) {
   }
   // 账号分区拦截：未勾选的分区功能对当前账号隐藏
   if(!pageVisible(pageId)){
-    toast('该账号未开通此功能（工作/生活分区未勾选）');
+    toast('该账号未开通此功能（工作/生活/娱乐分区未勾选）');
     return;
   }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -5941,13 +5947,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 141;                         // v141：英语加"我的词库" — 5 个分类（重点集/已掌握/复习中/待复习/不熟练）查看学过的词；记 wrong 次数做不熟练排序
+const WB_VERSION = 142;                         // v142：账号分区加「娱乐」作为第三分区，娱乐页从生活区拆出来；管理员可单独勾选娱乐；同步到 eng-games 聚焦版
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 58;                  // v141 发版：57→58（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 59;                  // v142 发版：58→59（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -9099,15 +9105,16 @@ async function refreshResetCodes(){
       } else {
         if(accBox) accBox.innerHTML = accs.map(function(a){
           var d = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '未知';
-          var part = a.partition || { work: true, life: true };
-          _accParts[a.email] = { work: !!part.work, life: !!part.life };
+          var part = a.partition || { work: true, life: true, fun: true };
+          _accParts[a.email] = { work: !!part.work, life: !!part.life, fun: !!part.fun };
           var em = escapeHtml(a.email);
           var raw = a.email;
-          return '<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;gap:8px">' +
+          return '<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;gap:8px;flex-wrap:wrap">' +
             '<div style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + em + '<div style="font-size:11px;color:var(--text-light);font-weight:400">注册于 ' + d + '</div></div>' +
-            '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0">' +
+            '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;flex-wrap:wrap">' +
               '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.work?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'work\',this.checked)">工作</label>' +
               '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.life?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'life\',this.checked)">生活</label>' +
+              '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.fun?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'fun\',this.checked)">娱乐</label>' +
             '</div>' +
           '</div>';
         }).join('');
