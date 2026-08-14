@@ -2133,7 +2133,46 @@ body {
     .subtabs::-webkit-scrollbar{display:none}
     .subtab{flex:0 0 auto;white-space:nowrap;padding:7px 12px}
     .ph-card{width:calc(50% - 4px)}
+    .eng-lib-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .eng-lib-tabs::-webkit-scrollbar{display:none}
+    .eng-lib-tab{flex:0 0 auto}
   }
+  /* ===== English library (我的词库) ===== */
+  .eng-library{background:#fff;border:1px solid #e8eaf3;border-radius:12px;padding:0 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+  .eng-library>summary{padding:13px 0;font-weight:600;font-size:14px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
+  .eng-library>summary::-webkit-details-marker{display:none}
+  .eng-library>summary::before{content:'📖';font-size:18px}
+  .eng-library[open]>summary::before{content:'📕'}
+  .eng-library>summary>small{font-weight:400;font-size:12px;color:var(--text-light);margin-left:auto}
+  .eng-lib-tabs{display:flex;gap:6px;padding:4px 0 10px 0}
+  .eng-lib-tab{padding:6px 12px;border-radius:16px;background:#f2f3f7;font-size:12px;cursor:pointer;border:1px solid transparent;white-space:nowrap;color:#333;transition:all .15s}
+  .eng-lib-tab:hover{background:#e8e9f0}
+  .eng-lib-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .eng-lib-tab .cnt{display:inline-block;padding:0 7px;margin-left:4px;border-radius:8px;font-size:11px;background:rgba(0,0,0,.06);line-height:18px;min-width:18px;text-align:center}
+  .eng-lib-tab.active .cnt{background:rgba(255,255,255,.35)}
+  .eng-lib-search{padding:0 0 10px 0}
+  .eng-lib-search input{width:100%;padding:8px 14px;border:1px solid #e0e0e8;border-radius:20px;font-size:13px;background:#f8f9fc;box-sizing:border-box;outline:none}
+  .eng-lib-search input:focus{border-color:var(--primary);background:#fff}
+  .eng-lib-list{display:grid;gap:8px;padding-bottom:14px;max-height:480px;overflow-y:auto}
+  .eng-lib-list::-webkit-scrollbar{width:6px}
+  .eng-lib-list::-webkit-scrollbar-thumb{background:#d0d3dc;border-radius:3px}
+  .eng-lib-item{background:#f8f9fc;border:1px solid #ebedf3;border-radius:10px;padding:10px 12px;transition:all .15s}
+  .eng-lib-item:hover{border-color:var(--primary);background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+  .eng-lib-item .cli-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .eng-lib-item .cli-w{font-weight:700;font-size:16px;color:#1a3a5c;letter-spacing:.3px}
+  .eng-lib-item .cli-p{font-size:12px;color:#888;font-family:'Apple Color Emoji','Segoe UI Emoji',sans-serif}
+  .eng-lib-item .cli-speak{background:#e8f0fe;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:13px;margin-left:auto;flex-shrink:0;transition:all .15s}
+  .eng-lib-item .cli-speak:hover{background:#d4e4fc;transform:scale(1.08)}
+  .eng-lib-item .cli-m{font-size:13px;color:#333;margin:2px 0 4px 0}
+  .eng-lib-item .cli-ex{font-size:12px;color:#586577;line-height:1.6;margin-bottom:4px}
+  .eng-lib-item .cli-ex .cli-t{color:var(--primary);font-weight:500;margin-left:4px}
+  .eng-lib-item .cli-meta{font-size:11px;color:#999;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .eng-lib-item .cli-meta .badge{display:inline-block;padding:2px 7px;border-radius:8px;background:#eef2f8;font-size:10px;color:#5a6378}
+  .eng-lib-item .cli-meta .badge.level{background:#fff3e0;color:#fa8c16}
+  .eng-lib-item .cli-meta .badge.level.b5{background:#e6f7ee;color:#1a7f4b}
+  .eng-lib-item .cli-meta .badge.wrong{background:#fff1f0;color:#cf1322}
+  .eng-lib-empty{text-align:center;padding:20px 12px;color:var(--text-light);font-size:13px;background:#f8f9fc;border-radius:10px;border:1px dashed #dde0e8}
+  .eng-lib-empty .emoji{font-size:32px;margin-bottom:6px}
   </style>
   <div class="page-header"><div><div class="page-title">英语学习中心</div><div class="page-subtitle">零基础也能学，沟通客户更自信</div></div><button class="badge-btn">编辑状态</button></div>
 
@@ -2170,6 +2209,20 @@ body {
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:#fa8c16" id="engDue">0</div><div style="font-size:11px;color:var(--text-light)">今日待复习</div></div>
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:var(--primary)" id="engWaiting">0</div><div style="font-size:11px;color:var(--text-light)">复习中</div></div>
     </div>
+    <details class="eng-library" id="engLibrary" ontoggle="renderEngLibrary()">
+      <summary>我的词库<small>点开查看学过的词 · 重点 / 掌握 / 复习 / 不熟练</small></summary>
+      <div class="eng-lib-tabs">
+        <button class="eng-lib-tab active" data-tab="starred" onclick="engLibTab('starred',this)">⭐ 重点集<span class="cnt">0</span></button>
+        <button class="eng-lib-tab" data-tab="mastered" onclick="engLibTab('mastered',this)">📗 已掌握<span class="cnt">0</span></button>
+        <button class="eng-lib-tab" data-tab="reviewing" onclick="engLibTab('reviewing',this)">🔁 复习中<span class="cnt">0</span></button>
+        <button class="eng-lib-tab" data-tab="due" onclick="engLibTab('due',this)">⏰ 待复习<span class="cnt">0</span></button>
+        <button class="eng-lib-tab" data-tab="weak" onclick="engLibTab('weak',this)">🆕 不熟练<span class="cnt">0</span></button>
+      </div>
+      <div class="eng-lib-search">
+        <input type="text" id="engLibSearch" placeholder="🔍 搜索单词 / 释义（实时过滤）" oninput="renderEngLibrary()">
+      </div>
+      <div id="engLibList" class="eng-lib-list"></div>
+    </details>
     <div class="card" style="background:#f5f7ff;border:1px solid #dbe2ff;padding:12px 14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-weight:600">📅 每日学习目标</span>
@@ -4671,6 +4724,7 @@ function engUpdateMasteryUI(){
   const el3 = document.getElementById('engDue'); if(el3) el3.textContent = m.due;
   const cnt = document.querySelector('#en-word .eng-deck[onclick*="review"]');
   if(cnt) cnt.textContent = '🔁 复习' + (m.due>0 ? ' ('+m.due+')' : '');
+  engLibUpdateCounts();   // v141：同步我的词库 5 个分类的计数
 }
 function approxIPA(w){
   const s=(w||'').toLowerCase().replace(/[^a-z]/g,'');
@@ -5042,12 +5096,13 @@ function engMark(known){
   const list = isReview ? engDueList() : (engState.deck==='starred' ? engState.starred : engDecks[engState.deck]);
   const c = list[engState.idx];
   if(c){
-    // 间隔复习：认识→升盒、推后复习；不认识→回盒1、10分钟后再现
+    // 间隔复习：认识→升盒、推后复习；不认识→回盒1、10分钟后再现；v141 顺手累计 wrong（不认识次数）
     engState.srs = engState.srs || {};
-    let s = engState.srs[c.w] || { box: 1, due: 0 };
+    let s = engState.srs[c.w] || { box: 1, due: 0, wrong: 0 };
     s.box = known ? Math.min(5, s.box + 1) : 1;
     const iv = [0,1,2,4,7,15][s.box] || 15; // box1..5 对应复习间隔(天)
     s.due = Date.now() + (known ? iv*86400000 : 10*60000);
+    if(known){ s.wrong = 0; } else { s.wrong = (s.wrong || 0) + 1; }
     engState.srs[c.w] = s;
   }
   if(known) engState.known++;
@@ -5059,6 +5114,7 @@ function engMark(known){
   wbEngSave();
   engUpdateGoalUI();
   renderEngCard();
+  renderEngLibrary();   // v141：标记完后立刻刷新我的词库
 }
 function selectEngDeck(name, btn, force){
   engState.deck = name;
@@ -5068,6 +5124,167 @@ function selectEngDeck(name, btn, force){
   wbEngSave();
   engUpdateGoalUI();
   renderEngCard();
+}
+
+// ===== 我的词库（v141）：按分类查看学过的单词 =====
+let engLibTabName = 'starred';
+const ENG_DECK_LABEL = {
+  daily:'日常高频词', biz:'雅思', travel:'旅行英语', extra:'综合拓展',
+  food:'食物饮食', school:'校园学习', health:'健康医疗', emotion:'情感表达',
+  nature:'自然环境', tech:'科技网络', home:'家居生活', sport:'体育运动',
+  social:'社交关系', work:'工作职业', science:'科学探索',
+  starred:'重点集', review:'复习'
+};
+function engLibIndexCards(){
+  // 把所有 deck 的词卡按 word 索引，方便通过 srs/重点集回查词卡详情
+  const idx = {};
+  try{
+    Object.keys(engDecks).forEach(function(dk){
+      (engDecks[dk] || []).forEach(function(c){
+        if(c && c.w && !idx[c.w]) idx[c.w] = Object.assign({deck: dk}, c);
+      });
+    });
+  }catch(e){}
+  return idx;
+}
+function engLibCounts(){
+  const srs = engState.srs || {};
+  const now = Date.now();
+  let mastered=0, reviewing=0, due=0, weak=0;
+  Object.keys(srs).forEach(function(w){
+    const s = srs[w];
+    if(s.box >= 5) mastered++;
+    else if(s.due <= now) due++;
+    else reviewing++;
+    if(s.box <= 1) weak++;
+  });
+  return {
+    starred: (engState.starred || []).length,
+    mastered: mastered,
+    reviewing: reviewing,
+    due: due,
+    weak: weak
+  };
+}
+function engLibUpdateCounts(){
+  const counts = engLibCounts();
+  const tabs = document.querySelectorAll('#engLibrary .eng-lib-tab');
+  tabs.forEach(function(t){
+    const n = t.getAttribute('data-tab');
+    const span = t.querySelector('.cnt');
+    if(span) span.textContent = counts[n] || 0;
+  });
+  // 如果当前已经渲染过列表，列表也要重新算（防止后台 srs 变化没刷新）
+  const wrap = document.getElementById('engLibList');
+  if(wrap && wrap.getAttribute('data-rendered') === '1') renderEngLibrary();
+}
+function engLibTab(name, btn){
+  engLibTabName = name;
+  if(btn){
+    btn.closest('.eng-lib-tabs').querySelectorAll('.eng-lib-tab').forEach(function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  renderEngLibrary();
+}
+function engLibGetList(){
+  const srs = engState.srs || {};
+  const now = Date.now();
+  const idx = engLibIndexCards();
+  let out = [];
+  if(engLibTabName === 'starred'){
+    (engState.starred || []).forEach(function(c){
+      out.push(Object.assign({box: srs[c.w] ? srs[c.w].box : 0, wrong: srs[c.w] ? (srs[c.w].wrong || 0) : 0}, c));
+    });
+  } else if(engLibTabName === 'mastered'){
+    Object.keys(srs).forEach(function(w){
+      const s = srs[w];
+      if(s.box >= 5 && idx[w]) out.push(Object.assign({box: s.box}, idx[w]));
+    });
+  } else if(engLibTabName === 'reviewing'){
+    Object.keys(srs).forEach(function(w){
+      const s = srs[w];
+      if(s.box < 5 && s.due > now && idx[w]) out.push(Object.assign({box: s.box, dueIn: s.due - now}, idx[w]));
+    });
+  } else if(engLibTabName === 'due'){
+    Object.keys(srs).forEach(function(w){
+      const s = srs[w];
+      if(s.box < 5 && s.due <= now && idx[w]) out.push(Object.assign({box: s.box}, idx[w]));
+    });
+  } else if(engLibTabName === 'weak'){
+    Object.keys(srs).forEach(function(w){
+      const s = srs[w];
+      if(s.box <= 1 && idx[w]) out.push(Object.assign({box: s.box, wrong: s.wrong || 0}, idx[w]));
+    });
+  }
+  // 搜索过滤
+  const qEl = document.getElementById('engLibSearch');
+  const q = (qEl ? qEl.value : '').trim().toLowerCase();
+  if(q){
+    out = out.filter(function(c){
+      return (c.w || '').toLowerCase().indexOf(q) !== -1
+          || (c.m || '').toLowerCase().indexOf(q) !== -1
+          || (c.e || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  // 排序：⭐重点集不排序保持加入顺序；其他按单词字母
+  if(engLibTabName !== 'starred'){
+    out.sort(function(a, b){ return (a.w || '').localeCompare(b.w || ''); });
+  }
+  return out;
+}
+function engLibDueStr(dueIn){
+  if(dueIn == null) return '';
+  const d = Math.floor(dueIn / 86400000);
+  const h = Math.floor((dueIn % 86400000) / 3600000);
+  if(d >= 1) return '⏰ '+d+'天后再来';
+  if(h >= 1) return '⏰ '+h+'小时后再来';
+  const m = Math.max(1, Math.floor(dueIn / 60000));
+  return '⏰ '+m+'分钟后再来';
+}
+function renderEngLibrary(){
+  const wrap = document.getElementById('engLibList');
+  if(!wrap) return;
+  engLibUpdateCounts();
+  const list = engLibGetList();
+  if(list.length === 0){
+    const msg = {
+      starred: { emoji:'⭐', text:'重点集还空着 · 在背单词时点卡片上的「⭐ 加入重点」把难记的词收进来' },
+      mastered: { emoji:'📗', text:'还没有掌握 5 级的词 · 每天点「😎 我认识」就能攒起来' },
+      reviewing: { emoji:'🔁', text:'复习中 0 个 · 刚标记「认识」的词会按遗忘曲线排到这里' },
+      due: { emoji:'⏰', text:'今日待复习 0 个 · 复习曲线还没来新的词' },
+      weak: { emoji:'🆕', text:'不熟练 0 个 · 标记「😅 还不认识」会自动归到这里' }
+    }[engLibTabName] || { emoji:'📭', text:'这里还空着' };
+    wrap.innerHTML = '<div class="eng-lib-empty"><div class="emoji">'+msg.emoji+'</div><div>'+msg.text+'</div></div>';
+    wrap.setAttribute('data-rendered', '1');
+    return;
+  }
+  wrap.innerHTML = list.map(function(c){
+    const w = esc(c.w || '');
+    const p = esc(c.p || '');
+    const m = esc(c.m || '');
+    const e = esc(c.e || '');
+    const t = esc(c.t || '');
+    const deck = esc(ENG_DECK_LABEL[c.deck] || c.deck || '');
+    const box = c.box || 0;
+    const wrong = c.wrong || 0;
+    const dueIn = c.dueIn;
+    const levelBadge = '<span class="badge level '+(box>=5?'b5':'')+'">⭐ 等级 '+box+'/5</span>';
+    const deckBadge = '<span class="badge">📚 '+deck+'</span>';
+    const wrongBadge = wrong > 0 ? '<span class="badge wrong">😅 错 '+wrong+' 次</span>' : '';
+    const dueBadge = (engLibTabName==='reviewing' && dueIn) ? '<span class="badge">'+engLibDueStr(dueIn)+'</span>' : '';
+    const safeW = String(c.w || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return '<div class="eng-lib-item">' +
+      '<div class="cli-head">' +
+        '<span class="cli-w">'+w+'</span>' +
+        (p ? '<span class="cli-p">'+p+'</span>' : '') +
+        '<button class="cli-speak" onclick="speakEng(\''+safeW+'\')" title="听发音">🔊</button>' +
+      '</div>' +
+      (m ? '<div class="cli-m">'+m+'</div>' : '') +
+      (e ? '<div class="cli-ex">📝 '+e+(t ? '<span class="cli-t"> · '+t+'</span>' : '')+'</div>' : '') +
+      '<div class="cli-meta">' + deckBadge + levelBadge + wrongBadge + dueBadge + '</div>' +
+    '</div>';
+  }).join('');
+  wrap.setAttribute('data-rendered', '1');
 }
 function engGoalStep(d){
   engState.dailyGoal = Math.max(5, Math.min(200, engState.dailyGoal + d));
@@ -5086,12 +5303,14 @@ function engStar(){
     wbEngSave();
     toast('已移出重点集');
     renderEngCard();
+    renderEngLibrary();   // v141：立刻刷新我的词库
     return;
   }
   if(engState.starred.some(x=>x.w===c.w)){ toast('已在重点集'); return; }
   engState.starred.push({w:c.w,m:c.m,p:c.p,e:c.e,deck:engState.deck});
   wbEngSave();
   toast('⭐ 已加入重点集');
+  renderEngLibrary();   // v141：立刻刷新我的词库
 }
 function engDateKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
 function computeStreak(){
@@ -5722,13 +5941,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 140;                         // v140：谁是卧底按顺序翻牌+翻后变灰+查看身份移底部上拉；笔记卡片固定高度+点击查看全部；学语法加语音朗读；单词翻页例句发音改用 window._engCard 引用
+const WB_VERSION = 141;                         // v141：英语加"我的词库" — 5 个分类（重点集/已掌握/复习中/待复习/不熟练）查看学过的词；记 wrong 次数做不熟练排序
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 57;                  // v127 发版：56→57
+const WB_DISPLAY_VERSION = 58;                  // v141 发版：57→58（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
