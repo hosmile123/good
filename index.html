@@ -2098,6 +2098,8 @@ body {
   .g-block.warn .gt{color:#d9480f}
   .g-block.warn .gd{background:#fff7f0;padding:6px 8px;border-radius:6px}
   .g-ex{background:#f5f7ff;border-left:3px solid var(--primary);padding:8px 10px;border-radius:6px;font-size:12px;margin-top:6px;color:var(--text-primary)}
+  .g-speak{display:inline-block;background:#f0f4ff;border:1px solid #dbe2ff;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;color:var(--primary);margin-left:4px;vertical-align:middle;transition:.15s}
+  .g-speak:hover{background:var(--primary);color:#fff}
   .g-flash{animation:gflash 1.6s ease}
   @keyframes gflash{0%{box-shadow:0 0 0 3px #5B6CF9}100%{box-shadow:none}}
   .ph-group{margin-bottom:14px}
@@ -2609,6 +2611,12 @@ body {
       .spy-chip:hover{background:#e3e3e3}
       .spy-chip.viewed{background:#e8f5e9;color:#388E3C}
       .spy-chip.eliminated{background:#ffebee;color:#c00}
+      .spy-chip.current{background:#FF6B00;color:#fff;box-shadow:0 2px 8px rgba(255,107,0,.35);animation:spyPulse 1.5s infinite}
+      .spy-chip.disabled{background:#f5f5f5;color:#ccc;cursor:not-allowed}
+      .spy-chip.disabled:hover{background:#f5f5f5}
+      .spy-chip.done{background:#e8f5e9;color:#81C784;cursor:not-allowed;opacity:.6}
+      .spy-chip.done:hover{background:#e8f5e9}
+      @keyframes spyPulse{0%,100%{box-shadow:0 2px 8px rgba(255,107,0,.35)}50%{box-shadow:0 2px 16px rgba(255,107,0,.6)}}
       /* 脑筋急转弯 */
       .riddle-q{font-size:17px;font-weight:700;color:#222;text-align:center;padding:16px;background:#FFF8E1;border-radius:12px;margin:12px 0;line-height:1.6}
       .riddle-a{font-size:15px;color:#2E7D32;text-align:center;padding:14px;background:#E8F5E9;border-radius:12px;margin:12px 0;display:none}
@@ -4776,6 +4784,7 @@ function renderEngCard(){
   }
   const c = list[engState.idx];
   if(!c){ return; }
+  window._engCard = c;   // v140: 存当前卡片，🔊 按钮直接引用，避免 data-spk 属性编解码问题
   const hideWord = engState.listen && !engReveal;
   const starLabel = isStar ? '🗑 移出重点' : '⭐ 加入重点';
   wrap.innerHTML = `<div class="flashcard" id="engCard" onclick="flipEngCard()">
@@ -4784,7 +4793,7 @@ function renderEngCard(){
         <div class="fc-index">${engState.idx+1} / ${total}</div>
         <div class="fc-word" id="engWord" ${hideWord?'style="filter:blur(8px);user-select:none"':''}>${c.w}</div>
         <div class="fc-phon">${c.p || approxIPA(c.w)}</div>
-        <button class="fc-speak" data-spk="${encodeURIComponent(c.w)}" onclick="event.stopPropagation();speakEng(decodeURIComponent(this.getAttribute('data-spk')))">🔊 读单词</button>
+        <button class="fc-speak" onclick="event.stopPropagation();speakEng(window._engCard.w)">🔊 读单词</button>
         <button class="fc-star" onclick="event.stopPropagation();engStar()">${starLabel}</button>
         ${hideWord?`<button class="fc-reveal" onclick="event.stopPropagation();engReveal=true;renderEngCard()">👀 显示单词</button>`:''}
         <div style="margin-top:14px;font-size:12px;opacity:.85">👆 点击卡片看释义${hideWord?'（听力模式：先听再猜）':''}</div>
@@ -4792,7 +4801,7 @@ function renderEngCard(){
       <div class="flashcard-back">
         <div class="fc-index">${engState.idx+1} / ${total}</div>
         <div class="fc-mean">${c.m}</div>
-        <div class="fc-ex">${(c.e)? '<div style="margin-bottom:6px">'+esc(c.e)+' <button class="fc-speak" data-spk="'+encodeURIComponent(c.e||'')+'" onclick="event.stopPropagation();speakEng(decodeURIComponent(this.getAttribute(\'data-spk\')))">🔊</button></div>'+(c.t?'<div style="font-size:13px;color:var(--primary);font-weight:500">📝 '+esc(c.t)+'</div>':'') : '<span style="opacity:.6">（暂无例句，点上方🔊听单词发音）</span>'}</div>
+        <div class="fc-ex">${(c.e)? '<div style="margin-bottom:6px">'+esc(c.e)+' <button class="fc-speak" onclick="event.stopPropagation();speakEng(window._engCard.e)">🔊</button></div>'+(c.t?'<div style="font-size:13px;color:var(--primary);font-weight:500">📝 '+esc(c.t)+'</div>':'') : '<span style="opacity:.6">（暂无例句，点上方🔊听单词发音）</span>'}</div>
         <button class="fc-star" onclick="event.stopPropagation();engStar()">${starLabel}</button>
         <div style="margin-top:14px;font-size:12px;color:var(--text-light)">👆 点击返回</div>
       </div>
@@ -5589,10 +5598,24 @@ function renderEngGrammar(){
     return '<div class="g-lesson" id="gr-'+engGramChap+'-'+li+'"><h4>'+(li+1)+'. '+l.title+'</h4>' +
       l.blocks.map(function(b){
         var warn = (b.t.indexOf('⚠')>=0 || b.t.indexOf('易错')>=0 || b.t.indexOf('注意')>=0);
-        return '<div class="g-block'+(warn?' warn':'')+'"><div class="gt">'+b.t+'</div><div class="gd">'+b.d+'</div>'+(b.ex?'<div class="g-ex">📌 例：'+b.ex+'</div>':'')+'</div>';
+        if(!window._gramBlocks) window._gramBlocks = [];
+        var bi = window._gramBlocks.length; window._gramBlocks.push(b);
+        var exHtml = b.ex ? '<div class="g-ex">📌 例：'+b.ex+' <button class="g-speak" onclick="event.stopPropagation();speakEng(window._gramBlocks['+bi+'].e)">🔊</button></div>' : '';
+        return '<div class="g-block'+(warn?' warn':'')+'"><div class="gt">'+b.t+'</div><div class="gd">'+b.d+'</div>'+exHtml+'<button class="g-speak" style="margin-top:4px" onclick="event.stopPropagation();_gramSpeak('+bi+')">🔊 朗读本节</button></div>';
       }).join('') + '</div>';
   }).join('');
   box.innerHTML = html;
+}
+// v140: 语法朗读 —— 从 block.d 中提取英文单词/短语/句子朗读
+function _gramSpeak(idx){
+  var b = window._gramBlocks && window._gramBlocks[idx];
+  if(!b) return;
+  var eng = (b.d||'').match(/[a-zA-Z][a-zA-Z\s,.'!?()\-]+/g);
+  if(eng && eng.length){
+    eng = eng.filter(function(s){ return s.trim().length >= 2; });
+    if(eng.length){ speakEng(eng.join('. ')); return; }
+  }
+  if(b.ex) speakEng(b.ex);
 }
 function openGrammarLesson(ci,li){
   engGramChap = ci;
@@ -5699,7 +5722,7 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 139;                         // v139：删除"作息习惯"页标题下副标题"早睡早起 · 经期 · 体重 全面管理"
+const WB_VERSION = 140;                         // v140：谁是卧底按顺序翻牌+翻后变灰+查看身份移底部上拉；笔记卡片固定高度+点击查看全部；学语法加语音朗读；单词翻页例句发音改用 window._engCard 引用
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
@@ -6354,45 +6377,74 @@ function startSpyGame(){
     var word = role==='spy'? pair[1] : (role==='white'? '⬜ 白板（无词）' : pair[0]);
     players.push({name:'玩家'+(i+1), role:role, word:word, viewed:false});
   }
-  window._spyState={players:players, pair:pair, spyCnt:spyCnt, rolesShown:false};
+  window._spyState={players:players, pair:pair, spyCnt:spyCnt, rolesShown:false, currentPlayer:0};
   var area=document.getElementById('spyPlayArea');
   area.innerHTML='<div style="text-align:center;margin:10px 0;font-size:13px;color:#FF6B00;font-weight:bold">本次共 '+spyCnt+' 个卧底'+(hasWhite?' + 1 白板':'')+'</div>'+
-    '<div style="text-align:center;margin:4px 0;font-size:13px;color:#888">点下方玩家卡片查看词语（依次传递手机，翻牌后点词语可隐藏）</div>'+
-    '<div class="spy-player-list">'+players.map(function(p,i){ return '<div class="spy-chip" onclick="revealSpyPlayer('+i+')">'+esc(p.name)+'</div>'; }).join('')+'</div>'+
+    '<div style="text-align:center;margin:4px 0;font-size:13px;color:#888">👆 按顺序依次查看身份，翻牌后点词语隐藏即自动传给下一人</div>'+
+    '<div class="spy-player-list" id="spyPlayerList">'+_renderSpyChips()+'</div>'+
     '<div id="spyRoleCard"></div>'+
-    '<div id="spyRolesPanel" style="display:none"></div>'+
     '<div style="display:flex;gap:8px;margin-top:10px">'+
-      '<button class="btn-primary" style="flex:1;background:#9C27B0" onclick="showSpyRoles()">👁 查看身份</button>'+
       '<button class="btn-primary" style="flex:1;background:#999" onclick="openSpyGame()">重新发牌</button>'+
       '<button class="btn-primary" style="flex:1;background:#4CAF50" onclick="endSpyGame(true)">平民胜</button>'+
       '<button class="btn-primary" style="flex:1;background:#f44336" onclick="endSpyGame(false)">卧底胜</button>'+
+    '</div>'+
+    '<div id="spyRolesPanel" style="display:none"></div>'+
+    '<div style="margin-top:20px;border-top:1px dashed #ddd;padding-top:14px">'+
+      '<details style="font-size:13px">'+
+        '<summary style="cursor:pointer;color:#9C27B0;font-weight:600;padding:6px 0">👁 查看所有玩家身份（主持人专用，点击展开）</summary>'+
+        '<div style="padding:10px 0">'+
+          '<button class="btn-primary" style="width:100%;background:#9C27B0" onclick="showSpyRoles()">👁 查看/隐藏身份</button>'+
+          '<div id="spyRolesContent" style="margin-top:8px"></div>'+
+        '</div>'+
+      '</details>'+
     '</div>';
+}
+function _renderSpyChips(){
+  var s=window._spyState; if(!s) return '';
+  return s.players.map(function(p,i){
+    var cls='spy-chip';
+    if(i < s.currentPlayer) cls += ' done';
+    else if(i === s.currentPlayer) cls += ' current';
+    else cls += ' disabled';
+    var click = (i === s.currentPlayer) ? ' onclick="revealSpyPlayer('+i+')"' : '';
+    return '<div class="'+cls+'"'+click+'>'+esc(p.name)+'</div>';
+  }).join('');
 }
 function revealSpyPlayer(idx){
   var s=window._spyState; if(!s) return;
-  var p=s.players[idx]; p.viewed=true;
-  // 只显示词语，不显示身份；点击词语卡片可隐藏
+  if(idx !== s.currentPlayer) return;
+  var p=s.players[idx];
   document.getElementById('spyRoleCard').innerHTML='<div class="spy-role-card" onclick="hideSpyWord()">'+
     '<div class="spy-role-label">你的词（点击隐藏）</div>'+
     '<div class="spy-role-word">'+esc(p.word)+'</div>'+
     '</div>';
-  var listEl=document.querySelector('#spyPlayArea .spy-player-list');
-  if(listEl) listEl.innerHTML=s.players.map(function(pp,i){ return '<div class="spy-chip'+(pp.viewed?' viewed':'')+'" onclick="revealSpyPlayer('+i+')">'+esc(pp.name)+'</div>'; }).join('');
 }
 function hideSpyWord(){
+  var s=window._spyState; if(!s) return;
   var c=document.getElementById('spyRoleCard'); if(c) c.innerHTML='';
+  s.currentPlayer++;
+  var listEl=document.getElementById('spyPlayerList');
+  if(listEl) listEl.innerHTML=_renderSpyChips();
+  if(s.currentPlayer >= s.players.length){
+    var rc=document.getElementById('spyRoleCard');
+    if(rc){
+      var div=document.createElement('div');
+      div.style.cssText='text-align:center;margin:8px 0;font-size:13px;color:#4CAF50;font-weight:bold';
+      div.textContent='✅ 所有人已查看完毕，开始描述和投票吧！';
+      rc.parentNode.insertBefore(div, rc.nextSibling);
+    }
+  }
 }
 function showSpyRoles(){
   var s=window._spyState; if(!s) return;
-  var panel=document.getElementById('spyRolesPanel'); if(!panel) return;
+  var panel=document.getElementById('spyRolesContent'); if(!panel) return;
   s.rolesShown=!s.rolesShown;
-  if(!s.rolesShown){ panel.style.display='none'; panel.innerHTML=''; return; }
+  if(!s.rolesShown){ panel.innerHTML=''; return; }
   var items=s.players.map(function(pp,i){
     var tag = pp.role==='spy'? '<span style="color:#FF5252;font-weight:800">🕵️ 卧底</span>' : (pp.role==='white'? '<span style="color:#999">⬜ 白板</span>' : '<span style="color:#4CAF50">👤 平民</span>');
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid #eee;border-radius:10px;margin-bottom:6px;font-size:15px"><b>'+esc(pp.name)+'</b>'+tag+'<span style="color:#555">'+esc(pp.word)+'</span></div>';
   }).join('');
-  panel.style.display='block';
-  panel.innerHTML='<div style="margin:10px 0 6px;font-size:13px;font-weight:700;color:#9C27B0">👁 主持视角（仅你可见）</div>'+items;
+  panel.innerHTML='<div style="margin:6px 0;font-size:13px;font-weight:700;color:#9C27B0">👁 主持视角（仅你可见）</div>'+items;
 }
 function endSpyGame(civWin){
   var s=window._spyState; if(!s) return;
@@ -8315,14 +8367,33 @@ function renderNotesList(){
   }
   grid.innerHTML = list.map(function(n){
     var date = n.updated ? new Date(n.updated).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    var bodyPreview = (n.body||'').replace(/\s+/g,' ').trim().slice(0,60) || '无附加文案';
+    var bodyPreview = (n.body||'').replace(/\s+/g,' ').trim().slice(0,120) || '无附加文案';
     var srcTag = n.fromJournal ? ' <span style="font-size:10px;background:#F6FFED;color:#52C41A;padding:1px 6px;border-radius:8px;vertical-align:middle">📒 来自日志</span>' : '';
-    return '<div class="card" style="padding:12px;cursor:pointer;transition:.15s" onclick="openNoteEditor(\''+(n.id||'')+'\')">'+
+    return '<div class="card" style="padding:12px;cursor:pointer;transition:.15s;max-height:145px;overflow:hidden" onclick="viewNoteFull(\''+(n.id||'')+'\')">'+
       '<div style="font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.title||'未命名')+srcTag+'</div>'+
-      '<div style="font-size:12px;color:var(--text-light);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(bodyPreview)+'</div>'+
-      '<div style="font-size:11px;color:var(--text-light);margin-top:8px">'+date+'</div>'+
+      '<div style="font-size:12px;color:var(--text-light);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(bodyPreview)+'</div>'+
+      '<div style="font-size:11px;color:var(--text-light);margin-top:6px">'+date+'</div>'+
       '</div>';
   }).join('');
+}
+// v140: 笔记卡片点击查看全部内容（固定高度+弹窗）
+function viewNoteFull(id){
+  var d = getNotes();
+  var items = d.items || [];
+  var n = null;
+  for(var i=0;i<items.length;i++){ if(items[i].id===id){ n=items[i]; break; } }
+  if(!n) return;
+  var date = n.updated ? new Date(n.updated).toLocaleString('zh-CN') : '';
+  var srcTag = n.fromJournal ? ' <span style="font-size:11px;background:#F6FFED;color:#52C41A;padding:2px 8px;border-radius:8px">📒 来自日志</span>' : '';
+  _gm('noteViewModal',
+    '<div class="gm-header"><div class="gm-title">📝 '+esc(n.title||'未命名')+srcTag+'</div><button class="gm-close" onclick="closeGameModal(\'noteViewModal\')">✕</button></div>'+
+    '<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">'+esc(date)+'</div>'+
+    '<div style="font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word;padding:14px;background:#f8f9fa;border-radius:10px;max-height:55vh;overflow:auto">'+esc(n.body||'（无内容）')+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+      '<button class="btn-primary" style="flex:1" onclick="closeGameModal(\'noteViewModal\');openNoteEditor(\''+id+'\')">✏️ 编辑</button>'+
+      '<button class="btn-primary" style="flex:1;background:#999" onclick="closeGameModal(\'noteViewModal\')">关闭</button>'+
+    '</div>'
+  );
 }
 function openNoteEditor(id){
   document.getElementById('notesListView').style.display = 'none';
