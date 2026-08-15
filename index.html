@@ -1557,7 +1557,7 @@ body {
     <button class="filter-tab" onclick="clientSetTag(this,'战败')">💔 战败</button>
   </div>
   <div class="filter-row" id="clientTypeFilter" style="margin-top:8px">
-    <button class="filter-tab active" onclick="clientSetType(this,'全部')">全部类型</button>
+    <button class="filter-tab active" onclick="clientSetType(this,'全部')">分类</button>
     <button class="filter-tab" onclick="clientSetType(this,'财险')">🏢 财险</button>
     <button class="filter-tab" onclick="clientSetType(this,'TOB')">📜 TOB</button>
     <button class="filter-tab" onclick="clientSetType(this,'TOC')">👤 TOC</button>
@@ -3608,24 +3608,23 @@ function toggleTodo(el) {
   textEl.style.color = isDone ? 'var(--text-light)' : 'var(--text-primary)';
 }
 function deleteTodo(el) { if(confirm('确定删除这个待办吗？')) el.closest('.todo-item').remove(); }
-// 预约客户 → 待办展示（客户中心打「预约」标签并设置联系时间后，自动出现在待办里）
+// 预约客户 → 待办展示（客户设置了「下次需要联系的日期」后，自动出现在待办里）
 function renderAppointmentsTodos(){
   var box = document.getElementById('apptTodoBox'); if(!box) return;
   var list = getClients();
   var today = _today();
   var appts = list.filter(function(c){
-    return (c.apptDate || ((c.tags||[]).indexOf('预约')>=0 && c.followUpTime));
+    return c.apptDate;
   }).map(function(c){
-    var dt = (c.apptDate||'') + (c.followUpTime?(' '+c.followUpTime):'');
     var overdue = c.apptDate && c.apptDate < today;
     var isToday = c.apptDate === today;
-    return { c:c, dt:dt, overdue:overdue, isToday:isToday };
+    return { c:c, overdue:overdue, isToday:isToday };
   });
   // 排序：今天的优先，其次逾期未处理，再按日期升序
   appts.sort(function(a,b){
     if(a.isToday!==b.isToday) return a.isToday?-1:1;
     if(a.overdue!==b.overdue) return a.overdue?-1:1;
-    return (a.c.apptDate||'').localeCompare(b.c.apptDate||'') || (a.c.followUpTime||'').localeCompare(b.c.followUpTime||'');
+    return (a.c.apptDate||'').localeCompare(b.c.apptDate||'');
   });
   if(appts.length===0){ box.innerHTML=''; box.style.display='none'; return; }
   box.style.display='block';
@@ -3635,7 +3634,7 @@ function renderAppointmentsTodos(){
     return '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid #EB2F96">'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:14px;font-weight:600">📞 联系 '+esc(c.name)+badge+'</div>'+
-        '<div style="font-size:12px;color:var(--text-light);margin-top:3px">⏰ '+esc(o.dt)+(c.company?(' · '+esc(c.company)):'')+(c.phone?(' · '+esc(c.phone)):'')+'</div>'+
+        '<div style="font-size:12px;color:var(--text-light);margin-top:3px">⏰ '+esc(c.apptDate||'')+(c.company?(' · '+esc(c.company)):'')+(c.phone?(' · '+esc(c.phone)):'')+'</div>'+
       '</div>'+
       '<button class="btn-primary" style="flex-shrink:0;padding:6px 12px;font-size:13px" onclick="openClientForm(\''+c.id+'\')">查看客户</button>'+
     '</div>';
@@ -3871,7 +3870,7 @@ function renderClients(){
     var sub = [c.company||'', (c.tags||[]).indexOf('成交')>=0 && +c.amount ? '¥'+(+c.amount).toLocaleString() : ''].filter(Boolean).join(' · ');
     var appt = '';
     if(c.apptDate){
-      appt = '<div style="margin-top:4px;font-size:11px;color:#EB2F96;font-weight:500">📅 预约：'+(c.apptDate)+(c.followUpTime?(' '+c.followUpTime):'')+'</div>';
+      appt = '<div style="margin-top:4px;font-size:11px;color:#EB2F96;font-weight:500">📅 下次联系：'+(c.apptDate)+'</div>';
     }
     return '<div class="client-card" data-id="'+c.id+'">'+
       '<button type="button" class="client-del-reveal" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')">🗑 删除</button>'+
@@ -3918,7 +3917,7 @@ function inCurrentWeek(ds){
 function openClientForm(id){
   var c = id ? getClients().find(function(x){return x.id===id;}) : null;
   var isEdit = !!c;
-  c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财险', tags:[], amount:0, dealType:'财险', dealStatus:'承保', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:'', apptDate:'', followUpTime:''};
+  c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财险', tags:[], amount:0, dealType:'财险', dealStatus:'承保', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:'', apptDate:''};
   var isProp = c.type==='财险';
   var lblName = isProp?'车主':'姓名', lblTitle = isProp?'车牌':'职务', lblCompany = isProp?'车架号':'公司';
   var tagBtns = CL_TAGS.map(function(t){
@@ -3933,19 +3932,15 @@ function openClientForm(id){
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话</label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
     '<div class="form-group" style="flex:1"><label>类型</label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
     '<div class="form-group"><label>标签（可多选）</label><div id="clTags" style="display:flex;flex-wrap:wrap;gap:8px">'+tagBtns+'</div></div>'+
-    '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px">'+
-      '<div style="font-size:12px;font-weight:600;color:#EB2F96;margin-bottom:10px">📅 预约日期（重点客户下次联系时间）</div>'+
-      '<div class="form-row" style="display:flex;gap:10px">'+
-        '<div class="form-group" style="flex:1"><label>预约日期</label><input id="clApptDate" type="date" value="'+(c.apptDate||'')+'"></div>'+
-        '<div class="form-group" style="flex:1"><label>联系时间</label><input id="clFollowTime" type="time" value="'+(c.followUpTime||'')+'"></div>'+
-      '</div>'+
+    '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
+    '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px;margin-top:8px">'+
+      '<div class="form-group" style="margin:0"><label style="color:#EB2F96;font-weight:600">下次需要联系的日期</label><input id="clApptDate" type="date" value="'+(c.apptDate||'')+'"></div>'+
     '</div>'+
     '<div class="form-group"><label>成交金额(元)</label><input id="clAmount" type="number" value="'+(+c.amount||0)+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>状态</label><select id="clDealStatus"><option'+(c.dealStatus==='承保'?' selected':'')+'>承保</option><option'+(c.dealStatus==='已出具'?' selected':'')+'>已出具</option><option'+(c.dealStatus==='审批中'?' selected':'')+'>审批中</option><option'+(c.dealStatus==='材料准备'?' selected':'')+'>材料准备</option></select></div>'+
     '<div class="form-group" style="flex:1"><label id="clFeeLabelA">'+(c.type==='TOB'?'保函手续费A(元)':'手续费A(元)')+'</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">'+(c.type==='TOB'?'保函手续费B(元)':'手续费B(元)')+'</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div>'+
     '<div class="form-group" style="flex:1"><label>日期</label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div></div>'+
-    '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div class="form-group"><label>备注</label><textarea id="clNote" rows="2">'+esc(c.note||'')+'</textarea></div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
@@ -3982,7 +3977,7 @@ function saveClient(id, isEdit){
     feeB:parseFloat((document.getElementById('clFeeB')||{}).value)||0,
     dealDate:(document.getElementById('clDealDate')||{}).value||_today(),
     note:(document.getElementById('clNote')||{}).value||'', date:_today(), expireDate:(document.getElementById('clExpireDate')||{}).value||'',
-    apptDate:(document.getElementById('clApptDate')||{}).value||'', followUpTime:(document.getElementById('clFollowTime')||{}).value||'', dealType:(orig&&orig.dealType)?orig.dealType:'财险'
+    apptDate:(document.getElementById('clApptDate')||{}).value||'', dealType:(orig&&orig.dealType)?orig.dealType:'财险'
   };
   var list=getClients();
   if(isEdit){ var i=list.findIndex(function(x){return x.id===id;}); if(i>=0) list[i]=c; }
@@ -6120,13 +6115,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 144;                         // v144：客户类型改名（财险/TOB/TOC）；客户详情新增「预约日期」，卡片改为「今天预约客户 / 本周预约联系客户」并数据联动
+const WB_VERSION = 145;                         // v145：客户「下次需要联系的日期」字段搬到到期日下方、只留一个日期字段；客户页「全部类型」改名为「分类」
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 61;                  // v144 发版：60→61（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 62;                  // v145 发版：61→62（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
