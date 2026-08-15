@@ -1008,6 +1008,9 @@ body {
   <div class="sidebar-item" data-page="client" onclick="switchPage('client')">
     <span class="icon">👥</span><span class="label">客户</span>
   </div>
+  <div class="sidebar-item" data-page="client" onclick="openCloudSheets()" title="云端表格（WPS / 腾讯文档）">
+    <span class="icon">☁️</span><span class="label">云表格</span>
+  </div>
   <div class="sidebar-item" data-page="todo" onclick="switchPage('todo')">
     <span class="icon">✅</span><span class="label">待办</span>
   </div>
@@ -1176,6 +1179,7 @@ body {
     <div class="quick-item" data-qpage="performance" onclick="switchPage('performance')"><div class="qi-emoji">📊</div><span>工作</span></div>
     <div class="quick-item" data-qpage="performance" onclick="switchPage('performance'); document.getElementById('perfCarTab').click();"><div class="qi-emoji">🚗</div><span>计算</span></div>
     <div class="quick-item" data-qpage="client" onclick="switchPage('client')"><div class="qi-emoji">👥</div><span>客户</span></div>
+    <div class="quick-item" data-qpage="client" onclick="openCloudSheets()" title="WPS / 腾讯文档 在线表格"><div class="qi-emoji">☁️</div><span>云表格</span></div>
     <div class="quick-item" data-qpage="todo" onclick="switchPage('todo')"><div class="qi-emoji">✅</div><span>待办</span></div>
     <div class="quick-item" data-qpage="notes" onclick="switchPage('notes')"><div class="qi-emoji">📝</div><span>笔记</span></div>
     <div class="quick-item" data-qpage="english" onclick="switchPage('english')"><div class="qi-emoji">🔤</div><span>英语</span></div>
@@ -1596,7 +1600,7 @@ body {
     <button class="subtab" onclick="switchSub('cl',this,'cl-policy')">保单</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-guarantee')">保函</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-visit')">拜访</button>
-    <button class="subtab" onclick="switchSub('cl',this,'cl-cloud')">☁️ 云表格</button>
+    <button class="subtab" id="clCloudTab" onclick="switchSub('cl',this,'cl-cloud')">☁️ 云表格</button>
   </div>
 
   <!-- 客户列表 -->
@@ -3552,6 +3556,15 @@ function closeSidebar(){
   const ov=document.getElementById('sbOverlay');
   if(sb){ sb.classList.remove('open'); }
   if(ov){ ov.classList.remove('show'); }
+}
+
+// 跨页快捷：进入客户页并切换到「云表格」子页签
+function openCloudSheets(){
+  switchPage('client');
+  setTimeout(function(){
+    var btn = document.getElementById('clCloudTab');
+    if(btn) btn.click();
+  }, 60);
 }
 
 // Hub sub-tab switching
@@ -6130,13 +6143,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 146;                         // v146：云表格卡片去勾选/删按钮改 ⋮ 三点菜单（删除二次确认）；云表格顶部 Hero 卡删除；客户页新增「预约日」日期范围筛选
+const WB_VERSION = 147;                         // v147：「云表格」快捷入口——左侧导航栏 客户 下方 + 主页快捷入口 客户 后面，均跳转到客户页「云表格」子页签
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 63;                  // v146 发版：62→63（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 64;                  // v147 发版：63→64（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
