@@ -1582,6 +1582,15 @@ body {
     <button class="filter-tab" style="font-size:11px;padding:3px 10px" onclick="document.getElementById('clientExpireFrom').value='';document.getElementById('clientExpireTo').value='';renderClients()">清除</button>
   </div>
 
+  <!-- 预约日筛选（基于下次需要联系的日期） -->
+  <div class="date-filter-row" id="clientApptFilter" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span class="tf-label" style="font-size:11px">📅 预约日</span>
+    <input type="date" id="clientApptFrom" class="date-filter-input" onchange="renderClients()">
+    <span style="color:var(--text-light);font-size:12px">至</span>
+    <input type="date" id="clientApptTo" class="date-filter-input" onchange="renderClients()">
+    <button class="filter-tab" style="font-size:11px;padding:3px 10px" onclick="document.getElementById('clientApptFrom').value='';document.getElementById('clientApptTo').value='';renderClients()">清除</button>
+  </div>
+
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('cl',this,'cl-list')">客户</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-policy')">保单</button>
@@ -1660,12 +1669,6 @@ body {
 
   <!-- 云表格（腾讯文档/WPS 云端表格） -->
   <div class="subtab-content" id="cl-cloud">
-    <div class="card" style="background:linear-gradient(135deg,#E8F4FD,#F0E6FB);padding:16px;text-align:center">
-      <div style="font-size:28px;margin-bottom:8px">☁️</div>
-      <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:4px">云端表格</div>
-      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">连接 WPS / 腾讯文档 在线表格，查看和同步客户数据</div>
-    </div>
-
     <div class="section-label">🔗 快速链接</div>
     <div class="card" style="padding:0">
       <div class="list-item" onclick="window.open('https://docs.qq.com','_blank')" style="cursor:pointer">
@@ -1682,20 +1685,23 @@ body {
 
     <div class="section-label">📎 嵌入云表格</div>
     <style>
-      .cloud-sheet-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;transition:.15s}
-      .cloud-sheet-card.selected{border-color:var(--primary);background:rgba(74,144,217,.05)}
+      .cloud-sheet-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;transition:.15s;position:relative}
       .cloud-sheet-card .csc-row1{display:flex;align-items:center;gap:10px}
-      .cloud-sheet-card .csc-row1 input[type="checkbox"]{width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:var(--primary)}
       .cloud-sheet-card .csc-icon{width:36px;height:36px;background:#E6F4FF;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#2E7AE6;flex-shrink:0}
       .cloud-sheet-card .csc-name{flex:1;font-size:14px;font-weight:600;color:var(--text-primary);word-break:break-word}
+      .cloud-sheet-card .csc-more{width:28px;height:28px;background:transparent;border:none;font-size:18px;cursor:pointer;color:#999;border-radius:8px;display:flex;align-items:center;justify-content:center;line-height:1;transition:.15s;flex-shrink:0}
+      .cloud-sheet-card .csc-more:hover{background:#f3f4f6;color:#333}
+      .cloud-sheet-card .csc-menu{position:absolute;top:36px;right:14px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.08);min-width:130px;z-index:10;overflow:hidden}
+      .cloud-sheet-card .csc-menu .csc-menu-item{display:block;width:100%;padding:9px 14px;border:none;background:transparent;text-align:left;font-size:13px;cursor:pointer;color:#333;transition:.12s}
+      .cloud-sheet-card .csc-menu .csc-menu-item:hover{background:#f7f8fa}
+      .cloud-sheet-card .csc-menu .csc-menu-item.danger{color:#e44}
+      .cloud-sheet-card .csc-menu .csc-menu-item.danger:hover{background:#fff1f0}
       .cloud-sheet-card .csc-url{font-size:12px;color:#999;margin:8px 0 10px 46px;word-break:break-all;line-height:1.5}
       .cloud-sheet-card .csc-actions{display:flex;gap:8px;align-items:center;margin-left:46px}
       .cloud-sheet-card .csc-btn-open{flex:1;padding:9px 12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;font-weight:500;transition:.15s}
       .cloud-sheet-card .csc-btn-open:hover{opacity:.9}
       .cloud-sheet-card .csc-btn-copy{flex:1;padding:9px 12px;background:#f5f7fa;color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;font-weight:500;transition:.15s}
       .cloud-sheet-card .csc-btn-copy:hover{background:#eef0f4}
-      .cloud-sheet-card .csc-btn-delete{width:34px;height:34px;background:transparent;border:none;font-size:16px;cursor:pointer;color:#999;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:.15s}
-      .cloud-sheet-card .csc-btn-delete:hover{background:#fee;color:#e44}
       .cs-top-bar{display:flex;gap:8px;margin-bottom:12px;align-items:center}
       .cs-search-wrap{flex:1;position:relative;min-width:0}
       .cs-search-wrap .cs-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#999;font-size:14px;pointer-events:none}
@@ -1705,7 +1711,6 @@ body {
         .cs-top-bar{flex-wrap:wrap}
         .cs-search-wrap{flex:1 1 100%;order:1}
         .cs-top-bar .btn-primary{order:2;flex:1}
-        #cloudSheetBulkDelete{order:3;flex:1}
         .cloud-sheet-card .csc-url,.cloud-sheet-card .csc-actions{margin-left:0}
       }
     </style>
@@ -1715,7 +1720,6 @@ body {
         <input type="text" id="cloudSheetSearch" placeholder="搜索文档名称..." oninput="filterCloudSheets()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;outline:none;box-sizing:border-box">
       </div>
       <button class="btn-primary" onclick="addCloudSheet()" style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px">+ 单个添加</button>
-      <button id="cloudSheetBulkDelete" onclick="bulkDeleteCloudSheets()" style="display:none;flex-shrink:0;background:#fee;color:#e44;border:1px solid #fcc;border-radius:10px;padding:10px 14px;font-size:13px;cursor:pointer;font-weight:500">🗑 删除选中</button>
     </div>
     <div id="cloudSheetList"></div>
   </div>
@@ -3706,6 +3710,9 @@ function clientFiltered(list){
   // 到期日筛选
   var expFrom = ((document.getElementById('clientExpireFrom')||{}).value)||'';
   var expTo = ((document.getElementById('clientExpireTo')||{}).value)||'';
+  // 预约日筛选
+  var apptFrom = ((document.getElementById('clientApptFrom')||{}).value)||'';
+  var apptTo = ((document.getElementById('clientApptTo')||{}).value)||'';
   return list.filter(function(c){
     if(_clState.type!=='全部' && c.type!==_clState.type) return false;
     if(_clState.tag!=='全部' && (c.tags||[]).indexOf(_clState.tag)<0) return false;
@@ -3730,6 +3737,17 @@ function clientFiltered(list){
         if(expTo && ed > new Date(expTo+'T23:59:59')) return false;
       } else {
         // 无到期日的客户在开启到期日筛选时不显示
+        return false;
+      }
+    }
+    // 预约日范围筛选（基于 apptDate）
+    if(apptFrom || apptTo){
+      var ad = new Date(c.apptDate || '');
+      if(!isNaN(ad.getTime())){
+        if(apptFrom && ad < new Date(apptFrom+'T00:00:00')) return false;
+        if(apptTo && ad > new Date(apptTo+'T23:59:59')) return false;
+      } else {
+        // 无预约日的客户在开启预约日筛选时不显示
         return false;
       }
     }
@@ -4672,7 +4690,7 @@ function getCloudSheets(){
 function saveCloudSheets(list){
   try { localStorage.setItem(CLOUD_SHEETS_KEY, JSON.stringify(list)); } catch(e){}
 }
-var _cloudSheetsSelected = {}; // id -> true，选中状态（用于批量删除）
+var _cloudSheetsMenuId = null; // 当前打开 ⋮ 菜单的文档 id
 function renderCloudSheets(){
   var list = getCloudSheets();
   var filterEl = document.getElementById('cloudSheetSearch');
@@ -4685,40 +4703,42 @@ function renderCloudSheets(){
     : list;
   var box = document.getElementById('cloudSheetList');
   if(!box) return;
+  _cloudSheetsMenuId = null;
   if(!filtered.length){
     box.innerHTML = '<div class="cs-empty">' + (list.length ? '没有匹配的文档' : '暂无云文档，点击「+ 单个添加」添加') + '</div>';
     return;
   }
   box.innerHTML = filtered.map(function(s){
-    var sel = _cloudSheetsSelected[s.id] ? ' selected' : '';
-    var checked = _cloudSheetsSelected[s.id] ? 'checked' : '';
-    return '<div class="cloud-sheet-card' + sel + '" data-id="' + esc(s.id) + '">' +
+    return '<div class="cloud-sheet-card" data-id="' + esc(s.id) + '">' +
       '<div class="csc-row1">' +
-        '<input type="checkbox" ' + checked + ' onchange="toggleCloudSheetSelect(\'' + esc(s.id) + '\', this.checked)">' +
         '<div class="csc-icon">📄</div>' +
         '<div class="csc-name">' + esc(s.name||'(未命名)') + '</div>' +
+        '<button type="button" class="csc-more" onclick="event.stopPropagation();toggleCloudSheetMenu(\'' + esc(s.id) + '\')" title="更多">⋮</button>' +
       '</div>' +
       '<div class="csc-url">' + esc(s.url||'') + '</div>' +
       '<div class="csc-actions">' +
         '<button class="csc-btn-open" onclick="openCloudSheet(\'' + esc(s.id) + '\')">↗ 打开</button>' +
         '<button class="csc-btn-copy" onclick="copyCloudSheet(\'' + esc(s.id) + '\')">📋 复制</button>' +
-        '<button class="csc-btn-delete" onclick="deleteCloudSheet(\'' + esc(s.id) + '\')" title="删除">🗑</button>' +
       '</div>' +
     '</div>';
   }).join('');
 }
-function toggleCloudSheetSelect(id, checked){
-  if(checked) _cloudSheetsSelected[id] = true;
-  else delete _cloudSheetsSelected[id];
-  renderCloudSheets();
-  updateBulkDeleteBtn();
-}
-function updateBulkDeleteBtn(){
-  var btn = document.getElementById('cloudSheetBulkDelete');
-  if(!btn) return;
-  var n = Object.keys(_cloudSheetsSelected).length;
-  btn.style.display = n > 0 ? '' : 'none';
-  btn.textContent = '🗑 删除选中 (' + n + ')';
+function toggleCloudSheetMenu(id){
+  var box = document.getElementById('cloudSheetList'); if(!box) return;
+  var cards = box.querySelectorAll('.cloud-sheet-card');
+  cards.forEach(function(card){
+    var cid = card.getAttribute('data-id');
+    var m = card.querySelector('.csc-menu');
+    if(m){ m.parentNode.removeChild(m); }
+    if(cid === id && cid !== _cloudSheetsMenuId){
+      var menu = document.createElement('div');
+      menu.className = 'csc-menu';
+      menu.innerHTML = '<button type="button" class="csc-menu-item danger" onclick="event.stopPropagation();deleteCloudSheet(\'' + esc(id) + '\')">🗑 删除</button>';
+      card.appendChild(menu);
+      _cloudSheetsMenuId = id;
+    }
+  });
+  if(_cloudSheetsMenuId !== id) _cloudSheetsMenuId = null;
 }
 function filterCloudSheets(){
   renderCloudSheets();
@@ -4756,24 +4776,19 @@ function fallbackCopyText(text){
   document.body.removeChild(ta);
 }
 function deleteCloudSheet(id){
-  if(!confirm('确定删除这个云文档吗？')) return;
+  var s = getCloudSheets().find(function(x){ return x.id === id; });
+  if(!s){ toast('文档不存在'); return; }
+  if(!confirm('确定要删除云文档「'+(s.name||'(未命名)')+'」吗？\n此操作不可撤销。')) return;
+  if(!confirm('再次确认：删除后无法恢复，是否继续？')) return;
   var list = getCloudSheets().filter(function(x){ return x.id !== id; });
   saveCloudSheets(list);
-  delete _cloudSheetsSelected[id];
+  _cloudSheetsMenuId = null;
   renderCloudSheets();
-  updateBulkDeleteBtn();
   toast('已删除');
 }
 function bulkDeleteCloudSheets(){
-  var ids = Object.keys(_cloudSheetsSelected);
-  if(!ids.length) return;
-  if(!confirm('确定删除选中的 ' + ids.length + ' 个云文档吗？')) return;
-  var list = getCloudSheets().filter(function(x){ return !_cloudSheetsSelected[x.id]; });
-  saveCloudSheets(list);
-  _cloudSheetsSelected = {};
-  renderCloudSheets();
-  updateBulkDeleteBtn();
-  toast('已删除选中项');
+  // 已弃用：v146 改为三点菜单单项删除，不再支持批量删除
+  return;
 }
 function addCloudSheet(){
   var name = prompt('请输入文档名称：');
@@ -6115,13 +6130,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 145;                         // v145：客户「下次需要联系的日期」字段搬到到期日下方、只留一个日期字段；客户页「全部类型」改名为「分类」
+const WB_VERSION = 146;                         // v146：云表格卡片去勾选/删按钮改 ⋮ 三点菜单（删除二次确认）；云表格顶部 Hero 卡删除；客户页新增「预约日」日期范围筛选
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 62;                  // v145 发版：61→62（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 63;                  // v146 发版：62→63（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7720,6 +7735,13 @@ function closeConfirmDel(){
       document.querySelectorAll('.swipe-item.swiped').forEach(function(el){
         el.style.transform = ''; el.classList.remove('swiped');
       });
+    }
+    // 云表格 ⋮ 菜单：点击卡片外部关闭
+    if(_cloudSheetsMenuId && !e.target.closest('.cloud-sheet-card')){
+      document.querySelectorAll('.cloud-sheet-card .csc-menu').forEach(function(m){
+        if(m.parentNode) m.parentNode.removeChild(m);
+      });
+      _cloudSheetsMenuId = null;
     }
   });
 })();
