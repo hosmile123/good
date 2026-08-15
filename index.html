@@ -473,6 +473,96 @@ body {
 .client-del-reveal:active { opacity: .85; }
 .tag-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 16px; font-size: 13px; border: 1px solid var(--border); background: #fff; cursor: pointer; transition: .15s; }
 .tag-toggle.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ===== v148 客户卡片视觉优化：临近到期 / 临近联系日期高亮 ===== */
+/* 卡片整体：圆角 + 左边框色带 */
+.client-card {
+  border-radius: 14px;
+  margin-bottom: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 5px solid #d9e1ec;
+  box-shadow: 0 1px 3px rgba(15,23,42,.04);
+  transition: box-shadow .18s, transform .18s, border-color .18s;
+}
+.client-card:hover { box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+.client-card.client-urgent {
+  border-left-color: #ff4d4f;
+  box-shadow: -3px 0 12px rgba(255,77,79,.18), 0 2px 8px rgba(255,77,79,.10);
+  background: linear-gradient(90deg, rgba(255,77,79,.04), #fff 30%);
+}
+.client-card.client-warn {
+  border-left-color: #fa8c16;
+  box-shadow: -3px 0 12px rgba(250,140,22,.18), 0 2px 8px rgba(250,140,22,.08);
+  background: linear-gradient(90deg, rgba(250,140,22,.04), #fff 30%);
+}
+.client-card.client-ok {
+  border-left-color: #52c41a;
+  box-shadow: -3px 0 12px rgba(82,196,26,.16), 0 2px 6px rgba(82,196,26,.06);
+  background: linear-gradient(90deg, rgba(82,196,26,.03), #fff 30%);
+}
+/* 客户卡片新结构（v148 垂直布局） */
+.client-card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  position: relative;
+  z-index: 2;
+  background: transparent;       /* 颜色由 .client-card 控制 */
+  cursor: pointer;
+  transition: transform .2s;
+}
+.client-row1 { display: flex; align-items: center; gap: 10px; }
+.client-row1 .client-avatar { width: 38px; height: 38px; font-size: 15px; flex-shrink: 0; }
+.client-row1 .client-head { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.client-row1 .client-head .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.client-row1 .client-head .client-sub { font-size: 12px; color: var(--text-light); font-weight: 400; }
+.client-type-chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0f5ff; color: #2b6fd6; vertical-align: middle; margin-left: 4px; font-weight: 500; }
+.client-row1 .client-head .client-edit { margin-left: auto; color: var(--text-light); font-size: 16px; padding: 2px 4px; cursor: pointer; }
+.client-row1 .client-head .client-edit:hover { color: var(--primary); }
+.client-row2 { font-size: 12px; color: var(--text-secondary); line-height: 1.6; word-break: break-all; }
+.client-row2 .cm-sep { color: var(--text-light); margin: 0 6px; }
+.client-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.client-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 14px;
+  font-size: 12px; font-weight: 500;
+  background: #f1f5f9; color: var(--text-secondary);
+}
+.client-chip.chip-warn   { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+.client-chip.chip-urgent { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+.client-chip.chip-ok     { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+/* 行动按钮：橙/红胶囊 */
+.client-act-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: 14px;
+  font-size: 12px; font-weight: 600;
+  border: none; color: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.10);
+}
+.client-act-btn.act-red    { background: linear-gradient(135deg,#ff4d4f,#ff7875); box-shadow: 0 2px 6px rgba(255,77,79,.28); }
+.client-act-btn.act-orange { background: linear-gradient(135deg,#fa8c16,#ffa940); box-shadow: 0 2px 6px rgba(250,140,22,.28); }
+.client-act-btn.act-blue   { background: linear-gradient(135deg,#1890ff,#40a9ff); }
+.client-row4 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.client-row4 .client-note { font-size: 12px; color: var(--text-secondary); background: #f8fafc; padding: 4px 10px; border-radius: 10px; }
+/* 状态徽章（考虑/成交/已报价/加微 等） — 紧凑版用于 row1 */
+.client-tag-mini { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.client-tag-mini.t-deal      { background: #f6ffed; color: #389e0d; }
+.client-tag-mini.t-quote     { background: #e6f7ff; color: #1890ff; }
+.client-tag-mini.t-consider  { background: #fff7e6; color: #d46b08; }
+.client-tag-mini.t-reject    { background: #fff1f0; color: #cf1322; }
+.client-tag-mini.t-wx        { background: #f9f0ff; color: #722ed1; }
+.client-tag-mini.t-appt      { background: #fff0f6; color: #eb2f96; }
+.client-tag-mini.t-noans     { background: #fafafa; color: #8c8c8c; }
+.client-tag-mini.t-lost      { background: #fce4ec; color: #c62828; }
+.client-tag-mini.t-comm_settled   { background: #e6fffa; color: #13c2c2; }
+.client-tag-mini.t-comm_unsettled { background: #fff2e8; color: #fa541c; }
+/* 电脑端 ≥768px：双列网格（v148 客户卡片） */
+@media (min-width: 768px) {
+  #clientCardList { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  #clientCardList .client-card { margin-bottom: 0; }
+}
 .modal-form .form-group { margin-bottom: 12px; }
 .modal-form label { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; }
 .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; outline: none; box-sizing: border-box; }
@@ -3895,32 +3985,100 @@ function renderClients(){
   var rows = clientFiltered(list);
   if(rows.length===0){ box.innerHTML=''; var e=document.getElementById('clientEmpty'); if(e) e.hidden=false; return; }
   var e=document.getElementById('clientEmpty'); if(e) e.hidden=true;
+  var todayStr = _today();
   box.innerHTML = rows.map(function(c){
+    // 紧急度（用于卡片左边框色）
+    var lvl = clientUrgencyLevel(c, todayStr); // 'urgent' / 'warn' / 'ok' / ''
+    var clsUrg = lvl ? (' client-' + lvl) : '';
     var avatar = (c.name||'?').slice(0,1);
     var av = CL_TYPE_COLOR[c.type] ? 'background:'+CL_TYPE_COLOR[c.type] : '';
-    var sub = [c.company||'', (c.tags||[]).indexOf('成交')>=0 && +c.amount ? '¥'+(+c.amount).toLocaleString() : ''].filter(Boolean).join(' · ');
-    var appt = '';
-    if(c.apptDate){
-      appt = '<div style="margin-top:4px;font-size:11px;color:#EB2F96;font-weight:500">📅 下次联系：'+(c.apptDate)+'</div>';
+    // Row1：头像 + 姓名 + 类型chip + 状态徽章 + 编辑
+    var headName = '<span class="client-name">'+esc(c.name||'')+'</span>'
+      + (c.title? ' <span class="client-sub">'+esc(c.title)+'</span>':'')
+      + (c.type? ' <span class="client-type-chip">'+esc(c.type)+'</span>':'');
+    var headTags = (c.tags||[]).map(function(t){ return '<span class="client-tag-mini t-'+CL_TAG_CLASS[t]+'">'+t+'</span>'; }).join('');
+    var row1 = '<div class="client-row1">'
+      + '<div class="client-avatar" style="'+av+'">'+esc(avatar)+'</div>'
+      + '<div class="client-head">' + headName + ' ' + headTags
+      +   '<span class="client-edit" onclick="event.stopPropagation();openClientForm(\''+c.id+'\')" title="编辑">✏️</span>'
+      + '</div></div>';
+    // Row2：信息行（公司/车牌 + 职务/电话 等）— 用换行渲染
+    var infoBits = [];
+    if(c.type==='财险'){
+      if(c.title) infoBits.push('车牌 '+esc(c.title));
+      if(c.company) infoBits.push('车架号 '+esc(c.company));
+    } else {
+      if(c.company) infoBits.push(esc(c.company));
+      if(c.title) infoBits.push(esc(c.title));
     }
-    return '<div class="client-card" data-id="'+c.id+'">'+
-      '<button type="button" class="client-del-reveal" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')">🗑 删除</button>'+
-      '<div class="client-card-inner">'+
-        '<div class="client-avatar" style="'+av+'">'+esc(avatar)+'</div>'+
-        '<div class="client-info">'+
-          '<div class="client-name">'+esc(c.name||'')+(c.title?' <span class="client-sub">'+esc(c.title)+'</span>':'')+(c.expireDate?' <span class="client-exp">⏰ '+esc(c.expireDate)+'</span>':'')+'</div>'+
-          '<div class="client-meta-row">'+
-            (c.company?'<span class="cm">'+esc(c.company)+'</span>':'')+
-            (c.phone?'<span class="cm">📞 '+esc(c.phone)+'</span>':'')+
-            (c.dealDate?'<span class="cm">📅 '+esc(c.dealDate)+'</span>':'')+
-            clientTagHTML(c)+
-          '</div>'+
-          appt+
-        '</div>'+
-        '<div class="client-action">›</div>'+
-      '</div></div>';
+    if(c.phone) infoBits.push('📞 '+esc(c.phone));
+    var row2 = infoBits.length ? '<div class="client-row2">' + infoBits.join('<span class="cm-sep">·</span>') + '</div>' : '';
+    // Row3：日期 chip — 联系 + 到期
+    var chips = [];
+    if(c.apptDate){
+      var apptLevel = dateUrgencyLevel(c.apptDate, todayStr, 'appt');
+      var apptChipCls = apptLevel==='urgent' ? 'chip-urgent' : (apptLevel==='warn' ? 'chip-warn' : '');
+      chips.push('<span class="client-chip '+apptChipCls+'">📅 联系 '+esc(c.apptDate)+'</span>');
+    }
+    if(c.expireDate){
+      var expLevel = dateUrgencyLevel(c.expireDate, todayStr, 'expire');
+      var expChipCls = expLevel==='urgent' ? 'chip-urgent' : (expLevel==='warn' ? 'chip-warn' : '');
+      chips.push('<span class="client-chip '+expChipCls+'">⏰ 到期 '+esc(c.expireDate)+'</span>');
+    }
+    var row3 = chips.length ? '<div class="client-row3 client-chips">' + chips.join('') + '</div>' : '';
+    // Row4：行动按钮 + 备注
+    var row4Bits = [];
+    if(c.apptDate){
+      var apptLevel = dateUrgencyLevel(c.apptDate, todayStr, 'appt');
+      var label, btnCls;
+      if(apptLevel==='urgent'){ label = '今日联系 ' + c.apptDate; btnCls = 'act-red'; }
+      else if(apptLevel==='warn'){ label = '本周联系 ' + c.apptDate; btnCls = 'act-orange'; }
+      else { label = '计划联系 ' + c.apptDate; btnCls = 'act-red'; }
+      row4Bits.push('<span class="client-act-btn '+btnCls+'">📞 '+esc(label)+'</span>');
+    }
+    if(c.note){ row4Bits.push('<span class="client-note">📝 '+esc(c.note)+'</span>'); }
+    var row4 = row4Bits.length ? '<div class="client-row4">' + row4Bits.join('') + '</div>' : '';
+
+    return '<div class="client-card'+clsUrg+'" data-id="'+c.id+'">'
+      + '<button type="button" class="client-del-reveal" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')">🗑 删除</button>'
+      + '<div class="client-card-inner">'
+      +   row1 + row2 + row3 + row4
+      + '</div></div>';
   }).join('');
   bindClientSwipe();
+}
+// 卡片紧急度等级：用于左边框色
+function clientUrgencyLevel(c, todayStr){
+  // 优先级：任一字段 urgent 触发 urgent；任一字段 warn 触发 warn
+  if(c.apptDate   && dateUrgencyLevel(c.apptDate,   todayStr, 'appt')  ==='urgent') return 'urgent';
+  if(c.expireDate && dateUrgencyLevel(c.expireDate, todayStr, 'expire')==='urgent') return 'urgent';
+  if(c.apptDate   && dateUrgencyLevel(c.apptDate,   todayStr, 'appt')  ==='warn')   return 'warn';
+  if(c.expireDate && dateUrgencyLevel(c.expireDate, todayStr, 'expire')==='warn')   return 'warn';
+  return '';
+}
+// 日期紧急度等级
+// mode='appt'  联系日：今天=urgent，本周内(含过去)=warn，其余='
+// mode='expire' 到期日：≤7天（含已过期）=urgent，≤30天=warn，其余='
+function dateUrgencyLevel(ds, todayStr, mode){
+  if(!ds) return '';
+  var today = new Date(todayStr + 'T00:00:00');
+  var d = new Date(ds + 'T00:00:00');
+  if(isNaN(d.getTime())) return '';
+  var diffDays = Math.floor((d - today) / 86400000);
+  var day = today.getDay();
+  var diffToMon = (day===0?6:day-1);
+  var mon = new Date(today); mon.setDate(today.getDate()-diffToMon); mon.setHours(0,0,0,0);
+  var sun = new Date(mon); sun.setDate(mon.getDate()+7);
+
+  if(mode === 'appt'){
+    if(diffDays === 0) return 'urgent';        // 今天
+    if(d >= mon && d < sun) return 'warn';     // 本周内（含过去的本周）
+    return '';
+  }
+  // expire
+  if(diffDays <= 7) return 'urgent';           // 已过期 或 7天内
+  if(diffDays <= 30) return 'warn';            // 8~30天
+  return '';
 }
 function clientSetTag(btn, tag){
   if(btn){ document.querySelectorAll('#clientTagFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active'); }
@@ -6143,13 +6301,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 147;                         // v147：「云表格」快捷入口——左侧导航栏 客户 下方 + 主页快捷入口 客户 后面，均跳转到客户页「云表格」子页签
+const WB_VERSION = 148;                         // v148：客户卡片视觉优化——按临近到期/联系日期左边框变色（红/橙/蓝），日期 chip + 行动按钮按紧急度变色；电脑端改为双列网格；卡片改为垂直四行布局（header/info/dates/action）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 64;                  // v147 发版：63→64（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 65;                  // v148 发版：64→65（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
