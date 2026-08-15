@@ -1558,9 +1558,9 @@ body {
   </div>
   <div class="filter-row" id="clientTypeFilter" style="margin-top:8px">
     <button class="filter-tab active" onclick="clientSetType(this,'全部')">全部类型</button>
-    <button class="filter-tab" onclick="clientSetType(this,'财产险')">🏢 财产险</button>
-    <button class="filter-tab" onclick="clientSetType(this,'保函')">📜 保函</button>
-    <button class="filter-tab" onclick="clientSetType(this,'个人')">👤 个人</button>
+    <button class="filter-tab" onclick="clientSetType(this,'财险')">🏢 财险</button>
+    <button class="filter-tab" onclick="clientSetType(this,'TOB')">📜 TOB</button>
+    <button class="filter-tab" onclick="clientSetType(this,'TOC')">👤 TOC</button>
     <button class="filter-tab" onclick="clientSetType(this,'团险')">🤝 团险</button>
   </div>
 
@@ -1597,9 +1597,9 @@ body {
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'成交')"><div class="cs-num" style="color:var(--success)" id="csDeal">0</div><div class="cs-label">成交</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'已报价')"><div class="cs-num" style="color:var(--primary)" id="csQuote">0</div><div class="cs-label">已报价</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'加微')"><div class="cs-num" style="color:#722ED1" id="csWx">0</div><div class="cs-label">加微</div></div>
-      <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'预约')"><div class="cs-num" style="color:#EB2F96" id="csAppt">0</div><div class="cs-label">预约</div></div>
+      <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('today')"><div class="cs-num" style="color:#EB2F96" id="csTodayAppt">0</div><div class="cs-label">今天预约客户</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'无人')"><div class="cs-num" style="color:#8C8C8C" id="csNoAns">0</div><div class="cs-label">无人</div></div>
-      <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'战败')"><div class="cs-num" style="color:#C62828" id="csLost">0</div><div class="cs-label">战败</div></div>
+      <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('week')"><div class="cs-num" style="color:#FA8C16" id="csWeekAppt">0</div><div class="cs-label">本周预约联系客户</div></div>
       <div class="cs-item" style="cursor:pointer; background: linear-gradient(135deg, #FFF7E6, #FFE7BA)" onclick="document.getElementById('clientExpireFrom').value=_today(); var d=new Date();d.setDate(d.getDate()+30); document.getElementById('clientExpireTo').value=d.toISOString().slice(0,10); renderClients()"><div class="cs-num" style="color:#FA8C16" id="csExpiring">0</div><div class="cs-label">30天内到期</div></div>
     </div>
     <div class="search-bar"><input type="text" id="clientSearch" placeholder="搜索客户名称、公司..." oninput="renderClients()"></div>
@@ -1615,7 +1615,7 @@ body {
       <div class="ps-card orange"><div class="ps-num" style="color:var(--warning)" id="psExpiring">0</div><div class="ps-label">即将到期</div></div>
       <div class="ps-card red"><div class="ps-num" style="color:var(--danger)" id="psRenew">0</div><div class="ps-label">待续保</div></div>
     </div>
-    <div class="section-label">保单列表（财产险成交客户）</div>
+    <div class="section-label">保单列表（财险成交客户）</div>
     <div class="card" style="padding:0" id="policyList"></div>
   </div>
 
@@ -2319,7 +2319,7 @@ body {
     <div class="plan-card" data-name="商务英语基础" onclick="selectPlan(this)">
       <div class="plan-head"><span class="plan-emoji">💼</span><span class="plan-title">商务英语基础（销售向）</span></div>
       <div class="plan-meta">适合：跑业务 / 写邮件 / 见客户 · 约 6 周</div>
-      <div class="plan-desc">贴合你财产险与保函工作，学完能发英文邮件、打电话。</div>
+      <div class="plan-desc">贴合你财险与TOB工作，学完能发英文邮件、打电话。</div>
       <div class="plan-week">📅 第1-2周 邮件写作｜第3-4周 电话/报价用语｜第5-6周 会议/客户拜访表达</div>
       <button class="badge-btn plan-btn" onclick="event.stopPropagation();selectPlan(this.closest('.plan-card'))">选用此计划</button>
     </div>
@@ -3614,18 +3614,18 @@ function renderAppointmentsTodos(){
   var list = getClients();
   var today = _today();
   var appts = list.filter(function(c){
-    return (c.tags||[]).indexOf('预约')>=0 && (c.followUpDate||c.followUpTime);
+    return (c.apptDate || ((c.tags||[]).indexOf('预约')>=0 && c.followUpTime));
   }).map(function(c){
-    var dt = (c.followUpDate||'') + (c.followUpTime?(' '+c.followUpTime):'');
-    var overdue = c.followUpDate && c.followUpDate < today;
-    var isToday = c.followUpDate === today;
+    var dt = (c.apptDate||'') + (c.followUpTime?(' '+c.followUpTime):'');
+    var overdue = c.apptDate && c.apptDate < today;
+    var isToday = c.apptDate === today;
     return { c:c, dt:dt, overdue:overdue, isToday:isToday };
   });
   // 排序：今天的优先，其次逾期未处理，再按日期升序
   appts.sort(function(a,b){
     if(a.isToday!==b.isToday) return a.isToday?-1:1;
     if(a.overdue!==b.overdue) return a.overdue?-1:1;
-    return (a.c.followUpDate||'').localeCompare(b.c.followUpDate||'') || (a.c.followUpTime||'').localeCompare(b.c.followUpTime||'');
+    return (a.c.apptDate||'').localeCompare(b.c.apptDate||'') || (a.c.followUpTime||'').localeCompare(b.c.followUpTime||'');
   });
   if(appts.length===0){ box.innerHTML=''; box.style.display='none'; return; }
   box.style.display='block';
@@ -3675,27 +3675,28 @@ function selectMood(btn) {
 // ===== 客户中心：统一数据层（新增/删除/筛选/标签/与业绩打通） =====
 var CL_TAGS = ['成交','已报价','考虑','拒绝','加微','佣金已结算','佣金未结算','预约','无人','战败'];
 var CL_TAG_CLASS = {'成交':'deal','已报价':'quote','考虑':'consider','拒绝':'reject','加微':'wx','佣金已结算':'comm_settled','佣金未结算':'comm_unsettled','预约':'appt','无人':'noans','战败':'lost'};
-var CL_TYPE_COLOR = {'财产险':'linear-gradient(135deg,#1890FF,#40A9FF)','保函':'linear-gradient(135deg,#52C41A,#73D13D)','个人':'linear-gradient(135deg,#EB2F96,#F759AB)','团险':'linear-gradient(135deg,#FA8C16,#FFA940)'};
-var _clState = {tag:'全部', type:'全部'};
+var CL_TYPE_COLOR = {'财险':'linear-gradient(135deg,#1890FF,#40A9FF)','TOB':'linear-gradient(135deg,#52C41A,#73D13D)','TOC':'linear-gradient(135deg,#EB2F96,#F759AB)','团险':'linear-gradient(135deg,#FA8C16,#FFA940)'};
+var _clState = {tag:'全部', type:'全部', appt:null};
 
 function clKey(){ return 'wb_clients_' + (WB_SESSION||'guest'); }
 function getClients(){
   var c = _load(clKey(), null);
   if(c===null){ c = _seedClients(); _save(clKey(), c); }
+  else { c.forEach(function(x){ if(x.followUpDate && !x.apptDate){ x.apptDate = x.followUpDate; } }); }
   return c;
 }
 function saveClients(c){ _save(clKey(), c); }
 function _seedClients(){
   return [
-    {id:_uid(), name:'张建国', title:'总经理', company:'万达商业管理有限公司', phone:'138****0011', type:'财产险', tags:['成交','加微'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-08-01', note:'企财险续保意向强', date:'2026-08-01'},
-    {id:_uid(), name:'陈芳', title:'财务总监', company:'华为技术有限公司', phone:'139****0022', type:'财产险', tags:['成交'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-28', note:'企财险年单', date:'2026-07-28'},
-    {id:_uid(), name:'刘洋', title:'个体经营', company:'洋帆货运代理', phone:'137****0033', type:'财产险', tags:['成交'], amount:18500, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-15', note:'货运险', date:'2026-07-15'},
-    {id:_uid(), name:'李明', title:'工程部经理', company:'中国建筑第三工程局', phone:'136****0044', type:'保函', tags:['成交','佣金未结算'], amount:5000000, dealType:'保函', dealStatus:'审批中', dealDate:'2026-07-25', feeA:18000, feeB:2000, note:'投标保函', date:'2026-07-25'},
-    {id:_uid(), name:'周强', title:'项目经理', company:'中铁建设集团', phone:'135****0055', type:'保函', tags:['成交','加微','佣金已结算'], amount:8000000, dealType:'保函', dealStatus:'已出具', dealDate:'2026-07-18', feeA:20000, feeB:3000, note:'履约保函', date:'2026-07-18'},
-    {id:_uid(), name:'王磊', title:'采购主管', company:'中交集团', phone:'134****0066', type:'保函', tags:['已报价'], amount:0, note:'港口扩建保函报价中', date:'2026-07-22'},
-    {id:_uid(), name:'赵敏', title:'行政经理', company:'富力地产', phone:'133****0077', type:'财产险', tags:['考虑'], amount:0, note:'对比几家具企财险方案', date:'2026-07-30'},
-    {id:_uid(), name:'孙浩', title:'老板', company:'宏远贸易', phone:'132****0088', type:'个人', tags:['加微','已报价'], amount:0, note:'加微信，待推货运险', date:'2026-08-02'},
-    {id:_uid(), name:'吴桐', title:'财务', company:'绿地集团', phone:'131****0099', type:'财产险', tags:['拒绝'], amount:0, note:'已选别家', date:'2026-07-20'}
+    {id:_uid(), name:'张建国', title:'总经理', company:'万达商业管理有限公司', phone:'138****0011', type:'财险', tags:['成交','加微'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-08-01', apptDate:'2026-08-15', note:'企财险续保意向强', date:'2026-08-01'},
+    {id:_uid(), name:'陈芳', title:'财务总监', company:'华为技术有限公司', phone:'139****0022', type:'财险', tags:['成交'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-28', apptDate:'2026-08-13', note:'企财险年单', date:'2026-07-28'},
+    {id:_uid(), name:'刘洋', title:'个体经营', company:'洋帆货运代理', phone:'137****0033', type:'财险', tags:['成交'], amount:18500, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-15', note:'货运险', date:'2026-07-15'},
+    {id:_uid(), name:'李明', title:'工程部经理', company:'中国建筑第三工程局', phone:'136****0044', type:'TOB', tags:['成交','佣金未结算'], amount:5000000, dealType:'保函', dealStatus:'审批中', dealDate:'2026-07-25', apptDate:'2026-08-16', feeA:18000, feeB:2000, note:'投标保函', date:'2026-07-25'},
+    {id:_uid(), name:'周强', title:'项目经理', company:'中铁建设集团', phone:'135****0055', type:'TOB', tags:['成交','加微','佣金已结算'], amount:8000000, dealType:'保函', dealStatus:'已出具', dealDate:'2026-07-18', apptDate:'2026-08-20', feeA:20000, feeB:3000, note:'履约保函', date:'2026-07-18'},
+    {id:_uid(), name:'王磊', title:'采购主管', company:'中交集团', phone:'134****0066', type:'TOB', tags:['已报价'], amount:0, note:'港口扩建保函报价中', date:'2026-07-22'},
+    {id:_uid(), name:'赵敏', title:'行政经理', company:'富力地产', phone:'133****0077', type:'财险', tags:['考虑'], amount:0, note:'对比几家具企财险方案', date:'2026-07-30'},
+    {id:_uid(), name:'孙浩', title:'老板', company:'宏远贸易', phone:'132****0088', type:'TOC', tags:['加微','已报价'], amount:0, note:'加微信，待推货运险', date:'2026-08-02'},
+    {id:_uid(), name:'吴桐', title:'财务', company:'绿地集团', phone:'131****0099', type:'财险', tags:['拒绝'], amount:0, note:'已选别家', date:'2026-07-20'}
   ];
 }
 function clientFiltered(list){
@@ -3709,6 +3710,8 @@ function clientFiltered(list){
   return list.filter(function(c){
     if(_clState.type!=='全部' && c.type!==_clState.type) return false;
     if(_clState.tag!=='全部' && (c.tags||[]).indexOf(_clState.tag)<0) return false;
+    if(_clState.appt==='today' && c.apptDate!==_today()) return false;
+    if(_clState.appt==='week' && !inCurrentWeek(c.apptDate)) return false;
     if(kw){ var hay=(c.name+' '+(c.company||'')+' '+(c.note||'')+' '+c.tags.join(' ')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
     // 日期范围筛选（基于 dealDate 或 date）
     if(dateFrom || dateTo){
@@ -3850,8 +3853,10 @@ function renderClients(){
   var all = list.length;
   var cnt = {}; CL_TAGS.forEach(function(t){ cnt[t]=0; });
   list.forEach(function(c){ (c.tags||[]).forEach(function(t){ if(cnt[t]!==undefined) cnt[t]++; }); });
-  setText('csAll', all); setText('csDeal', cnt['成交']||0); setText('csQuote', cnt['已报价']||0); setText('csWx', cnt['加微']||0);
-  setText('csAppt', cnt['预约']||0); setText('csNoAns', cnt['无人']||0); setText('csLost', cnt['战败']||0);
+  setText('csAll', all);   setText('csDeal', cnt['成交']||0); setText('csQuote', cnt['已报价']||0); setText('csWx', cnt['加微']||0);
+  var todayCnt = list.filter(function(c){ return c.apptDate===_today(); }).length;
+  var weekCnt = list.filter(function(c){ return inCurrentWeek(c.apptDate); }).length;
+  setText('csTodayAppt', todayCnt); setText('csNoAns', cnt['无人']||0); setText('csWeekAppt', weekCnt);
   // 30天内到期统计
   var now = new Date(), expThresh = new Date(); expThresh.setDate(expThresh.getDate() + 30);
   var expiringCnt = list.filter(function(c){ var ed = c.expireDate; if(!ed) return false; var d = new Date(ed); return !isNaN(d.getTime()) && d >= now && d <= expThresh; }).length;
@@ -3865,8 +3870,8 @@ function renderClients(){
     var av = CL_TYPE_COLOR[c.type] ? 'background:'+CL_TYPE_COLOR[c.type] : '';
     var sub = [c.company||'', (c.tags||[]).indexOf('成交')>=0 && +c.amount ? '¥'+(+c.amount).toLocaleString() : ''].filter(Boolean).join(' · ');
     var appt = '';
-    if((c.tags||[]).indexOf('预约')>=0 && (c.followUpDate||c.followUpTime)){
-      appt = '<div style="margin-top:4px;font-size:11px;color:#EB2F96;font-weight:500">📅 预约联系：'+(c.followUpDate||'未设日期')+(c.followUpTime?(' '+c.followUpTime):'')+'</div>';
+    if(c.apptDate){
+      appt = '<div style="margin-top:4px;font-size:11px;color:#EB2F96;font-weight:500">📅 预约：'+(c.apptDate)+(c.followUpTime?(' '+c.followUpTime):'')+'</div>';
     }
     return '<div class="client-card" data-id="'+c.id+'">'+
       '<button type="button" class="client-del-reveal" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')">🗑 删除</button>'+
@@ -3889,17 +3894,32 @@ function renderClients(){
 }
 function clientSetTag(btn, tag){
   if(btn){ document.querySelectorAll('#clientTagFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active'); }
-  _clState.tag = tag; renderClients();
+  _clState.tag = tag; _clState.appt = null; renderClients();
 }
 function clientSetType(btn, type){
   document.querySelectorAll('#clientTypeFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active');
-  _clState.type = type; renderClients();
+  _clState.type = type; _clState.appt = null; renderClients();
+}
+function clientSetAppt(scope){
+  _clState.appt = (_clState.appt===scope) ? null : scope;
+  _clState.tag = '全部'; _clState.type = '全部';
+  var tf=document.querySelectorAll('#clientTagFilter .filter-tab'); tf.forEach(function(t){t.classList.remove('active');}); if(tf[0]) tf[0].classList.add('active');
+  var yf=document.querySelectorAll('#clientTypeFilter .filter-tab'); yf.forEach(function(t){t.classList.remove('active');}); if(yf[0]) yf[0].classList.add('active');
+  renderClients();
+}
+function inCurrentWeek(ds){
+  if(!ds) return false;
+  var d = new Date(ds+'T00:00:00'); if(isNaN(d.getTime())) return false;
+  var now = new Date(); var day = now.getDay(); var diffToMon = (day===0?6:day-1);
+  var mon = new Date(now); mon.setDate(now.getDate()-diffToMon); mon.setHours(0,0,0,0);
+  var sun = new Date(mon); sun.setDate(mon.getDate()+7);
+  return d >= mon && d < sun;
 }
 function openClientForm(id){
   var c = id ? getClients().find(function(x){return x.id===id;}) : null;
   var isEdit = !!c;
-  c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财产险', tags:[], amount:0, dealType:'财险', dealStatus:'承保', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:''};
-  var isProp = c.type==='财产险';
+  c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财险', tags:[], amount:0, dealType:'财险', dealStatus:'承保', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:'', apptDate:'', followUpTime:''};
+  var isProp = c.type==='财险';
   var lblName = isProp?'车主':'姓名', lblTitle = isProp?'车牌':'职务', lblCompany = isProp?'车架号':'公司';
   var tagBtns = CL_TAGS.map(function(t){
     var on = (c.tags||[]).indexOf(t)>=0 ? 'on':'';
@@ -3911,19 +3931,19 @@ function openClientForm(id){
     '<div class="form-group" style="flex:1"><label id="clLblTitle">'+lblTitle+'</label><input id="clTitle" value="'+esc(c.title||'')+'"></div></div>'+
     '<div class="form-group"><label id="clLblCompany">'+lblCompany+'</label><input id="clCompany" value="'+esc(c.company||'')+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话</label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
-    '<div class="form-group" style="flex:1"><label>类型</label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财产险'?' selected':'')+'>财产险</option><option'+(c.type==='保函'?' selected':'')+'>保函</option><option'+(c.type==='个人'?' selected':'')+'>个人</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
+    '<div class="form-group" style="flex:1"><label>类型</label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
     '<div class="form-group"><label>标签（可多选）</label><div id="clTags" style="display:flex;flex-wrap:wrap;gap:8px">'+tagBtns+'</div></div>'+
-    '<div id="clApptFields" style="display:'+((c.tags||[]).indexOf('预约')>=0?'block':'none')+';background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px">'+
-      '<div style="font-size:12px;font-weight:600;color:#EB2F96;margin-bottom:10px">📅 预约联系时间</div>'+
+    '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px">'+
+      '<div style="font-size:12px;font-weight:600;color:#EB2F96;margin-bottom:10px">📅 预约日期（重点客户下次联系时间）</div>'+
       '<div class="form-row" style="display:flex;gap:10px">'+
-        '<div class="form-group" style="flex:1"><label>联系日期</label><input id="clFollowDate" type="date" value="'+(c.followUpDate||'')+'"></div>'+
+        '<div class="form-group" style="flex:1"><label>预约日期</label><input id="clApptDate" type="date" value="'+(c.apptDate||'')+'"></div>'+
         '<div class="form-group" style="flex:1"><label>联系时间</label><input id="clFollowTime" type="time" value="'+(c.followUpTime||'')+'"></div>'+
       '</div>'+
     '</div>'+
     '<div class="form-group"><label>成交金额(元)</label><input id="clAmount" type="number" value="'+(+c.amount||0)+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>状态</label><select id="clDealStatus"><option'+(c.dealStatus==='承保'?' selected':'')+'>承保</option><option'+(c.dealStatus==='已出具'?' selected':'')+'>已出具</option><option'+(c.dealStatus==='审批中'?' selected':'')+'>审批中</option><option'+(c.dealStatus==='材料准备'?' selected':'')+'>材料准备</option></select></div>'+
-    '<div class="form-group" style="flex:1"><label id="clFeeLabelA">'+(c.type==='保函'?'保函手续费A(元)':'手续费A(元)')+'</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
-    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">'+(c.type==='保函'?'保函手续费B(元)':'手续费B(元)')+'</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div>'+
+    '<div class="form-group" style="flex:1"><label id="clFeeLabelA">'+(c.type==='TOB'?'保函手续费A(元)':'手续费A(元)')+'</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
+    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">'+(c.type==='TOB'?'保函手续费B(元)':'手续费B(元)')+'</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div>'+
     '<div class="form-group" style="flex:1"><label>日期</label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div></div>'+
     '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div class="form-group"><label>备注</label><textarea id="clNote" rows="2">'+esc(c.note||'')+'</textarea></div>'+
@@ -3936,32 +3956,33 @@ function openClientForm(id){
   var m=document.getElementById('clientModal'); m.innerHTML=html; m.style.display='flex';
   m.onclick=function(e){ if(e.target===m) closeModal('clientModal'); };
 }
-function clToggleTag(btn, tag){ btn.classList.toggle('on'); if(tag==='预约'){ var af=document.getElementById('clApptFields'); if(af) af.style.display=btn.classList.contains('on')?'block':'none'; } }
+function clToggleTag(btn, tag){ btn.classList.toggle('on'); }
 function clTypeChange(){
-  var t = (document.getElementById('clType')||{}).value||'财产险';
+  var t = (document.getElementById('clType')||{}).value||'财险';
   var lA = document.getElementById('clFeeLabelA'), lB = document.getElementById('clFeeLabelB');
-  if(t === '保函'){ if(lA) lA.textContent = '保函手续费A(元)'; if(lB) lB.textContent = '保函手续费B(元)'; }
+  if(t === 'TOB'){ if(lA) lA.textContent = '保函手续费A(元)'; if(lB) lB.textContent = '保函手续费B(元)'; }
   else { if(lA) lA.textContent = '手续费A(元)'; if(lB) lB.textContent = '手续费B(元)'; }
   var ln = document.getElementById('clLblName'), lt = document.getElementById('clLblTitle'), lc = document.getElementById('clLblCompany');
-  if(t === '财产险'){ if(ln) ln.textContent='车主'; if(lt) lt.textContent='车牌'; if(lc) lc.textContent='车架号'; }
+  if(t === '财险'){ if(ln) ln.textContent='车主'; if(lt) lt.textContent='车牌'; if(lc) lc.textContent='车架号'; }
   else { if(ln) ln.textContent='姓名'; if(lt) lt.textContent='职务'; if(lc) lc.textContent='公司'; }
   // 到期日所有类型均显示（不再仅限财产险）
 }
 function saveClient(id, isEdit){
   var name=(document.getElementById('clName')||{}).value||'';
   if(!name.trim()){ toast('请输入客户姓名'); return; }
+  var orig = isEdit ? getClients().find(function(x){return x.id===id;}) : null;
   var tags=[]; document.querySelectorAll('#clTags .tag-toggle.on').forEach(function(b){ tags.push(b.getAttribute('data-tag')); });
   var c={
     id:id, name:name.trim(), title:(document.getElementById('clTitle')||{}).value||'',
     company:(document.getElementById('clCompany')||{}).value||'', phone:(document.getElementById('clPhone')||{}).value||'',
-    type:(document.getElementById('clType')||{}).value||'财产险', tags:tags,
+    type:(document.getElementById('clType')||{}).value||'财险', tags:tags,
     amount:parseFloat((document.getElementById('clAmount')||{}).value)||0,
     dealStatus:(document.getElementById('clDealStatus')||{}).value||'承保',
     feeA:parseFloat((document.getElementById('clFeeA')||{}).value)||0,
     feeB:parseFloat((document.getElementById('clFeeB')||{}).value)||0,
     dealDate:(document.getElementById('clDealDate')||{}).value||_today(),
     note:(document.getElementById('clNote')||{}).value||'', date:_today(), expireDate:(document.getElementById('clExpireDate')||{}).value||'',
-    followUpDate:(document.getElementById('clFollowDate')||{}).value||'', followUpTime:(document.getElementById('clFollowTime')||{}).value||''
+    apptDate:(document.getElementById('clApptDate')||{}).value||'', followUpTime:(document.getElementById('clFollowTime')||{}).value||'', dealType:(orig&&orig.dealType)?orig.dealType:'财险'
   };
   var list=getClients();
   if(isEdit){ var i=list.findIndex(function(x){return x.id===id;}); if(i>=0) list[i]=c; }
@@ -4110,7 +4131,7 @@ async function exportClientsExcel(){
 async function downloadClientTemplate(){
   try{
     // 示例行：财产险时用"职务"填车牌、"公司"填车架号
-    var sample = [{ name:'示例客户', title:'沪A12345', company:'LVWABC1234567890', phone:'13800000000', type:'财产险', tags:['成交'], amount:10000, dealType:'财险', dealStatus:'承保', feeA:100, feeB:20, dealDate:'2026-01-01', expireDate:'2026-12-31', note:'财产险：职务列填车牌、公司列填车架号' }];
+    var sample = [{ name:'示例客户', title:'沪A12345', company:'LVWABC1234567890', phone:'13800000000', type:'财险', tags:['成交'], amount:10000, dealType:'财险', dealStatus:'承保', feeA:100, feeB:20, dealDate:'2026-01-01', expireDate:'2026-12-31', note:'财险：职务列填车牌、公司列填车架号' }];
     toast('正在生成模板...');
     var filename = '客户导入模板_'+_today()+'.xlsx';
     // 前端纯 JS 生成（STORED）→ 首选
@@ -4486,7 +4507,7 @@ function _importClientRows(rows){
       title: colMap.title ? (cols[colMap.title]||'').trim() : '',
       company: colMap.company ? (cols[colMap.company]||'').trim() : '',
       phone: colMap.phone ? (cols[colMap.phone]||'').trim() : '',
-      type: colMap.type ? ((cols[colMap.type]||'').trim() || '财产险') : '财产险',
+      type: colMap.type ? ((cols[colMap.type]||'').trim() || '财险') : '财险',
       tags: tags,
       amount: colMap.amount ? (parseFloat(cols[colMap.amount]) || 0) : 0,
       dealType: colMap.dealType ? ((cols[colMap.dealType]||'').trim() || '财险') : '财险',
@@ -4780,7 +4801,7 @@ function addCloudSheet(){
 // ----- 保单 / 保函 子页（由成交客户派生） -----
 function renderPolicy(){
   // 财产险成交（类型=财产险 或 业务类型=财险/其他）
-  var list=getClients().filter(function(c){ return (c.tags||[]).indexOf('成交')>=0 && (c.type==='财产险'||c.dealType==='财险'||c.dealType==='其他'); });
+  var list=getClients().filter(function(c){ return (c.tags||[]).indexOf('成交')>=0 && (c.type==='财险'||c.dealType==='财险'||c.dealType==='其他'); });
   var box=document.getElementById('policyList'); if(!box) return;
   var valid=list.filter(function(c){ return PERF_ISSUED.indexOf(c.dealStatus)>=0; });
   var premium=valid.reduce(function(s,c){return s+(+c.amount||0);},0);
@@ -6099,13 +6120,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 143;                         // v143：「嵌入云表格」改为卡片式管理 UI——搜索 + 单个添加 + 卡片列表（打开/复制/删除/批量删除）；默认预填 2 个示例
+const WB_VERSION = 144;                         // v144：客户类型改名（财险/TOB/TOC）；客户详情新增「预约日期」，卡片改为「今天预约客户 / 本周预约联系客户」并数据联动
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 60;                  // v143 发版：59→60（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 61;                  // v144 发版：60→61（用户从 1 重新计数的展示号，跳过 4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -8937,7 +8958,7 @@ function renderPerformance(){
   const fee=_q('.fo-item.guarantee-fee .fo-value'); if(fee) fee.textContent=fmtMoney(s.fee);
   // 保单统计（由成交客户派生）
   const cls=getClients();
-  const pol=cls.filter(c=>(c.tags||[]).indexOf('成交')>=0 && (c.type==='财产险'||c.dealType==='财险'||c.dealType==='其他'));
+  const pol=cls.filter(c=>(c.tags||[]).indexOf('成交')>=0 && (c.type==='财险'||c.dealType==='财险'||c.dealType==='其他'));
   const expiring=pol.filter(c=>c.dealStatus==='审批中'||c.dealStatus==='材料准备').length;
   const renewing=pol.filter(c=>(c.tags||[]).indexOf('待续保')>=0 || (c.note||'').indexOf('续保')>=0).length;
   _qa('.ps-card').forEach(c=>{
