@@ -2658,6 +2658,7 @@ body {
     <div class="subtab-bar" style="margin-bottom:12px">
       <button class="subtab active" onclick="switchSub('diary',this,'diary-write')">✏️ 写日记</button>
       <button class="subtab" onclick="switchSub('diary',this,'diary-view')">📖 看日记</button>
+      <button class="subtab" onclick="switchSub('diary',this,'diary-vault')">🔒 保险箱</button>
       <button class="subtab" onclick="switchSub('diary',this,'diary-settings')">⚙️ 设置</button>
     </div>
     <div class="subtab-content active" id="diary-write">
@@ -2681,6 +2682,39 @@ body {
       </div>
       <div class="section-label">📖 日记列表</div>
       <div class="card" style="padding:0" id="diaryList"></div>
+    </div>
+    <div class="subtab-content" id="diary-vault">
+      <div class="card visit-form" style="position:relative;min-height:calc(100vh - 260px);display:flex;flex-direction:column">
+        <div class="form-group" style="flex:0 0 auto;margin-bottom:10px">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>📝 私密内容（自动保存到本机）</span>
+            <span style="font-size:11px;color:var(--text-light);font-weight:normal" id="vaultStatus">就绪</span>
+          </label>
+          <textarea id="vaultText" placeholder="在这里写下只有你知道的文字..." rows="10" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;resize:vertical;line-height:1.6;min-height:200px" oninput="vaultTextChanged()"></textarea>
+        </div>
+        <div class="form-group" style="flex:1;display:flex;flex-direction:column">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            <span>🖼 保险箱图片 <span id="vaultImgCount" style="font-size:11px;color:var(--text-light);font-weight:normal">(0 张)</span></span>
+            <button class="badge-btn" style="font-size:11px;padding:4px 10px;color:#ff4d4f;border-color:#ff4d4f" onclick="vaultClearAll()">🗑 清空</button>
+          </label>
+          <div id="vaultImageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;padding:10px;border:1px dashed var(--border);border-radius:10px;min-height:120px;background:#fafafa;flex:1;align-content:start"></div>
+        </div>
+        <!-- 右下角浮动按钮组 -->
+        <div style="position:absolute;right:18px;bottom:18px;display:flex;flex-direction:column;gap:12px;z-index:5">
+          <button onclick="vaultPickCamera()" title="拍照上传" style="width:54px;height:54px;border-radius:50%;border:none;background:var(--primary);color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 14px rgba(74,108,247,.35);display:flex;align-items:center;justify-content:center">📷</button>
+          <button onclick="vaultPickFile()" title="选择图片上传" style="width:54px;height:54px;border-radius:50%;border:none;background:var(--success);color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 14px rgba(82,196,26,.35);display:flex;align-items:center;justify-content:center">🖼️</button>
+        </div>
+        <!-- 隐藏的 input：相机 + 文件 -->
+        <input type="file" id="vaultCameraInput" accept="image/*" capture="environment" style="display:none" onchange="vaultFilesPicked(this)">
+        <input type="file" id="vaultFileInput" accept="image/*" multiple style="display:none" onchange="vaultFilesPicked(this)">
+        <!-- 图片预览 modal -->
+        <div id="vaultPreviewMask" onclick="closeVaultPreview()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;align-items:center;justify-content:center;cursor:zoom-out">
+          <img id="vaultPreviewImg" src="" style="max-width:92vw;max-height:88vh;border-radius:8px">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-light);text-align:center;margin-top:8px;line-height:1.6">
+        🔒 保险箱内容仅保存在本机浏览器（localStorage），不上传任何服务器，关闭浏览器不会丢失
+      </div>
     </div>
     <div class="subtab-content" id="diary-settings">
       <div class="section-label">🔑 密码设置</div>
@@ -3677,6 +3711,7 @@ function switchSub(group, btn, targetId) {
     if(group==='rt' && targetId==='rt-smoke'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }
     if(group==='td'){ renderAppointmentsTodos(); }
     if(group==='rt' && targetId==='rt-sleeprise'){ initSrForm(); renderRoutine(); }
+    if(group==='diary' && targetId==='diary-vault'){ try{ renderVault(); }catch(e){ console.error('renderVault:', e); } }
   } catch(e) { console.error('switchSub error:', e); }
 }
 
@@ -6301,13 +6336,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 148;                         // v148：客户卡片视觉优化——按临近到期/联系日期左边框变色（红/橙/蓝），日期 chip + 行动按钮按紧急度变色；电脑端改为双列网格；卡片改为垂直四行布局（header/info/dates/action）
+const WB_VERSION = 149;                         // v149：日记页新增「🔒 保险箱」子页签——顶部私密文字 textarea（输入即自动保存到本机 localStorage），下方图片网格（base64 存储、自动压缩 ≤1280px），右下角圆形浮动按钮 📷 拍照 + 🖼️ 上传
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 65;                  // v148 发版：64→65（用户从 1 重新计数的展示号，跳过 4）
+const WB_DISPLAY_VERSION = 66;                  // v149 发版：65→66（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7640,6 +7675,131 @@ function switchPageDiary(){
   document.getElementById('diaryPwInput').value = '';
   var pw2 = document.getElementById('diaryPwInput2'); if(pw2){ pw2.value = ''; pw2.style.display = 'none'; }
   renderDiaryGate();
+}
+
+/* ---------- 保险箱（私密文字 + 图片，本地存储） ---------- */
+function vaultKey(){ return 'wb_vault_' + (WB_SESSION||'guest'); }
+function getVault(){
+  var d = _load(vaultKey(), null);
+  if(d === null){ d = { text: '', images: [] }; _save(vaultKey(), d); }
+  if(typeof d.text !== 'string') d.text = '';
+  if(!Array.isArray(d.images)) d.images = [];
+  return d;
+}
+function saveVault(d){ _save(vaultKey(), d); }
+function renderVault(){
+  var d = getVault();
+  var ta = document.getElementById('vaultText');
+  if(ta && ta.value !== d.text) ta.value = d.text;
+  var grid = document.getElementById('vaultImageGrid');
+  if(grid){
+    var cnt = d.images.length;
+    document.getElementById('vaultImgCount').textContent = '('+cnt+' 张)';
+    if(cnt === 0){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);font-size:12px;padding:30px 0">还没有图片，点击右下角 📷 或 🖼️ 上传</div>';
+    } else {
+      grid.innerHTML = d.images.map(function(img, idx){
+        return '<div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:#eee;cursor:zoom-in" onclick="openVaultPreview('+idx+')">'+
+          '<img src="'+img.data+'" loading="lazy" style="width:100%;height:100%;object-fit:cover">'+
+          '<button onclick="event.stopPropagation();vaultRemoveImage('+idx+')" title="删除" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:1;cursor:pointer">×</button>'+
+        '</div>';
+      }).join('');
+    }
+  }
+}
+function vaultTextChanged(){
+  var d = getVault();
+  var ta = document.getElementById('vaultText');
+  if(!ta) return;
+  d.text = ta.value;
+  saveVault(d);
+  var s = document.getElementById('vaultStatus');
+  if(s){ s.textContent = '已保存 '+new Date().toLocaleTimeString('zh-CN',{hour12:false}); s.style.color = 'var(--success)'; }
+}
+function vaultPickCamera(){
+  var inp = document.getElementById('vaultCameraInput');
+  if(inp){ inp.value = ''; inp.click(); }
+}
+function vaultPickFile(){
+  var inp = document.getElementById('vaultFileInput');
+  if(inp){ inp.value = ''; inp.click(); }
+}
+function vaultFilesPicked(input){
+  if(!input || !input.files || !input.files.length) return;
+  var d = getVault();
+  var list = Array.prototype.slice.call(input.files);
+  var pending = list.length;
+  list.forEach(function(f){
+    if(!f.type || f.type.indexOf('image/') !== 0){ pending--; if(pending===0) finish(); return; }
+    // 大图压缩（>1.5MB 自动降到 ≤1280px 长边，JPEG 0.82）
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var src = ev.target.result;
+      compressImageForVault(src, 1280, 0.82, function(dataUrl){
+        d.images.push({ id: _uid(), data: dataUrl, ts: Date.now(), name: f.name||'' });
+        saveVault(d);
+        pending--;
+        if(pending === 0) finish();
+      });
+    };
+    reader.readAsDataURL(f);
+  });
+  function finish(){
+    renderVault();
+    toast('已上传 '+list.length+' 张');
+  }
+}
+function compressImageForVault(src, maxSide, quality, cb){
+  // 小图直接返回
+  var img = new Image();
+  img.onload = function(){
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if(w <= maxSide && h <= maxSide && src.length < 1500000){
+      cb(src); return;
+    }
+    var scale = Math.min(1, maxSide / Math.max(w, h));
+    var cw = Math.round(w * scale), ch = Math.round(h * scale);
+    var canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cw,ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    try{
+      var out = canvas.toDataURL('image/jpeg', quality);
+      cb(out);
+    }catch(e){ cb(src); }
+  };
+  img.onerror = function(){ cb(src); };
+  img.src = src;
+}
+function vaultRemoveImage(idx){
+  if(!confirm('删除这张图片？')) return;
+  var d = getVault();
+  if(!d.images[idx]) return;
+  d.images.splice(idx, 1);
+  saveVault(d);
+  renderVault();
+  toast('已删除');
+}
+function vaultClearAll(){
+  var d = getVault();
+  if(!d.text && d.images.length === 0){ toast('保险箱已经是空的'); return; }
+  if(!confirm('清空保险箱全部内容（文字+图片）？\n此操作不可恢复！')) return;
+  d.text = '';
+  d.images = [];
+  saveVault(d);
+  renderVault();
+  toast('已清空');
+}
+function openVaultPreview(idx){
+  var d = getVault();
+  if(!d.images[idx]) return;
+  document.getElementById('vaultPreviewImg').src = d.images[idx].data;
+  document.getElementById('vaultPreviewMask').style.display = 'flex';
+}
+function closeVaultPreview(){
+  document.getElementById('vaultPreviewMask').style.display = 'none';
+  document.getElementById('vaultPreviewImg').src = '';
 }
 
 /* ---------- 记账 ---------- */
