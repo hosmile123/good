@@ -109,6 +109,51 @@ body {
 .sidebar-item .icon { font-size: 21px; line-height: 1; }
 .sidebar-item .label { font-size: 10px; line-height: 1.1; text-align: center; }
 
+/* ===== 侧栏折叠（仅图标 + hover 提示） ===== */
+.sb-toggle-btn {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 300;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--primary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  transition: all .2s;
+}
+.sb-toggle-btn:hover { background: var(--primary); color: #fff; transform: scale(1.05); }
+body.sb-collapsed { --sidebar-width: 60px; }
+body.sb-collapsed .sidebar-item .label { display: none; }
+body.sb-collapsed .sidebar-group-label,
+body.sb-collapsed .sidebar-divider,
+body.sb-collapsed .sb-close { display: none; }
+body.sb-collapsed .sidebar-item { width: 48px; height: 48px; }
+body.sb-collapsed .sidebar-item:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 400;
+  pointer-events: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+}
+
 /* ===== Main Content ===== */
 .main-content {
   margin-left: var(--sidebar-width);
@@ -258,6 +303,11 @@ body {
   font-weight: 500;
 }
 .btn-primary:active { opacity: 0.85; }
+.btn { padding: 9px 16px; border-radius: 24px; font-size: 13px; cursor: pointer; font-weight: 500; border: 1px solid var(--border); background: #fff; color: var(--text-primary); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-outline { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+.btn-outline:hover { background: #f0f6ff; }
+.ua-tip { font-size: 12px; color: var(--text-light); background: #F6F8FB; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; line-height: 1.6; margin: 8px 0; }
 
 /* ===== Cards ===== */
 .card {
@@ -560,6 +610,7 @@ body {
 .client-row1 .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
 .client-row1 .client-name-block .client-type-chip { margin-left: 0; }
 .client-row1 .client-row1-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.client-owner-badge { font-size: 11px; font-weight: 600; color: #722ED1; background: #F9F0FF; border: 1px solid #EFE0FF; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
 .client-icon-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; padding: 0; }
 .client-icon-btn:hover { background: #f1f5f9; color: var(--primary); }
 .client-icon-btn.del:hover { background: #fff1f0; color: #ff4d4f; }
@@ -854,7 +905,11 @@ body {
 .login-card {
   width: 100%; max-width: 340px; background: #fff; border-radius: 20px;
   padding: 28px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.25); text-align: center;
+  position: relative; z-index: 1;
 }
+/* 自定义背景图层（工作台 + 登录页） */
+#wbBgLayer { position: fixed; inset: 0; z-index: -1; background-size: cover; background-position: center; background-repeat: no-repeat; display: none; }
+#wbLoginBg { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; background-repeat: no-repeat; display: none; }
 .login-logo { font-size: 40px; margin-bottom: 6px; }
 .login-title { font-size: 19px; font-weight: 700; color: #1a1a1a; }
 .login-sub { font-size: 12px; color: #999; margin: 6px 0 18px; }
@@ -922,6 +977,7 @@ body {
   .app-container { margin-top: 0 !important; border-radius: 0 !important; max-width: 100% !important; }
   .sidebar { display: none !important; }
   .sidebar.open { display: flex !important; }
+  .sb-toggle-btn { display: none !important; }
   .main-content { margin-left: 0 !important; padding-top: 0 !important; min-height: 100vh !important; }
   /* 手机端：隐藏顶部标题栏，内容直接贴顶 */
   .mob-topbar { display: none !important; }
@@ -1099,6 +1155,28 @@ body {
       <label>或上传图片</label>
       <input type="file" id="epUpload" accept="image/*" style="font-size:12px;width:100%">
     </div>
+    <div style="border-top:1px solid var(--border);margin:16px 0 8px;padding-top:12px;font-size:13px;font-weight:600;color:var(--text-light)">🎨 自定义背景</div>
+    <div class="ep-field">
+      <label>工作台背景图</label>
+      <input type="file" id="epWorkBg" accept="image/*" style="font-size:12px;width:100%">
+      <div id="epWorkBgPrev" style="margin-top:8px;display:none;position:relative">
+        <img style="max-width:100%;max-height:90px;border-radius:10px;border:1px solid var(--border)">
+        <button type="button" onclick="clearWorkBg()" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:12px;line-height:1">✕</button>
+      </div>
+    </div>
+    <div class="ep-field">
+      <label>登录页背景图</label>
+      <input type="file" id="epLoginBg" accept="image/*" style="font-size:12px;width:100%">
+      <div id="epLoginBgPrev" style="margin-top:8px;display:none;position:relative">
+        <img style="max-width:100%;max-height:90px;border-radius:10px;border:1px solid var(--border)">
+        <button type="button" onclick="clearLoginBg()" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:12px;line-height:1">✕</button>
+      </div>
+    </div>
+    <div class="ep-field">
+      <label>背景透明度：<span id="epOpacityVal">60</span>%</label>
+      <input type="range" id="epOpacity" min="0" max="100" value="60" style="width:100%" oninput="document.getElementById('epOpacityVal').textContent=this.value">
+      <div style="font-size:11px;color:#999;margin-top:4px">数值越大背景越清晰，越小越淡</div>
+    </div>
     <div style="border-top:1px solid var(--border);margin:16px 0 8px;padding-top:12px;text-align:center;font-size:13px;font-weight:600;color:var(--text-light)">🔒 修改登录密码</div>
     <div class="ep-field">
       <label>当前密码</label>
@@ -1124,6 +1202,8 @@ body {
 <div class="app-container">
 
 <!-- ===== Sidebar ===== -->
+<button class="sb-toggle-btn" id="sbToggleBtn" title="折叠/展开侧栏" onclick="toggleSbCollapse()">«</button>
+
 <nav class="sidebar" id="sidebar">
   <div class="sb-close" style="display:none;align-self:flex-end;padding:8px 12px;font-size:20px;cursor:pointer;color:var(--text-light);line-height:1" onclick="closeSidebar()">✕</div>
   <div class="sidebar-group-label">工作</div>
@@ -1136,7 +1216,7 @@ body {
   <div class="sidebar-item" data-page="client" onclick="switchPage('client')">
     <span class="icon">👥</span><span class="label">客户</span>
   </div>
-  <div class="sidebar-item" data-page="client" onclick="openCloudSheets()" title="云端表格（WPS / 腾讯文档）">
+  <div class="sidebar-item" data-page="cloud" onclick="switchPage('cloud')" title="云端表格（WPS / 腾讯文档）">
     <span class="icon">☁️</span><span class="label">云表格</span>
   </div>
   <div class="sidebar-item" data-page="todo" onclick="switchPage('todo')">
@@ -1167,6 +1247,22 @@ body {
     <span class="icon">💰</span><span class="label">记账</span>
   </div>
 </nav>
+
+<script>
+function toggleSbCollapse(){
+  var collapsed = document.body.classList.toggle('sb-collapsed');
+  var btn = document.getElementById('sbToggleBtn');
+  if(btn) btn.textContent = collapsed ? '»' : '«';
+  try{ localStorage.setItem('wb_sb_collapsed', collapsed?'1':'0'); }catch(e){}
+}
+(function(){
+  try{ if(localStorage.getItem('wb_sb_collapsed')==='1'){ document.body.classList.add('sb-collapsed'); var b=document.getElementById('sbToggleBtn'); if(b) b.textContent='»'; } }catch(e){}
+  document.querySelectorAll('.sidebar-item').forEach(function(el){
+    var lbl = el.querySelector('.label');
+    if(lbl){ var t = lbl.textContent.trim(); el.setAttribute('data-tip', t); el.setAttribute('title', t); }
+  });
+})();
+</script>
 
 <!-- ===== Mobile Top Bar（已彻底移除，内容直接贴顶） ===== -->
 <!-- 移动端右上角悬浮菜单已移除，相关入口统一放在首页「快捷入口」 -->
@@ -1307,7 +1403,7 @@ body {
     <div class="quick-item" data-qpage="performance" onclick="switchPage('performance')"><div class="qi-emoji">📊</div><span>工作</span></div>
     <div class="quick-item" data-qpage="performance" onclick="switchPage('performance'); document.getElementById('perfCarTab').click();"><div class="qi-emoji">🚗</div><span>计算</span></div>
     <div class="quick-item" data-qpage="client" onclick="switchPage('client')"><div class="qi-emoji">👥</div><span>客户</span></div>
-    <div class="quick-item" data-qpage="client" onclick="openCloudSheets()" title="WPS / 腾讯文档 在线表格"><div class="qi-emoji">☁️</div><span>云表格</span></div>
+    <div class="quick-item" data-qpage="cloud" onclick="switchPage('cloud')" title="WPS / 腾讯文档 在线表格"><div class="qi-emoji">☁️</div><span>云表格</span></div>
     <div class="quick-item" data-qpage="todo" onclick="switchPage('todo')"><div class="qi-emoji">✅</div><span>待办</span></div>
     <div class="quick-item" data-qpage="notes" onclick="switchPage('notes')"><div class="qi-emoji">📝</div><span>笔记</span></div>
     <div class="quick-item" data-qpage="english" onclick="switchPage('english')"><div class="qi-emoji">🔤</div><span>英语</span></div>
@@ -1322,6 +1418,7 @@ body {
     <div class="quick-item" id="lpQuickEntry" style="display:none" onclick="openLifePass()"><div class="qi-emoji">🔐</div><span>生活密码</span></div>
     <div class="quick-item admin-only" id="qaInviteItem" style="display:none" onclick="openInviteAdmin()"><div class="qi-emoji">🔑</div><span>邀请码</span></div>
     <div class="quick-item admin-only" id="qaResetItem" style="display:none" onclick="openResetCodesAdmin()"><div class="qi-emoji">🔢</div><span>找回码</span></div>
+    <div class="quick-item admin-only" id="qaAdminItem" style="display:none" onclick="openAdminPanel()"><div class="qi-emoji">🧑‍💼</div><span>账号管理</span></div>
   </div>
 
   <div class="home-bottom-grid">
@@ -1671,6 +1768,7 @@ body {
     <button class="badge-btn" onclick="openClientForm()">+ 新增</button>
     <button class="badge-btn" style="background:#217346;color:#fff;margin-left:6px" onclick="exportClientsExcel()">📤 导出</button>
     <button class="badge-btn" style="background:#2B579A;color:#fff;margin-left:6px" onclick="showImportMenu()">📥 导入</button>
+    <button class="badge-btn" id="clientAssignBtn" style="background:#722ED1;color:#fff;margin-left:6px;display:none" onclick="openAssignModal()">🔀 客户分配</button>
     <!-- 视觉隐藏（非 display:none）：保证微信/移动端 WebView 能通过 <label for> 原生弹出文件选择面板 -->
     <input type="file" id="clientImportFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px;top:-9999px" onchange="closeModal('clientModal'); importClientsExcel(this)">
     <input type="file" id="wechatImportFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px;top:-9999px" onchange="closeModal('clientModal'); importWechatFile(this)">
@@ -1695,6 +1793,9 @@ body {
     <button class="filter-tab" onclick="clientSetType(this,'TOC')">👤 TOC</button>
     <button class="filter-tab" onclick="clientSetType(this,'团险')">🤝 团险</button>
   </div>
+
+  <!-- 人员筛选（管理员可见全部人员；员工仅见自己） -->
+  <div class="filter-row" id="clientPersonFilter" style="margin-top:8px"></div>
 
   <!-- 日期筛选 -->
   <div class="date-filter-row" id="clientDateFilter" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1728,7 +1829,6 @@ body {
     <button class="subtab" onclick="switchSub('cl',this,'cl-policy')">保单</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-guarantee')">保函</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-visit')">拜访</button>
-    <button class="subtab" id="clCloudTab" onclick="switchSub('cl',this,'cl-cloud')">☁️ 云表格</button>
   </div>
 
   <!-- 客户列表 -->
@@ -1799,8 +1899,13 @@ body {
     <div class="wb-modal" id="visitModal"></div>
   </div>
 
-  <!-- 云表格（腾讯文档/WPS 云端表格） -->
-  <div class="subtab-content" id="cl-cloud">
+  </div><!-- /page-client -->
+
+  <div class="page" id="page-cloud">
+    <div class="page-header">
+      <div><div class="page-title">云表格</div><div class="page-subtitle">腾讯文档 / WPS 在线表格</div></div>
+    </div>
+
     <div class="section-label">🔗 快速链接</div>
     <div class="card" style="padding:0">
       <div class="list-item" onclick="window.open('https://docs.qq.com','_blank')" style="cursor:pointer">
@@ -1855,10 +1960,176 @@ body {
     </div>
     <div id="cloudSheetList"></div>
   </div>
-</div>
 
 <!-- 客户新增/编辑弹窗 -->
 <div class="wb-modal" id="clientModal"></div>
+
+<!-- 客户分配（管理员） -->
+<div id="assignModal" class="modal-mask" style="display:none">
+  <div class="modal-card" style="max-width:700px;text-align:left">
+    <div class="modal-title" style="text-align:center">🔀 客户分配</div>
+    <div class="ua-tip">勾选要分配给该人员的客户（已归属的也可重新分配）。保存后客户即计入该人员名下，并记录上一位归属人。</div>
+    <div style="margin:12px 0">
+      <label style="font-size:13px;font-weight:600">分配给</label>
+      <select id="assignTarget" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;margin-top:6px"></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:8px 0">
+      <input type="text" id="assignSearch" placeholder="搜索客户名称 / 公司..." oninput="renderAssignList()" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px">
+      <button class="btn btn-outline btn-sm" onclick="assignToggleAll(true)">全选</button>
+      <button class="btn btn-outline btn-sm" onclick="assignToggleAll(false)">取消</button>
+    </div>
+    <div id="assignList" style="max-height:46vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:4px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="assignSelectedClients()">✅ 分配到该人员</button>
+      <button class="btn btn-primary" style="flex:1;background:#999" onclick="closeAssignModal()">取消</button>
+    </div>
+  </div>
+</div>
+<script>
+function openAssignModal(){
+  if(!wbIsAdmin()){ toast('仅管理员可分配客户'); return; }
+  var sel = document.getElementById('assignTarget');
+  var opts = '';
+  wbAllAccounts().forEach(function(a){ if(a.role==='admin') return; opts += '<option value="'+a.email+'">'+esc(a.nick||a.email)+'</option>'; });
+  if(!opts){ toast('暂无人员账号，请先在「账号设置 → 账号管理」中创建'); return; }
+  sel.innerHTML = opts;
+  document.getElementById('assignSearch').value = '';
+  renderAssignList();
+  var m = document.getElementById('assignModal'); m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target===m) closeAssignModal(); };
+}
+function renderAssignList(){
+  var box = document.getElementById('assignList'); if(!box) return;
+  var kw = (document.getElementById('assignSearch').value||'').trim().toLowerCase();
+  var all = _loadAllClients();
+  var rows = all.filter(function(c){
+    if(c.ownerUid && c.ownerUid===WB_SESSION){ /* 管理员自己的也允许分配出去 */ }
+    var hay = (c.name+' '+(c.company||'')+' '+(c.title||'')).toLowerCase();
+    return !kw || hay.indexOf(kw)>=0;
+  });
+  if(!rows.length){ box.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px">没有匹配的客户</div>'; return; }
+  box.innerHTML = rows.map(function(c){
+    var owner = c.ownerUid||'guest';
+    var ownerName = accountNick(owner);
+    var assignedAt = c.assignedAt ? c.assignedAt : (c.date||'—');
+    var subj = c.type==='财险' ? (c.title||'') : (c.company||'');
+    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #f3f4f6;cursor:pointer">'
+      + '<input type="checkbox" class="assign-chk" value="'+c.id+'" style="width:18px;height:18px;flex-shrink:0">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:14px;font-weight:600">'+esc(c.name||'')+' <span style="font-size:11px;color:#999">'+esc(c.type||'')+'</span></div>'
+      +   '<div style="font-size:12px;color:#666">'+esc(subj)+' · 到期 '+(c.expireDate||'—')+' · 分配时间 '+(assignedAt||'—')+' · 当前归属 '+esc(ownerName)+'</div>'
+      + '</div></label>';
+  }).join('');
+}
+function assignToggleAll(on){ document.querySelectorAll('#assignList .assign-chk').forEach(function(chk){ chk.checked=on; }); }
+function assignSelectedClients(){
+  var target = document.getElementById('assignTarget').value; if(!target){ toast('请选择分配对象'); return; }
+  var chks = document.querySelectorAll('#assignList .assign-chk:checked');
+  if(!chks.length){ toast('请勾选要分配的客户'); return; }
+  var ids = {}; chks.forEach(function(chk){ ids[chk.value]=true; });
+  var all = _loadAllClients();
+  var nowISO = new Date().toISOString();
+  var moved = 0;
+  all.forEach(function(c){
+    if(ids[c.id]){
+      var fromUid = c.ownerUid||'guest';
+      if(fromUid!==target){
+        c.assignHistory = c.assignHistory||[];
+        c.assignHistory.unshift({ at: nowISO, fromUid: fromUid, fromNick: accountNick(fromUid), toUid: target, toNick: accountNick(target) });
+        c.ownerUid = target; c.assignedAt = nowISO.slice(0,10);
+        moved++;
+      }
+    }
+  });
+  ALL_CLIENTS = all; _save('wb_clients_all', ALL_CLIENTS);
+  toast('已分配 '+moved+' 位客户给 '+accountNick(target));
+  closeAssignModal(); renderClients(); renderPerformance(); renderHome();
+}
+function closeAssignModal(){ var m=document.getElementById('assignModal'); if(m) m.style.display='none'; }
+</script>
+
+<!-- 账号管理（管理员） -->
+<div id="adminPanelModal" class="modal-mask" style="display:none">
+  <div class="modal-card" style="max-width:720px;text-align:left">
+    <div class="modal-title" style="text-align:center">🧑‍💼 账号管理</div>
+    <div class="ua-tip">管理本工作台的人员账号：备注昵称、开关导出权限（默认关闭）、查看全部导出记录。分配客户请在「客户 → 客户分配」。</div>
+    <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="batchSetExport(true)">批量开启全部导出</button>
+      <button class="btn btn-outline btn-sm" onclick="batchSetExport(false)">批量关闭全部导出</button>
+      <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="openAllExportLogs()">📋 全部导出记录</button>
+    </div>
+    <div id="adminAccountList" style="max-height:50vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-outline" style="flex:1" onclick="promptAddAccount()">➕ 新增人员账号</button>
+      <button class="btn btn-primary" style="flex:1;background:#999" onclick="closeAdminPanel()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 全部导出记录（管理员） -->
+<div id="allExportLogsModal" class="modal-mask" style="display:none">
+  <div class="modal-card" style="max-width:560px;text-align:left">
+    <div class="modal-title" style="text-align:center">📋 全部导出记录</div>
+    <div class="ua-tip">所有账号的 Excel 客户导出记录（按时间倒序）。谁、何时、导出多少条、导出范围一目了然。</div>
+    <div id="allExportLogsList" style="max-height:55vh;overflow:auto"></div>
+    <div style="text-align:center;margin-top:12px"><button class="btn btn-primary" style="background:#999" onclick="document.getElementById('allExportLogsModal').style.display='none'">关闭</button></div>
+  </div>
+</div>
+
+<script>
+function openAdminPanel(){ if(!wbIsAdmin()){ toast('仅管理员可管理'); return; } renderAdminPanel(); var m=document.getElementById('adminPanelModal'); m.style.display='flex'; m.onclick=function(e){ if(e.target===m) closeAdminPanel(); }; }
+function renderAdminPanel(){
+  var box=document.getElementById('adminAccountList'); if(!box) return;
+  var accs=wbAllAccounts();
+  box.innerHTML = accs.map(function(a){
+    var isAdmin = a.role==='admin';
+    var expChk = (a.exportEnabled||isAdmin) ? 'checked' : '';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #f3f4f6">'
+      + '<div style="font-size:22px;flex-shrink:0">'+esc(a.avatar||'👤')+'</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<input value="'+esc(a.nick)+'" data-email="'+a.email+'" onchange="setAccountNick(this)" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600">'
+      +   '<div style="font-size:11px;color:#999;margin-top:2px">'+esc(a.email)+(isAdmin?' · 管理员':' · 人员')+'</div>'
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;white-space:nowrap;flex-shrink:0">导出<input type="checkbox" '+(isAdmin?'disabled ':'')+expChk+' onchange="toggleAccountExport(\''+a.email+'\', this.checked)"></label>'
+      + (isAdmin?'':'<button class="btn btn-outline btn-sm" style="color:#ff4d4f;border-color:#ffccc7;flex-shrink:0" onclick="deleteAccount(\''+a.email+'\')">删除</button>')
+      + '</div>';
+  }).join('');
+}
+function setAccountNick(inp){ var email=inp.getAttribute('data-email'); wbUpdateAccount(email, {nick: inp.value.trim()||email}); toast('已备注昵称：'+inp.value.trim()); }
+function toggleAccountExport(email, on){ wbUpdateAccount(email, {exportEnabled: on}); }
+function batchSetExport(on){ var a=wbAccounts(); Object.keys(a).forEach(function(k){ if(a[k].role!=='admin') a[k].exportEnabled=on; }); wbSaveAccounts(a); renderAdminPanel(); toast(on?'已开启全部人员导出':'已关闭全部人员导出'); }
+function deleteAccount(email){
+  if(!confirm('删除账号「'+accountNick(email)+'」？该账号下的客户不会被删除，将归入管理员名下。')) return;
+  var a=wbAccounts(); if(a[email]){ delete a[email]; wbSaveAccounts(a); }
+  var all=_loadAllClients(); all.forEach(function(c){ if((c.ownerUid||'guest')===email) c.ownerUid=WB_SESSION; }); ALL_CLIENTS=all; _save('wb_clients_all', ALL_CLIENTS);
+  renderAdminPanel(); renderClients(); renderPersonFilter(); toast('已删除账号，其客户归入管理员');
+}
+function promptAddAccount(){
+  var email = prompt('新增人员账号：请输入登录邮箱'); if(!email) return; email=email.trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast('邮箱格式不正确'); return; }
+  if(wbAccounts()[email]){ toast('该账号已存在'); return; }
+  var nick = prompt('为该账号备注昵称（方便分配客户）', email) || email;
+  wbUpdateAccount(email, {nick: nick, role:'staff', exportEnabled:false, exportLogs:[]});
+  renderAdminPanel(); toast('已新增人员：'+nick);
+}
+function openAllExportLogs(){
+  var box=document.getElementById('allExportLogsList');
+  var accs=wbAllAccounts();
+  var html='';
+  accs.forEach(function(a){
+    var logs=(wbAccounts()[a.email] && wbAccounts()[a.email].exportLogs) || [];
+    if(!logs.length) return;
+    logs.sort(function(x,y){ return (y.at||'').localeCompare(x.at||''); });
+    html += '<div style="margin:10px 0"><div style="font-size:13px;font-weight:700;color:#722ED1">'+esc(a.nick)+' <span style="font-size:11px;color:#999;font-weight:400">'+esc(a.email)+'</span></div>';
+    html += logs.map(function(l){ return '<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px dashed #eee">'+esc(l.at)+' · 导出 '+l.count+' 条 · '+(l.scope||'')+'</div>'; }).join('');
+    html += '</div>';
+  });
+  if(!html) html='<div style="text-align:center;color:#999;font-size:13px;padding:20px">暂无导出记录</div>';
+  box.innerHTML=html;
+  var m=document.getElementById('allExportLogsModal'); m.style.display='flex'; m.onclick=function(e){ if(e.target===m) m.style.display='none'; };
+}
+function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if(m) m.style.display='none'; }
+</script>
 
 <!-- ========== 待办 HUB ========== -->
 <div class="page" id="page-todo">
@@ -3697,6 +3968,7 @@ async function switchPage(pageId) {
   if(pageId === 'diary') switchPageDiary();
   if(pageId === 'notes') renderNotesList();
   if(pageId === 'todo') renderAppointmentsTodos();
+  if(pageId === 'cloud') renderCloudSheets();
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
   window.scrollTo(0, 0);
 }
@@ -3720,13 +3992,9 @@ function closeSidebar(){
   if(ov){ ov.classList.remove('show'); }
 }
 
-// 跨页快捷：进入客户页并切换到「云表格」子页签
+// 跨页快捷：进入独立的「云表格」页面
 function openCloudSheets(){
-  switchPage('client');
-  setTimeout(function(){
-    var btn = document.getElementById('clCloudTab');
-    if(btn) btn.click();
-  }, 60);
+  switchPage('cloud');
 }
 
 // Hub sub-tab switching
@@ -3855,16 +4123,48 @@ function selectMood(btn) {
 var CL_TAGS = ['成交','已报价','考虑','拒绝','加微','佣金已结算','佣金未结算','预约','无人','战败'];
 var CL_TAG_CLASS = {'成交':'deal','已报价':'quote','考虑':'consider','拒绝':'reject','加微':'wx','佣金已结算':'comm_settled','佣金未结算':'comm_unsettled','预约':'appt','无人':'noans','战败':'lost'};
 var CL_TYPE_COLOR = {'财险':'linear-gradient(135deg,#1890FF,#40A9FF)','TOB':'linear-gradient(135deg,#52C41A,#73D13D)','TOC':'linear-gradient(135deg,#EB2F96,#F759AB)','团险':'linear-gradient(135deg,#FA8C16,#FFA940)'};
-var _clState = {tag:'全部', type:'全部', appt:null};
+var _clState = {tag:'全部', type:'全部', appt:null, person:'all'};
 
-function clKey(){ return 'wb_clients_' + (WB_SESSION||'guest'); }
-function getClients(){
-  var c = _load(clKey(), null);
-  if(c===null){ c = _seedClients(); _save(clKey(), c); }
-  else { c.forEach(function(x){ if(x.followUpDate && !x.apptDate){ x.apptDate = x.followUpDate; } }); }
-  return c;
+// ===== 客户共享库（多账号 / ownerUid 归属） =====
+// 所有账号的客户统一存于 wb_clients_all；每条客户带 ownerUid（归属账号 = 登录邮箱）。
+// 普通账号只见自己 ownerUid === WB_SESSION 的客户；管理员可见全部并可分配。
+var ALL_CLIENTS = null; // 内存缓存
+function _clientStoreKey(){ return 'wb_clients_all'; }
+function _loadAllClients(){
+  if(ALL_CLIENTS) return ALL_CLIENTS;
+  var raw = _load(_clientStoreKey(), null);
+  if(raw && Array.isArray(raw)){ ALL_CLIENTS = raw; return ALL_CLIENTS; }
+  // 迁移：把旧的 per-session 存储合并进共享库，并打上 ownerUid（按旧 key 反推账号）
+  var migrated = [];
+  try {
+    var keys = [];
+    for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k && k.indexOf('wb_clients_')===0 && k!==_clientStoreKey()) keys.push(k); }
+    keys.forEach(function(k){
+      try { var arr = JSON.parse(localStorage.getItem(k)||'null'); if(Array.isArray(arr)){ arr.forEach(function(c){ if(c && !c.ownerUid) c.ownerUid = k.replace('wb_clients_',''); migrated.push(c); }); localStorage.removeItem(k); } }catch(e){}
+    });
+  } catch(e){}
+  if(migrated.length){ ALL_CLIENTS = migrated; _save(_clientStoreKey(), ALL_CLIENTS); return ALL_CLIENTS; }
+  // 首次：播种示例客户，归属当前账号
+  var seed = _seedClients();
+  seed.forEach(function(c){ if(!c.ownerUid) c.ownerUid = (WB_SESSION||'guest'); if(c.followUpDate && !c.apptDate){ c.apptDate = c.followUpDate; } });
+  ALL_CLIENTS = seed; _save(_clientStoreKey(), ALL_CLIENTS);
+  return ALL_CLIENTS;
 }
-function saveClients(c){ _save(clKey(), c); }
+function getClients(){
+  var all = _loadAllClients();
+  if(wbIsAdmin()) return all.slice();
+  var me = (WB_SESSION||'guest');
+  return all.filter(function(c){ return (c.ownerUid||'guest') === me; });
+}
+function saveClients(list){
+  if(!Array.isArray(list)) return;
+  list.forEach(function(c){ if(!c.ownerUid) c.ownerUid = (WB_SESSION||'guest'); });
+  // 仅替换本次涉及 owner 的数据，保留其他账号客户的完整性
+  var owners = {}; list.forEach(function(c){ owners[c.ownerUid]=true; });
+  var others = ALL_CLIENTS.filter(function(c){ return !owners[c.ownerUid||(WB_SESSION||'guest')]; });
+  ALL_CLIENTS = others.concat(list);
+  _save(_clientStoreKey(), ALL_CLIENTS);
+}
 function _seedClients(){
   return [
     {id:_uid(), name:'张建国', title:'总经理', company:'万达商业管理有限公司', phone:'138****0011', type:'财险', tags:['成交','加微'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-08-01', apptDate:'2026-08-15', note:'企财险续保意向强', date:'2026-08-01'},
@@ -3892,6 +4192,7 @@ function clientFiltered(list){
   return list.filter(function(c){
     if(_clState.type!=='全部' && c.type!==_clState.type) return false;
     if(_clState.tag!=='全部' && (c.tags||[]).indexOf(_clState.tag)<0) return false;
+    if(_clState.person!=='all' && (c.ownerUid||'guest')!==_clState.person) return false;
     if(_clState.appt==='today' && c.apptDate!==_today()) return false;
     if(_clState.appt==='week' && !inCurrentWeek(c.apptDate)) return false;
     if(kw){ var hay=(c.name+' '+(c.company||'')+' '+(c.note||'')+' '+c.tags.join(' ')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
@@ -4041,6 +4342,7 @@ function bindSwipeList(containerId){
   });
 }
 function renderClients(){
+  renderPersonFilter();
   var list = getClients();
   // 统计
   var all = list.length;
@@ -4068,6 +4370,8 @@ function renderClients(){
     // 派生状态徽章
     var st = clientDerivedStatus(c, todayStr);
     var stBadge = st ? '<span class="client-status '+st.cls+'"><span>'+(st.icon||'')+'</span><span>'+esc(st.label)+'</span></span>' : '';
+    // 归属徽章（管理员查看全部时显示客户属于哪位人员）
+    var ownerBadge = (wbIsAdmin() && c.ownerUid && c.ownerUid!==WB_SESSION) ? '<span class="client-owner-badge" title="归属人员">@'+esc(accountNick(c.ownerUid))+'</span>' : '';
     // Row1：头像 + 姓名 + 类型 + 状态徽章 + 编辑/删除
     var row1 =
       '<div class="client-row1">'
@@ -4077,6 +4381,7 @@ function renderClients(){
       +   (c.type? '<span class="client-type-chip">'+esc(c.type)+'</span>':'')
       + '</div>'
       + '<div class="client-row1-right">'
+      +   ownerBadge
       +   stBadge
       +   '<button type="button" class="client-icon-btn" onclick="event.stopPropagation();openClientForm(\''+c.id+'\')" title="编辑">✏️</button>'
       +   '<button type="button" class="client-icon-btn del" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')" title="删除">🗑</button>'
@@ -4223,6 +4528,26 @@ function clientSetType(btn, type){
   document.querySelectorAll('#clientTypeFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active');
   _clState.type = type; _clState.appt = null; renderClients();
 }
+// 人员筛选（管理员按账号昵称筛选；员工仅“全部/我”）
+function renderPersonFilter(){
+  var box = document.getElementById('clientPersonFilter'); if(!box) return;
+  var html = '<button class="filter-tab'+( _clState.person==='all'?' active':'')+'" onclick="clientSetPerson(this,\'all\')">👥 人员·全部</button>';
+  if(wbIsAdmin()){
+    wbAllAccounts().forEach(function(a){
+      if(a.role==='admin') return; // 管理员自己不列为“人员”
+      var on = (_clState.person===a.email)?' active':'';
+      html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+a.email+'\')">'+esc(a.nick||a.email)+'</button>';
+    });
+  } else {
+    html += '<button class="filter-tab'+( _clState.person===WB_SESSION?' active':'')+'" onclick="clientSetPerson(this,\''+(WB_SESSION||'guest')+'\')">我</button>';
+  }
+  box.innerHTML = html;
+}
+function clientSetPerson(btn, uid){
+  document.querySelectorAll('#clientPersonFilter .filter-tab').forEach(function(t){t.classList.remove('active');});
+  btn.classList.add('active');
+  _clState.person = uid; renderClients();
+}
 function clientSetAppt(scope){
   _clState.appt = (_clState.appt===scope) ? null : scope;
   _clState.tag = '全部'; _clState.type = '全部';
@@ -4303,6 +4628,7 @@ function saveClient(id, isEdit){
     note:(document.getElementById('clNote')||{}).value||'', date:_today(), expireDate:(document.getElementById('clExpireDate')||{}).value||'',
     apptDate:(document.getElementById('clApptDate')||{}).value||'', dealType:(orig&&orig.dealType)?orig.dealType:'财险'
   };
+  c.ownerUid = orig ? orig.ownerUid : (WB_SESSION||'guest');
   var list=getClients();
   if(isEdit){ var i=list.findIndex(function(x){return x.id===id;}); if(i>=0) list[i]=c; }
   else list.unshift(c);
@@ -4423,8 +4749,16 @@ function _crc32(data){
 }
 // ===== Excel 导出 (.xlsx) —— 纯前端 STORED 打包生成（Excel/WPS 全平台均可打开，不依赖服务端） =====
 var CLIENT_HEADERS = ['序号','姓名','职务','公司','电话','类型','标签','成交金额(元)','状态','手续费A(元)','手续费B(元)','日期','到期日','备注'];
+function recordExportLog(count, scope){
+  if(wbIsAdmin()) return; // 管理员拥有全局权限，不记录单独限制
+  var acc = wbCurrentAccount(); if(!acc) return;
+  var logs = (wbAccounts()[WB_SESSION] && wbAccounts()[WB_SESSION].exportLogs) || [];
+  logs.push({ at: new Date().toLocaleString('zh-CN'), count: count, scope: scope||'客户列表' });
+  wbUpdateAccount(WB_SESSION, { exportLogs: logs });
+}
 async function exportClientsExcel(){
   try{
+    if(!wbCanExport()){ toast('当前账号未开启导出权限（请联系管理员在「账号设置 → 账号管理」开启）'); return; }
     var list = clientFiltered(getClients());
     if(!list.length){ toast('无数据可导出'); return; }
     toast('正在生成文件...');
@@ -4433,6 +4767,7 @@ async function exportClientsExcel(){
     try {
       var blob = await _buildXlsxBlob(list, CLIENT_HEADERS);
       _download(blob, filename);
+      recordExportLog(list.length, '客户列表（'+list.length+'条）');
       toast('已导出 '+list.length+' 条客户');
       return;
     } catch(fe){
@@ -4441,6 +4776,7 @@ async function exportClientsExcel(){
     }
     // 前端失败才用服务端兜底（需已上传最新函数代码）
     await _fetchXlsxFromServer(list, false, filename);
+    recordExportLog(list.length, '客户列表（'+list.length+'条）');
     toast('已导出 '+list.length+' 条客户');
   }catch(err){
     console.error(err);
@@ -4836,7 +5172,8 @@ function _importClientRows(rows){
       dealDate: colMap.dealDate ? (cols[colMap.dealDate]||'').trim() : '',
       expireDate: colMap.expireDate ? (cols[colMap.expireDate]||'').trim() : '',
       note: colMap.note ? (cols[colMap.note]||'').trim() : '',
-      date: colMap.dealDate ? ((cols[colMap.dealDate]||'').trim() || _today()) : _today()
+      date: colMap.dealDate ? ((cols[colMap.dealDate]||'').trim() || _today()) : _today(),
+      ownerUid: (WB_SESSION||'guest')
     };
     list.unshift(c);
     added++;
@@ -6436,13 +6773,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 150;                         // v150：客户卡片按图重排——顶部状态徽章（到期/预约/加保/在保/已报价/审批中/战败），row1 头像+名+类型+状态+编辑/删除小图标，row2 车牌/车架号/电话 同行，row3 四合一 chip（联系-蓝/到期-按紧急度变色/行动-本周联系-橙+逾期未联系-红/备注-灰）
+const WB_VERSION = 151;                         // v151：多账号体系（人员筛选/客户分配/导出权限管理）、云表格独立页面、侧栏折叠、自定义背景图（工作台+登录页+透明度）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 67;                  // v150 发版：66→67（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 68;                  // v151 发版：67→68（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -6454,7 +6791,14 @@ let WB_MODE = 'login';
 
 function wbHash(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h<<5)-h+s.charCodeAt(i); h|=0; } return 'h'+(h>>>0).toString(36); }
 // 保留本地账户兼容（离线模式）；在线模式用 API
-function wbAccounts(){ try { const a=JSON.parse(localStorage.getItem('wb_accounts')||'{}'); for(const k in a){ if(typeof a[k]==='string') a[k]={pw:a[k],wechat:null}; } return a; } catch(e){ return {}; } }
+function wbAccounts(){ try { const a=JSON.parse(localStorage.getItem('wb_accounts')||'{}'); for(const k in a){ if(typeof a[k]==='string') a[k]={pw:a[k],wechat:null}; if(!a[k].nick) a[k].nick = (String(k).trim().toLowerCase()===WB_ADMIN_EMAIL.toLowerCase()) ? '管理员' : k; if(a[k].role===undefined) a[k].role = (String(k).trim().toLowerCase()===WB_ADMIN_EMAIL.toLowerCase()) ? 'admin' : 'staff'; if(a[k].exportEnabled===undefined) a[k].exportEnabled=false; if(!a[k].exportLogs) a[k].exportLogs=[]; if(!a[k].avatar) a[k].avatar='👤'; if(!a[k].color) a[k].color='#2563eb'; } return a; } catch(e){ return {}; } }
+function wbAllAccounts(){ var a=wbAccounts(); return Object.keys(a).map(function(k){ var o=a[k]; return {email:k, nick:o.nick||k, role:o.role||'staff', exportEnabled:!!o.exportEnabled, exportLogs:o.exportLogs||[], avatar:o.avatar||'👤', color:o.color||'#2563eb'}; }); }
+function accountNick(email){ var a=wbAccounts(); if(a[email]) return a[email].nick||email; return email; }
+function wbIsStaff(){ return !wbIsAdmin(); }
+function wbSaveAccounts(a){ try{ localStorage.setItem('wb_accounts', JSON.stringify(a)); }catch(e){} }
+function wbUpdateAccount(email, patch){ var a=wbAccounts(); if(!a[email]) a[email]={pw:'',wechat:null}; Object.assign(a[email], patch); if(!a[email].nick) a[email].nick=email; wbSaveAccounts(a); }
+function wbCurrentAccount(){ if(!WB_SESSION) return null; var a=wbAccounts(); return a[WB_SESSION] ? {email:WB_SESSION, nick:a[WB_SESSION].nick||WB_SESSION, role:a[WB_SESSION].role||'staff', exportEnabled:!!a[WB_SESSION].exportEnabled, exportLogs:a[WB_SESSION].exportLogs||[], avatar:a[WB_SESSION].avatar||'👤', color:a[WB_SESSION].color||'#2563eb'} : null; }
+function wbCanExport(){ var c=wbCurrentAccount(); if(wbIsAdmin()) return true; return !!(c && c.exportEnabled); }
 function wbSaveAccounts(a){ localStorage.setItem('wb_accounts', JSON.stringify(a)); }
 
 // ===== API 配置 =====
@@ -6546,6 +6890,16 @@ function openEditProfile(){
   const prev=document.getElementById('epAvatarPreview'); prev.textContent=p.avatar; prev.style.background=''; prev.dataset.img='';
   if(String(p.avatar).indexOf('data:image')===0){ prev.textContent=''; prev.style.background='center/cover no-repeat url('+p.avatar+')'; prev.dataset.img=p.avatar; }
   document.getElementById('epUpload').value='';
+  // 背景设置
+  var bg = loadBg();
+  epWorkBgData = bg.work || null; epLoginBgData = bg.login || null;
+  var wprev=document.getElementById('epWorkBgPrev'), lprev=document.getElementById('epLoginBgPrev');
+  if(wprev){ if(epWorkBgData){ wprev.style.display='block'; wprev.querySelector('img').src=epWorkBgData; } else { wprev.style.display='none'; } }
+  if(lprev){ if(epLoginBgData){ lprev.style.display='block'; lprev.querySelector('img').src=epLoginBgData; } else { lprev.style.display='none'; } }
+  var opEl=document.getElementById('epOpacity'); if(opEl) opEl.value=(bg.opacity!=null?bg.opacity:60);
+  var opVal=document.getElementById('epOpacityVal'); if(opVal) opVal.textContent=(bg.opacity!=null?bg.opacity:60);
+  var wb1=document.getElementById('epWorkBg'); if(wb1) wb1.value='';
+  var wb2=document.getElementById('epLoginBg'); if(wb2) wb2.value='';
   m.style.display='flex';
 }
 function closeEditProfile(){ const m=document.getElementById('editProfileModal'); if(m) m.style.display='none'; }
@@ -6554,6 +6908,12 @@ function saveProfile(){
   const prev=document.getElementById('epAvatarPreview');
   let av='👤'; if(prev.dataset.img){ av=prev.dataset.img; } else { av=prev.textContent||'👤'; }
   try{ localStorage.setItem(wbProfileKey(), JSON.stringify({name:name, avatar:av})); }catch(e){}
+  // 背景设置持久化
+  var bg = loadBg();
+  bg.work = epWorkBgData; bg.login = epLoginBgData;
+  var opInp=document.getElementById('epOpacity'); bg.opacity = opInp?(parseInt(opInp.value,10)||60):60;
+  try{ localStorage.setItem(wbBgKey(), JSON.stringify(bg)); }catch(e){}
+  applyBackgrounds();
   var nmEl=document.getElementById('accountName'); if(nmEl) nmEl.textContent=name;
   const avEl=document.getElementById('accountAvatar');
   if(avEl){ avEl.textContent=''; if(String(av).indexOf('data:image')===0){ avEl.style.background='center/cover no-repeat url('+av+')'; } else { avEl.textContent=av; avEl.style.background=''; } }
@@ -6599,6 +6959,41 @@ async function changePassword(){
 }
 // 头像上传：FileReader 转 base64 预览（保存时一并写入）
 (function(){ var up=document.getElementById('epUpload'); if(!up) return; up.addEventListener('change', function(e){ var f=e.target.files&&e.target.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(){ var data=r.result; var prev=document.getElementById('epAvatarPreview'); prev.textContent=''; prev.style.background='center/cover no-repeat url('+data+')'; prev.dataset.img=data; document.querySelectorAll('.ep-av').forEach(function(x){x.classList.remove('active');}); }; r.readAsDataURL(f); }); })();
+
+/* ===== 自定义背景图（工作台 / 登录页 / 透明度） ===== */
+var epWorkBgData = null, epLoginBgData = null;
+function wbBgKey(){ return 'wb_bg'; }
+function loadBg(){ try{ return JSON.parse(localStorage.getItem(wbBgKey())||'null')||{}; }catch(e){ return {}; } }
+function applyBackgrounds(){
+  var bg = loadBg();
+  var work = document.getElementById('wbBgLayer');
+  if(!work){ work=document.createElement('div'); work.id='wbBgLayer'; document.body.appendChild(work); }
+  var op = (bg.opacity!=null?bg.opacity:60);
+  if(bg.work){ work.style.display='block'; work.style.backgroundImage='url('+bg.work+')'; work.style.opacity=(op/100); }
+  else { work.style.display='none'; }
+  var lo = document.getElementById('loginOverlay');
+  if(lo){
+    var lb = document.getElementById('wbLoginBg');
+    if(!lb){ lb=document.createElement('div'); lb.id='wbLoginBg'; lo.insertBefore(lb, lo.firstChild); }
+    if(bg.login){ lb.style.display='block'; lb.style.backgroundImage='url('+bg.login+')'; lb.style.opacity=(op/100); }
+    else { lb.style.display='none'; }
+  }
+}
+function bindBgUpload(inputId, setter, prevId){
+  var inp=document.getElementById(inputId); if(!inp) return;
+  inp.addEventListener('change', function(e){
+    var f=e.target.files&&e.target.files[0]; if(!f) return;
+    var r=new FileReader(); r.onload=function(){ setter(r.result); var p=document.getElementById(prevId); if(p){ p.style.display='block'; var img=p.querySelector('img'); if(img) img.src=r.result; } };
+    r.readAsDataURL(f);
+  });
+}
+function clearWorkBg(){ epWorkBgData=null; var p=document.getElementById('epWorkBgPrev'); if(p) p.style.display='none'; var i=document.getElementById('epWorkBg'); if(i) i.value=''; }
+function clearLoginBg(){ epLoginBgData=null; var p=document.getElementById('epLoginBgPrev'); if(p) p.style.display='none'; var i=document.getElementById('epLoginBg'); if(i) i.value=''; }
+(function(){
+  bindBgUpload('epWorkBg', function(d){ epWorkBgData=d; }, 'epWorkBgPrev');
+  bindBgUpload('epLoginBg', function(d){ epLoginBgData=d; }, 'epLoginBgPrev');
+  applyBackgrounds();
+})();
 function wbSyncSidebar(){
   const active = WB_MAIN.querySelector('.page.active');
   const pid = active ? active.id.replace('page-','') : 'home';
@@ -9666,7 +10061,7 @@ function wbLocalInviteCode(){
 // 根据登录身份显示/隐藏管理员菜单项
 function wbApplyAdminUI(){
   var show = wbIsAdmin() ? '' : 'none';
-  ['qaInviteItem','qaResetItem'].forEach(function(id){
+  ['qaInviteItem','qaResetItem','qaAdminItem'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.style.display = show;
   });
