@@ -544,6 +544,44 @@ body {
 .client-act-btn.act-red    { background: linear-gradient(135deg,#ff4d4f,#ff7875); box-shadow: 0 2px 6px rgba(255,77,79,.28); }
 .client-act-btn.act-orange { background: linear-gradient(135deg,#fa8c16,#ffa940); box-shadow: 0 2px 6px rgba(250,140,22,.28); }
 .client-act-btn.act-blue   { background: linear-gradient(135deg,#1890ff,#40a9ff); }
+/* ===== v150 状态徽章（置顶右，pill 形态） ===== */
+.client-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; white-space: nowrap; }
+.client-status.s-active { background: linear-gradient(135deg,#e6f7ff,#bae7ff); color: #096dd9; }
+.client-status.s-add    { background: linear-gradient(135deg,#f6ffed,#d9f7be); color: #389e0d; }
+.client-status.s-appt   { background: linear-gradient(135deg,#fff0f6,#ffd6e7); color: #c41d7f; }
+.client-status.s-expire { background: linear-gradient(135deg,#fff1f0,#ffccc7); color: #cf1322; }
+.client-status.s-quote  { background: linear-gradient(135deg,#fff7e6,#ffe7ba); color: #d46b08; }
+.client-status.s-review { background: linear-gradient(135deg,#f9f0ff,#efdbff); color: #722ed1; }
+.client-status.s-lost   { background: linear-gradient(135deg,#fafafa,#f0f0f0); color: #595959; }
+/* v150 客户卡片：行 1 重排（头像 + 名 + 类型 + 状态徽章 + 编辑/删除） */
+.client-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.client-row1 .client-avatar { width: 38px; height: 38px; font-size: 15px; flex-shrink: 0; }
+.client-row1 .client-name-block { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.client-row1 .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+.client-row1 .client-name-block .client-type-chip { margin-left: 0; }
+.client-row1 .client-row1-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+.client-icon-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; padding: 0; }
+.client-icon-btn:hover { background: #f1f5f9; color: var(--primary); }
+.client-icon-btn.del:hover { background: #fff1f0; color: #ff4d4f; }
+/* v150 行 2：车牌/车架号/电话（同行，三个字段） */
+.client-row2 { font-size: 12px; color: var(--text-secondary); line-height: 1.6; word-break: break-all; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.client-row2 .cm-field { display: inline-flex; align-items: center; gap: 3px; }
+/* v150 行 3：四合一 chip 行（联系 + 到期 + 行动 + 备注） */
+.client-row3 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.client-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 14px;
+  font-size: 12px; font-weight: 500;
+  background: #f1f5f9; color: var(--text-secondary);
+}
+.client-chip.chip-warn   { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+.client-chip.chip-urgent { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+.client-chip.chip-ok     { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+.client-chip.chip-contact { background: #e6f7ff; color: #096dd9; border: 1px solid #91d5ff; }
+.client-chip.chip-action-red    { background: linear-gradient(135deg,#ff4d4f,#ff7875); color: #fff; border: none; font-weight: 600; box-shadow: 0 2px 6px rgba(255,77,79,.25); }
+.client-chip.chip-action-orange { background: linear-gradient(135deg,#fa8c16,#ffa940); color: #fff; border: none; font-weight: 600; box-shadow: 0 2px 6px rgba(250,140,22,.25); }
+.client-chip.chip-action-blue   { background: linear-gradient(135deg,#1890ff,#40a9ff); color: #fff; border: none; font-weight: 600; box-shadow: 0 2px 6px rgba(24,144,255,.22); }
+.client-chip.chip-note { background: #f8fafc; color: var(--text-secondary); border: 1px solid #e2e8f0; font-weight: 400; }
 .client-row4 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .client-row4 .client-note { font-size: 12px; color: var(--text-secondary); background: #f8fafc; padding: 4px 10px; border-radius: 10px; }
 /* 状态徽章（考虑/成交/已报价/加微 等） — 紧凑版用于 row1 */
@@ -4023,64 +4061,91 @@ function renderClients(){
   var todayStr = _today();
   box.innerHTML = rows.map(function(c){
     // 紧急度（用于卡片左边框色）
-    var lvl = clientUrgencyLevel(c, todayStr); // 'urgent' / 'warn' / 'ok' / ''
+    var lvl = clientUrgencyLevel(c, todayStr);
     var clsUrg = lvl ? (' client-' + lvl) : '';
     var avatar = (c.name||'?').slice(0,1);
     var av = CL_TYPE_COLOR[c.type] ? 'background:'+CL_TYPE_COLOR[c.type] : '';
-    // Row1：头像 + 姓名 + 类型chip + 状态徽章 + 编辑
-    var headName = '<span class="client-name">'+esc(c.name||'')+'</span>'
-      + (c.title? ' <span class="client-sub">'+esc(c.title)+'</span>':'')
-      + (c.type? ' <span class="client-type-chip">'+esc(c.type)+'</span>':'');
-    var headTags = (c.tags||[]).map(function(t){ return '<span class="client-tag-mini t-'+CL_TAG_CLASS[t]+'">'+t+'</span>'; }).join('');
-    var row1 = '<div class="client-row1">'
+    // 派生状态徽章
+    var st = clientDerivedStatus(c, todayStr);
+    var stBadge = st ? '<span class="client-status '+st.cls+'"><span>'+(st.icon||'')+'</span><span>'+esc(st.label)+'</span></span>' : '';
+    // Row1：头像 + 姓名 + 类型 + 状态徽章 + 编辑/删除
+    var row1 =
+      '<div class="client-row1">'
       + '<div class="client-avatar" style="'+av+'">'+esc(avatar)+'</div>'
-      + '<div class="client-head">' + headName + ' ' + headTags
-      +   '<span class="client-edit" onclick="event.stopPropagation();openClientForm(\''+c.id+'\')" title="编辑">✏️</span>'
-      + '</div></div>';
-    // Row2：信息行（公司/车牌 + 职务/电话 等）— 用换行渲染
+      + '<div class="client-name-block">'
+      +   '<span class="client-name">'+esc(c.name||'')+'</span>'
+      +   (c.type? '<span class="client-type-chip">'+esc(c.type)+'</span>':'')
+      + '</div>'
+      + '<div class="client-row1-right">'
+      +   stBadge
+      +   '<button type="button" class="client-icon-btn" onclick="event.stopPropagation();openClientForm(\''+c.id+'\')" title="编辑">✏️</button>'
+      +   '<button type="button" class="client-icon-btn del" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')" title="删除">🗑</button>'
+      + '</div>'
+      + '</div>';
+    // Row2：信息（车牌/车架号/电话 仅 财险；其他显示 公司/职位/电话）
     var infoBits = [];
     if(c.type==='财险'){
-      if(c.title) infoBits.push('车牌 '+esc(c.title));
-      if(c.company) infoBits.push('车架号 '+esc(c.company));
+      if(c.title)   infoBits.push('<span class="cm-field">车牌 <b>'+esc(c.title)+'</b></span>');
+      if(c.company) infoBits.push('<span class="cm-field">车架号 <b>'+esc(c.company)+'</b></span>');
     } else {
-      if(c.company) infoBits.push(esc(c.company));
-      if(c.title) infoBits.push(esc(c.title));
+      if(c.company) infoBits.push('<span class="cm-field">公司 <b>'+esc(c.company)+'</b></span>');
+      if(c.title)   infoBits.push('<span class="cm-field">职位 <b>'+esc(c.title)+'</b></span>');
     }
-    if(c.phone) infoBits.push('📞 '+esc(c.phone));
-    var row2 = infoBits.length ? '<div class="client-row2">' + infoBits.join('<span class="cm-sep">·</span>') + '</div>' : '';
-    // Row3：日期 chip — 联系 + 到期
+    if(c.phone) infoBits.push('<span class="cm-field">电话 <b>'+esc(c.phone)+'</b></span>');
+    var row2 = infoBits.length ? '<div class="client-row2">' + infoBits.join('') + '</div>' : '';
+    // Row3：四合一 chip 行
     var chips = [];
+    // 联系 chip（始终蓝）
     if(c.apptDate){
-      var apptLevel = dateUrgencyLevel(c.apptDate, todayStr, 'appt');
-      var apptChipCls = apptLevel==='urgent' ? 'chip-urgent' : (apptLevel==='warn' ? 'chip-warn' : '');
-      chips.push('<span class="client-chip '+apptChipCls+'">📅 联系 '+esc(c.apptDate)+'</span>');
+      chips.push('<span class="client-chip chip-contact">📅 联系 '+esc(fmtDateShort(c.apptDate))+'</span>');
     }
+    // 到期 chip（按紧急度变色）
     if(c.expireDate){
       var expLevel = dateUrgencyLevel(c.expireDate, todayStr, 'expire');
       var expChipCls = expLevel==='urgent' ? 'chip-urgent' : (expLevel==='warn' ? 'chip-warn' : '');
-      chips.push('<span class="client-chip '+expChipCls+'">⏰ 到期 '+esc(c.expireDate)+'</span>');
+      chips.push('<span class="client-chip '+expChipCls+'">🕐 到期 '+esc(fmtDateShort(c.expireDate))+'</span>');
     }
-    var row3 = chips.length ? '<div class="client-row3 client-chips">' + chips.join('') + '</div>' : '';
-    // Row4：行动按钮 + 备注
-    var row4Bits = [];
+    // 行动 chip（按 appt 紧急度变红/橙/蓝）
     if(c.apptDate){
-      var apptLevel = dateUrgencyLevel(c.apptDate, todayStr, 'appt');
-      var label, btnCls;
-      if(apptLevel==='urgent'){ label = '今日联系 ' + c.apptDate; btnCls = 'act-red'; }
-      else if(apptLevel==='warn'){ label = '本周联系 ' + c.apptDate; btnCls = 'act-orange'; }
-      else { label = '计划联系 ' + c.apptDate; btnCls = 'act-red'; }
-      row4Bits.push('<span class="client-act-btn '+btnCls+'">📞 '+esc(label)+'</span>');
+      var ap = dateUrgencyLevel(c.apptDate, todayStr, 'appt');
+      var apAction, apCls;
+      if(ap==='urgent'){
+        // 今日或已过期
+        if(c.apptDate <= todayStr){
+          apAction = '逾期未联系 ' + fmtDateShort(c.apptDate);
+        } else {
+          apAction = '今日联系 ' + fmtDateShort(c.apptDate);
+        }
+        apCls = 'chip-action-red';
+      } else if(ap==='warn'){
+        apAction = '本周联系 ' + fmtDateShort(c.apptDate);
+        apCls = 'chip-action-orange';
+      } else {
+        // 远期：用一个普通 chip 显示
+        apAction = '计划联系 ' + fmtDateShort(c.apptDate);
+        apCls = '';
+      }
+      chips.push('<span class="client-chip '+apCls+'">📞 '+esc(apAction)+'</span>');
     }
-    if(c.note){ row4Bits.push('<span class="client-note">📝 '+esc(c.note)+'</span>'); }
-    var row4 = row4Bits.length ? '<div class="client-row4">' + row4Bits.join('') + '</div>' : '';
+    // 备注 chip（最末）
+    if(c.note){ chips.push('<span class="client-chip chip-note">📝 '+esc(c.note)+'</span>'); }
+    var row3 = chips.length ? '<div class="client-row3">' + chips.join('') + '</div>' : '';
 
     return '<div class="client-card'+clsUrg+'" data-id="'+c.id+'">'
-      + '<button type="button" class="client-del-reveal" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')">🗑 删除</button>'
       + '<div class="client-card-inner">'
-      +   row1 + row2 + row3 + row4
+      +   row1 + row2 + row3
       + '</div></div>';
   }).join('');
   bindClientSwipe();
+}
+// 短日期：YYYY-MM-DD → MM-DD
+function fmtDateShort(d){
+  if(!d) return '';
+  var s = String(d);
+  // 接受 'YYYY-MM-DD' 或 'YYYY-MM-DDTHH:MM:SS'
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[2]+'-'+m[3];
+  return s;
 }
 // 卡片紧急度等级：用于左边框色
 function clientUrgencyLevel(c, todayStr){
@@ -4090,6 +4155,41 @@ function clientUrgencyLevel(c, todayStr){
   if(c.apptDate   && dateUrgencyLevel(c.apptDate,   todayStr, 'appt')  ==='warn')   return 'warn';
   if(c.expireDate && dateUrgencyLevel(c.expireDate, todayStr, 'expire')==='warn')   return 'warn';
   return '';
+}
+// 客户状态徽章派生：当前业务状态（与"行动 chip"分开；行动 chip 反映待办紧迫度）
+// 优先级：到期 > 加保 > 在保/已出具 > 审批中 > 已报价 > 战败
+function clientDerivedStatus(c, todayStr){
+  // 1) 到期：expireDate 已过
+  if(c.expireDate && dateUrgencyLevel(c.expireDate, todayStr, 'expire')==='urgent'){
+    return { key:'expire', label:'到期', cls:'s-expire', icon:'⚠️' };
+  }
+  // 2) 加保：加微 tag + 尚未成交/承保
+  var hasWx = (c.tags||[]).indexOf('加微') >= 0;
+  var hasDeal = (c.tags||[]).indexOf('成交') >= 0 || c.dealStatus==='承保' || c.dealStatus==='已出具';
+  if(hasWx && !hasDeal){
+    return { key:'add', label:'加保', cls:'s-add', icon:'➕' };
+  }
+  // 3) 在保：成交承保
+  if(c.dealStatus==='承保' || (c.tags||[]).indexOf('成交')>=0){
+    return { key:'active', label:'在保', cls:'s-active', icon:'✓' };
+  }
+  // 4) 已出具：保函已发出
+  if(c.dealStatus==='已出具'){
+    return { key:'active', label:'已出具', cls:'s-active', icon:'✓' };
+  }
+  // 5) 审批中 / 材料准备：保函审批
+  if(c.dealStatus==='审批中' || c.dealStatus==='材料准备'){
+    return { key:'review', label: c.dealStatus, cls:'s-review', icon:'🕓' };
+  }
+  // 6) 已报价
+  if(c.dealStatus==='已报价' || (c.tags||[]).indexOf('已报价')>=0){
+    return { key:'quote', label:'已报价', cls:'s-quote', icon:'💬' };
+  }
+  // 7) 战败
+  if((c.tags||[]).indexOf('拒绝')>=0 || (c.tags||[]).indexOf('战败')>=0){
+    return { key:'lost', label:'战败', cls:'s-lost', icon:'✕' };
+  }
+  return null;
 }
 // 日期紧急度等级
 // mode='appt'  联系日：今天=urgent，本周内(含过去)=warn，其余='
@@ -6336,13 +6436,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 149;                         // v149：日记页新增「🔒 保险箱」子页签——顶部私密文字 textarea（输入即自动保存到本机 localStorage），下方图片网格（base64 存储、自动压缩 ≤1280px），右下角圆形浮动按钮 📷 拍照 + 🖼️ 上传
+const WB_VERSION = 150;                         // v150：客户卡片按图重排——顶部状态徽章（到期/预约/加保/在保/已报价/审批中/战败），row1 头像+名+类型+状态+编辑/删除小图标，row2 车牌/车架号/电话 同行，row3 四合一 chip（联系-蓝/到期-按紧急度变色/行动-本周联系-橙+逾期未联系-红/备注-灰）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 66;                  // v149 发版：65→66（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 67;                  // v150 发版：66→67（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
