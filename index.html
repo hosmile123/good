@@ -519,10 +519,28 @@ body.sb-collapsed .sidebar-item:hover::after {
 .tag.appt { background: #FFF0F6; color: #EB2F96; }
 .tag.noans { background: #FAFAFA; color: #8C8C8C; }
 .tag.lost { background: #FCE4EC; color: #C62828; }
+/* 一级优先级标签（卡片展示配色） */
+.tag.t-l1a { background: #FFF1F0; color: #FF4D4F; }
+.tag.t-l1b { background: #E6F7FF; color: #1890FF; }
+.tag.t-l1c { background: #FAFAFA; color: #8C8C8C; }
+.tag.t-l1d { background: #F9F0FF; color: #722ED1; }
 .client-action { color: var(--primary); font-size: 20px; cursor: pointer; }
 .client-del-reveal:active { opacity: .85; }
 .tag-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 16px; font-size: 13px; border: 1px solid var(--border); background: #fff; cursor: pointer; transition: .15s; }
 .tag-toggle.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+/* 标签分级单选（编辑弹窗） */
+.tag-groups { display: flex; flex-direction: column; gap: 10px; }
+.tag-group { }
+.tg-title { font-size: 12px; color: var(--text); font-weight: 600; margin-bottom: 6px; }
+.tg-req { color: #FF4D4F; margin-left: 2px; }
+.tg-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 16px; font-size: 13px; border: 1px solid var(--border); background: #fff; cursor: pointer; transition: .15s; color: var(--text); }
+.tag-chip:hover { border-color: var(--primary); }
+.tag-chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tag-chip.t-l1a { border-color: #FF4D4F; color: #FF4D4F; }
+.tag-chip.t-l1b { border-color: #1890FF; color: #1890FF; }
+.tag-chip.t-l1c { border-color: #8C8C8C; color: #8C8C8C; }
+.tag-chip.t-l1d { border-color: #722ED1; color: #722ED1; }
 
 /* ===== v148 客户卡片视觉优化：临近到期 / 临近联系日期高亮 ===== */
 /* 卡片整体：圆角 + 左边框色带 */
@@ -4120,8 +4138,24 @@ function selectMood(btn) {
 }
 
 // ===== 客户中心：统一数据层（新增/删除/筛选/标签/与业绩打通） =====
-var CL_TAGS = ['成交','已报价','考虑','拒绝','加微','预约','无人','战败','已结算','未结算'];
-var CL_TAG_CLASS = {'成交':'deal','已报价':'quote','考虑':'consider','拒绝':'reject','加微':'wx','预约':'appt','无人':'noans','战败':'lost','已结算':'comm_settled','未结算':'comm_unsettled'};
+// 标签三级分组：一级（优先级·必选）、二级（阶段·必选）、其他（可选，选 0 或 1）
+// 每类内只能选一个；一级、二级为必选标签，其他可选可不选。
+var CL_TAG_GROUPS = [
+  {key:'l1', name:'一级标签（优先级·必选）', required:true, opts:[
+    {v:'A(高)', cls:'t-l1a'}, {v:'B(中)', cls:'t-l1b'}, {v:'C(低)', cls:'t-l1c'}, {v:'D', cls:'t-l1d'}
+  ]},
+  {key:'l2', name:'二级标签（阶段·必选）', required:true, opts:[
+    {v:'成交', cls:'t-deal'}, {v:'已报价', cls:'t-quote'}, {v:'考虑', cls:'t-consider'}, {v:'拒绝', cls:'t-reject'},
+    {v:'加微', cls:'t-wx'}, {v:'预约', cls:'t-appt'}, {v:'无人', cls:'t-noans'}, {v:'战败', cls:'t-lost'}
+  ]},
+  {key:'other', name:'其他标签（可选）', required:false, opts:[
+    {v:'已结算', cls:'t-settled'}, {v:'未结算', cls:'t-unsettled'}
+  ]}
+];
+var CL_TAG_CLASS = {}; var CL_ALL_TAGS = []; var CL_TAG_GROUP_OF = {};
+CL_TAG_GROUPS.forEach(function(g){
+  g.opts.forEach(function(o){ CL_TAG_CLASS[o.v]=o.cls; CL_ALL_TAGS.push(o.v); CL_TAG_GROUP_OF[o.v]=g.key; });
+});
 var CL_TYPE_COLOR = {'财险':'linear-gradient(135deg,#1890FF,#40A9FF)','TOB':'linear-gradient(135deg,#52C41A,#73D13D)','TOC':'linear-gradient(135deg,#EB2F96,#F759AB)','团险':'linear-gradient(135deg,#FA8C16,#FFA940)'};
 var _clState = {tag:'全部', type:'全部', appt:null, person:'all'};
 
@@ -4167,15 +4201,15 @@ function saveClients(list){
 }
 function _seedClients(){
   return [
-    {id:_uid(), name:'张建国', title:'总经理', company:'万达商业管理有限公司', phone:'138****0011', type:'财险', tags:['成交','加微'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-08-01', apptDate:'2026-08-15', note:'企财险续保意向强', date:'2026-08-01'},
-    {id:_uid(), name:'陈芳', title:'财务总监', company:'华为技术有限公司', phone:'139****0022', type:'财险', tags:['成交'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-28', apptDate:'2026-08-13', note:'企财险年单', date:'2026-07-28'},
-    {id:_uid(), name:'刘洋', title:'个体经营', company:'洋帆货运代理', phone:'137****0033', type:'财险', tags:['成交'], amount:18500, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-15', note:'货运险', date:'2026-07-15'},
-    {id:_uid(), name:'李明', title:'工程部经理', company:'中国建筑第三工程局', phone:'136****0044', type:'TOB', tags:['成交','未结算'], amount:5000000, dealType:'保函', dealStatus:'审批中', dealDate:'2026-07-25', apptDate:'2026-08-16', feeA:18000, feeB:2000, note:'投标保函', date:'2026-07-25'},
-    {id:_uid(), name:'周强', title:'项目经理', company:'中铁建设集团', phone:'135****0055', type:'TOB', tags:['成交','加微','已结算'], amount:8000000, dealType:'保函', dealStatus:'已出具', dealDate:'2026-07-18', apptDate:'2026-08-20', feeA:20000, feeB:3000, note:'履约保函', date:'2026-07-18'},
-    {id:_uid(), name:'王磊', title:'采购主管', company:'中交集团', phone:'134****0066', type:'TOB', tags:['已报价'], amount:0, note:'港口扩建保函报价中', date:'2026-07-22'},
-    {id:_uid(), name:'赵敏', title:'行政经理', company:'富力地产', phone:'133****0077', type:'财险', tags:['考虑'], amount:0, note:'对比几家具企财险方案', date:'2026-07-30'},
-    {id:_uid(), name:'孙浩', title:'老板', company:'宏远贸易', phone:'132****0088', type:'TOC', tags:['加微','已报价'], amount:0, note:'加微信，待推货运险', date:'2026-08-02'},
-    {id:_uid(), name:'吴桐', title:'财务', company:'绿地集团', phone:'131****0099', type:'财险', tags:['拒绝'], amount:0, note:'已选别家', date:'2026-07-20'}
+    {id:_uid(), name:'张建国', title:'总经理', company:'万达商业管理有限公司', phone:'138****0011', type:'财险', tags:['A(高)','成交'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-08-01', apptDate:'2026-08-15', note:'企财险续保意向强', date:'2026-08-01'},
+    {id:_uid(), name:'陈芳', title:'财务总监', company:'华为技术有限公司', phone:'139****0022', type:'财险', tags:['B(中)','成交'], amount:86000, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-28', apptDate:'2026-08-13', note:'企财险年单', date:'2026-07-28'},
+    {id:_uid(), name:'刘洋', title:'个体经营', company:'洋帆货运代理', phone:'137****0033', type:'财险', tags:['B(中)','成交'], amount:18500, dealType:'财险', dealStatus:'承保', dealDate:'2026-07-15', note:'货运险', date:'2026-07-15'},
+    {id:_uid(), name:'李明', title:'工程部经理', company:'中国建筑第三工程局', phone:'136****0044', type:'TOB', tags:['A(高)','成交','未结算'], amount:5000000, dealType:'保函', dealStatus:'审批中', dealDate:'2026-07-25', apptDate:'2026-08-16', feeA:18000, feeB:2000, note:'投标保函', date:'2026-07-25'},
+    {id:_uid(), name:'周强', title:'项目经理', company:'中铁建设集团', phone:'135****0055', type:'TOB', tags:['A(高)','成交','已结算'], amount:8000000, dealType:'保函', dealStatus:'已出具', dealDate:'2026-07-18', apptDate:'2026-08-20', feeA:20000, feeB:3000, note:'履约保函', date:'2026-07-18'},
+    {id:_uid(), name:'王磊', title:'采购主管', company:'中交集团', phone:'134****0066', type:'TOB', tags:['C(低)','已报价'], amount:0, note:'港口扩建保函报价中', date:'2026-07-22'},
+    {id:_uid(), name:'赵敏', title:'行政经理', company:'富力地产', phone:'133****0077', type:'财险', tags:['C(低)','考虑'], amount:0, note:'对比几家具企财险方案', date:'2026-07-30'},
+    {id:_uid(), name:'孙浩', title:'老板', company:'宏远贸易', phone:'132****0088', type:'TOC', tags:['B(中)','加微'], amount:0, note:'加微信，待推货运险', date:'2026-08-02'},
+    {id:_uid(), name:'吴桐', title:'财务', company:'绿地集团', phone:'131****0099', type:'财险', tags:['C(低)','拒绝'], amount:0, note:'已选别家', date:'2026-07-20'}
   ];
 }
 function clientFiltered(list){
@@ -4346,7 +4380,7 @@ function renderClients(){
   var list = getClients();
   // 统计
   var all = list.length;
-  var cnt = {}; CL_TAGS.forEach(function(t){ cnt[t]=0; });
+  var cnt = {}; CL_ALL_TAGS.forEach(function(t){ cnt[t]=0; });
   list.forEach(function(c){ (c.tags||[]).forEach(function(t){ if(cnt[t]!==undefined) cnt[t]++; }); });
   setText('csAll', all);   setText('csDeal', cnt['成交']||0); setText('csQuote', cnt['已报价']||0); setText('csWx', cnt['加微']||0);
   var todayCnt = list.filter(function(c){ return c.apptDate===_today(); }).length;
@@ -4569,10 +4603,7 @@ function openClientForm(id){
   c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财险', tags:[], amount:0, dealType:'财险', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:'', apptDate:''};
   var isProp = c.type==='财险';
   var lblName = isProp?'车主':'姓名', lblTitle = isProp?'车牌':'职务', lblCompany = isProp?'车架号':'公司';
-  var tagBtns = CL_TAGS.map(function(t){
-    var on = (c.tags||[]).indexOf(t)>=0 ? 'on':'';
-    return '<button type="button" class="tag-toggle '+on+'" onclick="clToggleTag(this,\''+t+'\')" data-tag="'+t+'">'+t+'</button>';
-  }).join('');
+  var tagHTML = clTagGroupsHTML(c);
   var html = '<div class="modal-card"><div class="modal-title">'+(isEdit?'✏️ 编辑客户':'➕ 新增客户')+'</div>'+
     '<div class="modal-form" style="margin-top:12px">'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clLblName">'+lblName+'</label><input id="clName" value="'+esc(c.name||'')+'"></div>'+
@@ -4581,7 +4612,7 @@ function openClientForm(id){
     '<div class="form-group"><label>地址</label><input id="clAddress" value="'+esc(c.address||'')+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话</label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
     '<div class="form-group" style="flex:1"><label>类型</label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
-    '<div class="form-group"><label>标签（可多选）</label><div id="clTags" style="display:flex;flex-wrap:wrap;gap:8px">'+tagBtns+'</div></div>'+
+    '<div class="form-group"><label>标签（分级单选：一级/二级必选，其他可选）</label>'+tagHTML+'</div>'+
     '<div class="form-group"><label>日期</label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
     '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px;margin-top:8px">'+
@@ -4600,7 +4631,30 @@ function openClientForm(id){
   var m=document.getElementById('clientModal'); m.innerHTML=html; m.style.display='flex';
   m.onclick=function(e){ if(e.target===m) closeModal('clientModal'); };
 }
-function clToggleTag(btn, tag){ btn.classList.toggle('on'); }
+function clTagGroupsHTML(c){
+  var tags = c.tags||[];
+  var html = '<div class="tag-groups">';
+  CL_TAG_GROUPS.forEach(function(g){
+    html += '<div class="tag-group"><div class="tg-title">'+g.name+(g.required?'<span class="tg-req">*</span>':'')+'</div><div class="tg-opts" id="clTagGroup_'+g.key+'">';
+    g.opts.forEach(function(o){
+      var on = tags.indexOf(o.v)>=0 ? ' on':'';
+      html += '<button type="button" class="tag-chip '+o.cls+on+'" data-value="'+o.v+'" onclick="clTagPick(\''+g.key+'\',\''+o.v+'\',this)">'+o.v+'</button>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+// 分级单选：每类内只能选一个；必选类（一级/二级）不允许清空，可选类（其他）可切换
+function clTagPick(group, value, el){
+  var wrap = document.getElementById('clTagGroup_'+group);
+  if(!wrap) return;
+  var grp=null; CL_TAG_GROUPS.forEach(function(g){ if(g.key===group) grp=g; });
+  var isOn = el.classList.contains('on');
+  wrap.querySelectorAll('.tag-chip').forEach(function(chip){ chip.classList.remove('on'); });
+  if(grp && grp.required){ el.classList.add('on'); }
+  else if(!isOn){ el.classList.add('on'); }
+}
 function clTypeChange(){
   var t = (document.getElementById('clType')||{}).value||'财险';
   var lA = document.getElementById('clFeeLabelA'), lB = document.getElementById('clFeeLabelB');
@@ -4615,7 +4669,13 @@ function saveClient(id, isEdit){
   var name=(document.getElementById('clName')||{}).value||'';
   if(!name.trim()){ toast('请输入客户姓名'); return; }
   var orig = isEdit ? getClients().find(function(x){return x.id===id;}) : null;
-  var tags=[]; document.querySelectorAll('#clTags .tag-toggle.on').forEach(function(b){ tags.push(b.getAttribute('data-tag')); });
+  var tags=[];
+  ['l1','l2','other'].forEach(function(g){
+    var wrap = document.getElementById('clTagGroup_'+g);
+    if(wrap){ var on = wrap.querySelector('.tag-chip.on'); if(on) tags.push(on.getAttribute('data-value')); }
+  });
+  if(!document.querySelector('#clTagGroup_l1 .tag-chip.on')){ toast('请选择「一级标签」（优先级，必选）'); return; }
+  if(!document.querySelector('#clTagGroup_l2 .tag-chip.on')){ toast('请选择「二级标签」（阶段，必选）'); return; }
   var c={
     id:id, name:name.trim(), title:(document.getElementById('clTitle')||{}).value||'',
     company:(document.getElementById('clCompany')||{}).value||'', address:(document.getElementById('clAddress')||{}).value||'', phone:(document.getElementById('clPhone')||{}).value||'',
@@ -6774,13 +6834,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 152;                         // v152：客户表单调整（删状态字段、日期上移默认当天、标签改名并移至战败后、新增地址栏）+ 地址进导出/导入
+const WB_VERSION = 153;                         // v153：客户标签重构为三级分级单选（一级优先级A高/B中/C低/D·必选、二级阶段·必选、其他已结算/未结算·可选）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 69;                  // v152 发版：68→69（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 70;                  // v153 发版：69→70（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
