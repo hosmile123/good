@@ -1807,6 +1807,7 @@ function toggleSbCollapse(){
   </div>
   <!-- 第二行标签筛选：一级优先级（A/B/C/D）+ 其他（已结算/未结算） -->
   <div class="filter-row" id="clientTagFilter2" style="margin-top:6px">
+    <button class="filter-tab active" onclick="clientSetTag(this,'全部')">全部</button>
     <button class="filter-tab" onclick="clientSetTag(this,'A')">🅰️ A(高)</button>
     <button class="filter-tab" onclick="clientSetTag(this,'B')">🅱️ B(中)</button>
     <button class="filter-tab" onclick="clientSetTag(this,'C')">©️ C(低)</button>
@@ -4167,7 +4168,7 @@ CL_TAG_GROUPS.forEach(function(g){
   g.opts.forEach(function(o){ CL_TAG_CLASS[o.v]=o.cls; CL_ALL_TAGS.push(o.v); CL_TAG_GROUP_OF[o.v]=g.key; });
 });
 var CL_TYPE_COLOR = {'财险':'linear-gradient(135deg,#1890FF,#40A9FF)','TOB':'linear-gradient(135deg,#52C41A,#73D13D)','TOC':'linear-gradient(135deg,#EB2F96,#F759AB)','团险':'linear-gradient(135deg,#FA8C16,#FFA940)'};
-var _clState = {tag:'全部', type:'全部', appt:null, person:'all'};
+var _clState = {tagStage:'全部', tagPrio:'全部', type:'全部', appt:null, person:'all'};
 
 // ===== 客户共享库（多账号 / ownerUid 归属） =====
 // 所有账号的客户统一存于 wb_clients_all；每条客户带 ownerUid（归属账号 = 登录邮箱）。
@@ -4235,10 +4236,15 @@ function clientFiltered(list){
   var apptTo = ((document.getElementById('clientApptTo')||{}).value)||'';
   return list.filter(function(c){
     if(_clState.type!=='全部' && c.type!==_clState.type) return false;
-    if(_clState.tag!=='全部'){
-      var allow = _resolveTagFilter(_clState.tag);
-      var has=false; for(var i=0;i<allow.length;i++) if((c.tags||[]).indexOf(allow[i])>=0){ has=true; break; }
-      if(!has) return false;
+    if(_clState.tagStage!=='全部'){
+      var allowS = _resolveTagFilter(_clState.tagStage);
+      var hasS=false; for(var i=0;i<allowS.length;i++) if((c.tags||[]).indexOf(allowS[i])>=0){ hasS=true; break; }
+      if(!hasS) return false;
+    }
+    if(_clState.tagPrio!=='全部'){
+      var allowP = _resolveTagFilter(_clState.tagPrio);
+      var hasP=false; for(var i=0;i<allowP.length;i++) if((c.tags||[]).indexOf(allowP[i])>=0){ hasP=true; break; }
+      if(!hasP) return false;
     }
     if(_clState.person!=='all' && (c.ownerUid||'guest')!==_clState.person) return false;
     if(_clState.appt==='today' && c.apptDate!==_today()) return false;
@@ -4569,13 +4575,12 @@ function dateUrgencyLevel(ds, todayStr, mode){
   return '';
 }
 function clientSetTag(btn, tag){
-  if(btn){
-    ['#clientTagFilter','#clientTagFilter2'].forEach(function(sel){
-      document.querySelectorAll(sel+' .filter-tab').forEach(function(t){t.classList.remove('active');});
-    });
-    btn.classList.add('active');
-  }
-  _clState.tag = tag; _clState.appt = null; renderClients();
+  // 两行筛选相互独立：每行只能选一个，点击仅清除本行高亮；可同时按「阶段」+「优先级/结算」组合筛选
+  var rowSel = (btn && btn.parentNode) ? '#'+btn.parentNode.id : '#clientTagFilter';
+  document.querySelectorAll(rowSel+' .filter-tab').forEach(function(t){t.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  if(rowSel==='#clientTagFilter2'){ _clState.tagPrio = tag; } else { _clState.tagStage = tag; }
+  _clState.appt = null; renderClients();
 }
 // 将筛选短标签（A/B/C/D）映射到存储的实际值（A(高)/B(中)/C(低)/D），
 // 已结算/未结算/成交/已报价 等直接按原值匹配。
@@ -4612,9 +4617,9 @@ function clientSetPerson(btn, uid){
 }
 function clientSetAppt(scope){
   _clState.appt = (_clState.appt===scope) ? null : scope;
-  _clState.tag = '全部'; _clState.type = '全部';
+  _clState.tagStage = '全部'; _clState.tagPrio = '全部'; _clState.type = '全部';
   var tf=document.querySelectorAll('#clientTagFilter .filter-tab'); tf.forEach(function(t){t.classList.remove('active');}); if(tf[0]) tf[0].classList.add('active');
-  var tf2=document.querySelectorAll('#clientTagFilter2 .filter-tab'); tf2.forEach(function(t){t.classList.remove('active');});
+  var tf2=document.querySelectorAll('#clientTagFilter2 .filter-tab'); tf2.forEach(function(t){t.classList.remove('active');}); if(tf2[0]) tf2[0].classList.add('active');
   var yf=document.querySelectorAll('#clientTypeFilter .filter-tab'); yf.forEach(function(t){t.classList.remove('active');}); if(yf[0]) yf[0].classList.add('active');
   renderClients();
 }
@@ -4637,7 +4642,7 @@ function openClientForm(id){
     '<div class="modal-form" style="margin-top:12px">'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clLblName">'+lblName+'</label><input id="clName" value="'+esc(c.name||'')+'"></div>'+
     '<div class="form-group" style="flex:1"><label id="clLblTitle">'+lblTitle+'</label><input id="clTitle" value="'+esc(c.title||'')+'"></div></div>'+
-    '<div class="form-group"><label id="clLblCompany">'+lblCompany+'</label><input id="clCompany" value="'+esc(c.company||'')+'"></div>'+
+    '<div class="form-group"><label id="clLblCompany">'+lblCompany+'</label><input id="clCompany" maxlength="17" autocapitalize="characters" value="'+esc(c.company||'')+'"></div>'+
     '<div class="form-group"><label>地址</label><input id="clAddress" value="'+esc(c.address||'')+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话<span class="req">*</span></label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
     '<div class="form-group" style="flex:1"><label>类型<span class="req">*</span></label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
@@ -4658,7 +4663,13 @@ function openClientForm(id){
       '<button class="btn-primary" style="flex:1;background:#999" onclick="closeModal(\'clientModal\')">取消</button>'+
     '</div></div>';
   var m=document.getElementById('clientModal'); m.innerHTML=html; m.style.display='flex';
-  m.onclick=function(e){ if(e.target===m) closeModal('clientModal'); };
+  // 点击遮罩才关闭；拖动（含编辑时误滑到遮罩区域）不关闭，避免左滑误关弹窗
+  m._mx=0; m._my=0; m._mmoved=false;
+  m.onmousedown=function(e){ m._mx=e.clientX; m._my=e.clientY; m._mmoved=false; };
+  m.onmousemove=function(e){ if(Math.abs(e.clientX-m._mx)>6||Math.abs(e.clientY-m._my)>6) m._mmoved=true; };
+  m.ontouchstart=function(e){ var t=e.touches[0]; if(!t) return; m._mx=t.clientX; m._my=t.clientY; m._mmoved=false; };
+  m.ontouchmove=function(e){ var t=e.touches[0]; if(!t) return; if(Math.abs(t.clientX-m._mx)>6||Math.abs(t.clientY-m._my)>6) m._mmoved=true; };
+  m.onclick=function(e){ if(e.target===m && !m._mmoved) closeModal('clientModal'); m._mmoved=false; };
 }
 function clTagGroupsHTML(c){
   var tags = c.tags||[];
@@ -4703,7 +4714,7 @@ function saveClient(id, isEdit){
   if(!title.trim()){ toast('请输入'+(type==='财险'?'车牌':'职务')+'（必填项）'); return; }
   var company = elVal('clCompany');
   if(!company.trim()){ toast('请输入'+(type==='财险'?'车架号':'公司')+'（必填项）'); return; }
-  if(type==='财险' && company.trim().length!==17){ toast('车架号必须为 17 位（当前 '+company.trim().length+' 位）'); return; }
+  if(type==='财险' && !/^[A-Za-z0-9]{17}$/.test(company.trim())){ toast('车架号必须为 17 位数字或字母（当前 '+company.trim().length+' 位）'); return; }
   var phone = elVal('clPhone');
   if(!phone.trim()){ toast('请输入电话（必填项）'); return; }
   if(!/^\d{11}$/.test(phone.trim())){ toast('电话必须为 11 位数字'); return; }
@@ -6873,13 +6884,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 154;                         // v154：①客户中心副标题改为「客户·跟进·维护·拜访 统一管理」；②标签筛选新增第二行（A(高)/B(中)/C(低)/D/已结算/未结算）；③客户表单必填校验（车主/姓名、职务/车牌、公司/车架号、电话、类型、日期 加 *）+ 车架号 17 位、电话 11 位 约束
+const WB_VERSION = 155;                         // v155：①修复编辑客户弹窗拖动（左滑到遮罩）误关问题；②财险车架号校验改为 17 位字母或数字；③客户筛选两行标签（阶段行 + 优先级/结算行）相互独立，可各选一个组合筛选
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 71;                  // v154 发版：70→71（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 72;                  // v155 发版：71→72（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
