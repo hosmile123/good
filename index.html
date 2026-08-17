@@ -13,6 +13,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
+<!-- v167-cachebust: 强制刷新所有客户端缓存（v166 的区间标题已上线，部分手机端仍持旧缓存） -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -6980,13 +6981,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 166;                         // v166：戒烟里程碑由"单天阈值"改为"区间范围"——9 个阶段标题改为 3-7/7-15/15-30/30-90/90-120/120-180/180-270/270-365/365+ 天，匹配逻辑由 days>=d 改为 days∈[lo,hi)；正文内容不变
+const WB_VERSION = 167;                         // v167：v166 已推送 22 分钟仍被部分手机浏览器持旧缓存；改一行 head 注释强制重新拉取，确保区间标题生效
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 83;                  // v166 发版：82→83（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 84;                  // v167 发版：83→84（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
