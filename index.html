@@ -364,6 +364,13 @@ body.sb-collapsed .sidebar-item:hover::after {
 }
 .filter-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
 .date-filter-input { font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:16px; outline:none; font-family:inherit; color:var(--text-primary); background:#fff; min-width:0; }
+/* 客户中心筛选行：PC 端 chip，移动端 <select> 节省空间 */
+.filter-select { display: none; width: 100%; max-width: 100%; padding: 8px 12px; border-radius: 18px; border: 1px solid var(--border); background: #fff; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; box-sizing: border-box; }
+.filter-select:focus { border-color: var(--primary); }
+@media (max-width: 768px) {
+  .filter-row.mobile-select .filter-tab { display: none; }
+  .filter-row.mobile-select .filter-select { display: block; }
+}
 
 /* ===== Hero Banner ===== */
 .hero-banner {
@@ -1844,7 +1851,7 @@ function toggleSbCollapse(){
   </div>
 
   <!-- 标签筛选（可点击统计下钻） -->
-  <div class="filter-row" id="clientTagFilter">
+  <div class="filter-row mobile-select" id="clientTagFilter">
     <button class="filter-tab active" onclick="clientSetTag(this,'全部')">全部</button>
     <button class="filter-tab" onclick="clientSetTag(this,'成交')">✅ 成交</button>
     <button class="filter-tab" onclick="clientSetTag(this,'已报价')">💡 已报价</button>
@@ -1854,6 +1861,17 @@ function toggleSbCollapse(){
     <button class="filter-tab" onclick="clientSetTag(this,'预约')">📅 预约</button>
     <button class="filter-tab" onclick="clientSetTag(this,'无人')">📵 无人</button>
     <button class="filter-tab" onclick="clientSetTag(this,'战败')">💔 战败</button>
+    <select class="filter-select" onchange="clientSetTag(this,this.value)" aria-label="跟进状态">
+      <option value="全部">📋 全部</option>
+      <option value="成交">✅ 成交</option>
+      <option value="已报价">💡 已报价</option>
+      <option value="考虑">🤔 考虑</option>
+      <option value="拒绝">🚫 拒绝</option>
+      <option value="加微">➕ 加微</option>
+      <option value="预约">📅 预约</option>
+      <option value="无人">📵 无人</option>
+      <option value="战败">💔 战败</option>
+    </select>
   </div>
   <!-- 第二行标签筛选：一级优先级（A/B/C/D）+ 其他（已结算/未结算） -->
   <div class="filter-row" id="clientTagFilter2" style="margin-top:6px">
@@ -1874,7 +1892,7 @@ function toggleSbCollapse(){
   </div>
 
   <!-- 人员筛选（管理员可见全部人员；员工仅见自己） -->
-  <div class="filter-row" id="clientPersonFilter" style="margin-top:8px"></div>
+  <div class="filter-row mobile-select" id="clientPersonFilter" style="margin-top:8px"></div>
 
   <!-- 日期筛选 -->
   <div class="date-filter-row" id="clientDateFilter" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -4614,11 +4632,18 @@ function dateUrgencyLevel(ds, todayStr, mode){
   if(diffDays <= 30) return 'warn';            // 8~30天
   return '';
 }
-function clientSetTag(btn, tag){
+function clientSetTag(src, tag){
   // 两行筛选相互独立：每行只能选一个，点击仅清除本行高亮；可同时按「阶段」+「优先级/结算」组合筛选
-  var rowSel = (btn && btn.parentNode) ? '#'+btn.parentNode.id : '#clientTagFilter';
-  document.querySelectorAll(rowSel+' .filter-tab').forEach(function(t){t.classList.remove('active');});
-  if(btn) btn.classList.add('active');
+  // src 可能是 chip(button) 或移动端 select；任一来源都要同步更新另一边的选中态
+  var rowEl = (src && src.parentNode) ? src.parentNode : document.getElementById('clientTagFilter');
+  var rowSel = rowEl && rowEl.id ? ('#'+rowEl.id) : '#clientTagFilter';
+  if(rowEl) rowEl.querySelectorAll('.filter-tab').forEach(function(t){t.classList.remove('active');});
+  if(src && src.tagName==='SELECT'){ src.value = tag; } else if(src && src.classList){ src.classList.add('active'); }
+  // 同步 select 的选中态
+  if(rowEl){
+    var sel = rowEl.querySelector('.filter-select');
+    if(sel && src!==sel) sel.value = tag;
+  }
   if(rowSel==='#clientTagFilter2'){ _clState.tagPrio = tag; } else { _clState.tagStage = tag; }
   _clState.appt = null; renderClients();
 }
@@ -4638,21 +4663,37 @@ function clientSetType(btn, type){
 // 人员筛选（管理员按账号昵称筛选；员工仅“全部/我”）
 function renderPersonFilter(){
   var box = document.getElementById('clientPersonFilter'); if(!box) return;
+  // chips (PC 端)
   var html = '<button class="filter-tab'+( _clState.person==='all'?' active':'')+'" onclick="clientSetPerson(this,\'all\')">👥 人员·全部</button>';
+  // options (移动端 select)
+  var opts = '<option value="all">👥 人员·全部</option>';
   if(wbIsAdmin()){
     wbAllAccounts().forEach(function(a){
       if(a.role==='admin') return; // 管理员自己不列为“人员”
       var on = (_clState.person===a.email)?' active':'';
-      html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+a.email+'\')">'+esc(a.nick||a.email)+'</button>';
+      var label = esc(a.nick||a.email);
+      html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+a.email+'\')">'+label+'</button>';
+      var sel = (_clState.person===a.email)?' selected':'';
+      opts += '<option value="'+a.email+'"'+sel+'>'+label+'</option>';
     });
   } else {
-    html += '<button class="filter-tab'+( _clState.person===WB_SESSION?' active':'')+'" onclick="clientSetPerson(this,\''+(WB_SESSION||'guest')+'\')">我</button>';
+    var meUid = WB_SESSION||'guest';
+    var on = (_clState.person===meUid)?' active':'';
+    var sel = (_clState.person===meUid)?' selected':'';
+    html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+meUid+'\')">我</button>';
+    opts += '<option value="'+meUid+'"'+sel+'>我</option>';
   }
+  html += '<select class="filter-select" onchange="clientSetPerson(this,this.value)" aria-label="人员筛选">'+opts+'</select>';
   box.innerHTML = html;
 }
-function clientSetPerson(btn, uid){
-  document.querySelectorAll('#clientPersonFilter .filter-tab').forEach(function(t){t.classList.remove('active');});
-  btn.classList.add('active');
+function clientSetPerson(src, uid){
+  var rowEl = (src && src.parentNode) ? src.parentNode : document.getElementById('clientPersonFilter');
+  if(rowEl) rowEl.querySelectorAll('.filter-tab').forEach(function(t){t.classList.remove('active');});
+  if(src && src.tagName==='SELECT'){ src.value = uid; } else if(src && src.classList){ src.classList.add('active'); }
+  if(rowEl){
+    var sel = rowEl.querySelector('.filter-select');
+    if(sel && src!==sel) sel.value = uid;
+  }
   _clState.person = uid; renderClients();
 }
 function clientSetAppt(scope){
@@ -4661,6 +4702,10 @@ function clientSetAppt(scope){
   var tf=document.querySelectorAll('#clientTagFilter .filter-tab'); tf.forEach(function(t){t.classList.remove('active');}); if(tf[0]) tf[0].classList.add('active');
   var tf2=document.querySelectorAll('#clientTagFilter2 .filter-tab'); tf2.forEach(function(t){t.classList.remove('active');}); if(tf2[0]) tf2[0].classList.add('active');
   var yf=document.querySelectorAll('#clientTypeFilter .filter-tab'); yf.forEach(function(t){t.classList.remove('active');}); if(yf[0]) yf[0].classList.add('active');
+  // 同步移动端下拉
+  var sTag = document.querySelector('#clientTagFilter .filter-select'); if(sTag) sTag.value = '全部';
+  var sTag2 = document.querySelector('#clientTagFilter2 .filter-select'); if(sTag2) sTag2.value = '全部';
+  var sType = document.querySelector('#clientTypeFilter .filter-select'); if(sType) sType.value = '全部';
   renderClients();
 }
 function inCurrentWeek(ds){
@@ -6921,13 +6966,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 160;                         // v160：①互换跟进状态/跟进等级标题（一级=跟进等级 A(高)/B(中)/C(低)/D，二级=跟进状态 成交/已报价/考虑/拒绝/加微/预约/无人/战败）；②客户卡片在姓名/类型旁显示跟进等级与跟进状态徽章（红框位置）；③编辑表单「日期」label 改为「联系日期」；④TOB 类型时手续费 A/B 也统一显示为「手续费A(元)/手续费B(元)」（去掉「保函」二字）；⑤客户卡片移除左侧头像圆
+const WB_VERSION = 161;                         // v161：客户中心「跟进状态」行（#clientTagFilter）与「人员」行（#clientPersonFilter）在窄屏（≤768px）改为下拉单选，PC 端保留 chip 按钮——节省移动端纵向空间，避免换行；两端选中态双向同步
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 77;                  // v160 发版：76→77（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 78;                  // v161 发版：77→78（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
