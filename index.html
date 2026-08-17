@@ -479,11 +479,11 @@ body.sb-collapsed .sidebar-item:hover::after {
 .cs-label { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 .search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
 .search-bar input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 24px; font-size: 14px; outline: none; }
-.client-card { position: relative; overflow: hidden; border-bottom: 1px solid #F5F5F5; background: #ff4d4f; }
+.client-card { position: relative; overflow: hidden; border-bottom: 1px solid #F5F5F5; background: #fff; }
 .client-card:last-child { border-bottom: none; }
-.client-card-inner { position: relative; z-index: 2; background: #fff; display: flex; align-items: center; gap: 12px; padding: 14px; box-sizing: border-box; transition: transform .2s; cursor: pointer; }
+.client-card-inner { position: relative; z-index: 2; background: #fff; display: flex; align-items: center; gap: 12px; padding: 14px; box-sizing: border-box; cursor: pointer; }
 .client-del-reveal { position: absolute; top: 0; right: 0; height: 100%; width: 88px; background: #ff4d4f; color: #fff; border: none; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 1; cursor: pointer; }
-@media(hover:hover){ .client-card:hover .client-card-inner { transform: translateX(-88px); } }
+/* 客户卡片删除已迁移到「更多」⋮ 菜单（v159），不再需要左滑删除交互 */
 /* 通用左滑删除（待办 / 体重 / 收支明细 等复用） */
 .swipe-card { position: relative; overflow: hidden; background: #ff4d4f; }
 .swipe-reveal { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #ff4d4f; color: #fff; border: none; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 1; cursor: pointer; }
@@ -659,8 +659,19 @@ body.sb-collapsed .sidebar-item:hover::after {
 .client-icon-btn { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--text-light); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; padding: 0; }
 .client-icon-btn:hover { background: #f1f5f9; color: var(--primary); }
 .client-icon-btn.del:hover { background: #fff1f0; color: #ff4d4f; }
+.client-icon-btn.more { font-weight: 700; font-size: 18px; line-height: 1; letter-spacing: 1px; color: var(--text-light); }
+.client-icon-btn.more:hover { background: #f1f5f9; color: var(--text); }
+/* v159：卡片「更多」⋮ 弹出菜单（点开显示删除） */
+.client-popmenu { position: absolute; top: 40px; right: 8px; z-index: 30; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 18px rgba(15,23,42,.16); padding: 4px; min-width: 104px; }
+.client-popmenu-item { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 9px 12px; font-size: 13px; font-family: inherit; color: var(--text); border-radius: 6px; cursor: pointer; }
+.client-popmenu-item:hover { background: #f5f5f5; }
+.client-popmenu-item.danger { color: #ff4d4f; }
+.client-popmenu-item.danger:hover { background: #fff1f0; }
 /* v150 行 2：车牌/车架号/电话（同行，三个字段） */
 .client-row2 { font-size: 12px; color: var(--text-secondary); line-height: 1.6; word-break: break-all; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+/* v159：客户中心卡片内容统一靠左对齐 */
+.client-card-inner, .client-row1, .client-row2, .client-row3, .client-name-block { text-align: left; justify-content: flex-start; }
+.client-card-inner { align-items: stretch; }
 .client-row2 .cm-field { display: inline-flex; align-items: center; gap: 3px; }
 /* v150 行 3：四合一 chip 行（联系 + 到期 + 行动 + 备注） */
 .client-row3 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -4193,10 +4204,10 @@ function selectMood(btn) {
 // 标签三级分组：一级（优先级·必选）、二级（阶段·必选）、其他（可选，选 0 或 1）
 // 每类内只能选一个；一级、二级为必选标签，其他可选可不选。
 var CL_TAG_GROUPS = [
-  {key:'l1', name:'一级标签（优先级·必选）', required:true, opts:[
+  {key:'l1', name:'跟进状态（必选）', required:true, opts:[
     {v:'A(高)', cls:'t-l1a'}, {v:'B(中)', cls:'t-l1b'}, {v:'C(低)', cls:'t-l1c'}, {v:'D', cls:'t-l1d'}
   ]},
-  {key:'l2', name:'二级标签（阶段·必选）', required:true, opts:[
+  {key:'l2', name:'跟进等级（必选）', required:true, opts:[
     {v:'成交', cls:'t-deal'}, {v:'已报价', cls:'t-quote'}, {v:'考虑', cls:'t-consider'}, {v:'拒绝', cls:'t-reject'},
     {v:'加微', cls:'t-wx'}, {v:'预约', cls:'t-appt'}, {v:'无人', cls:'t-noans'}, {v:'战败', cls:'t-lost'}
   ]},
@@ -4331,58 +4342,39 @@ function clientTagHTML(c){
 }
 // 客户卡片左滑删除（触摸 + 电脑端鼠标拖拽）
 function bindClientSwipe(){
+  // v159：删除已迁移到卡片「更多」⋮ 菜单，不再需要左滑删除；此处仅绑定点击打开编辑
   var cards = document.querySelectorAll('#clientCardList .client-card');
   cards.forEach(function(card){
     var inner = card.querySelector('.client-card-inner');
     if(!inner || inner._bound) return; inner._bound = true;
-    var startX = 0, startY = 0, dx = 0, dy = 0, moved = false, dragging = false;
-    function onStart(x, y){ startX = x; startY = y; dx = 0; dy = 0; moved = false; dragging = true; inner.style.transition = ''; }
-    function onMove(x, y){
-      if(!dragging) return;
-      dx = x - startX; dy = y - startY;
-      if(Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
-      if(Math.abs(dy) > Math.abs(dx)) return;
-      if(dx < 0) inner.style.transform = 'translateX(' + Math.max(dx, -88) + 'px)';
-    }
-    function onEnd(){
-      if(!dragging) return false; dragging = false;
-      var slidOut = false;
-      if(moved && Math.abs(dx) > Math.abs(dy)){
-        inner.style.transition = 'transform .2s';
-        inner.style.transform = (dx < -44) ? 'translateX(-88px)' : 'translateX(0)';
-        inner._guard = true; setTimeout(function(){ inner._guard = false; }, 350);
-        slidOut = dx < -44;
-      }
-      startX = 0; startY = 0;
-      return slidOut;
-    }
-    // 触摸端
-    card.addEventListener('touchstart', function(e){ onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-    card.addEventListener('touchmove', function(e){ onMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-    card.addEventListener('touchend', onEnd);
-    // 电脑端：鼠标按住向左拖动才滑出
-    card.addEventListener('mousedown', function(e){
-      if(e.button !== 0) return;
-      onStart(e.clientX, e.clientY);
-      var blocked = false;
-      function mm(ev){ onMove(ev.clientX, ev.clientY); }
-      function blockClick(ev){ if(blocked && inner.contains(ev.target)){ ev.stopPropagation(); ev.preventDefault(); } }
-      function mu(){
-        var slidOut = onEnd();
-        document.removeEventListener('mousemove', mm);
-        document.removeEventListener('mouseup', mu);
-        document.removeEventListener('click', blockClick, true);
-        if(slidOut){ blocked = true; setTimeout(function(){ blocked = false; }, 350); }
-      }
-      document.addEventListener('mousemove', mm);
-      document.addEventListener('mouseup', mu);
-      document.addEventListener('click', blockClick, true);
-    });
     inner.addEventListener('click', function(e){
-      if(inner._guard){ inner._guard = false; e.stopPropagation(); e.preventDefault(); return; }
       openClientForm(card.getAttribute('data-id'));
     });
   });
+}
+// v159：客户卡片「更多」⋮ 菜单（点开显示删除，避免误删）
+function toggleClientMenu(id, btn){
+  if(!id) return;
+  var card = btn.closest('.client-card');
+  if(!card) return;
+  // 关闭所有已打开的菜单
+  document.querySelectorAll('#clientCardList .client-popmenu').forEach(function(m){ m.remove(); });
+  var existing = card.querySelector('.client-popmenu');
+  if(existing){ return; }  // 当前已打开 → 本次点击仅关闭
+  var menu = document.createElement('div');
+  menu.className = 'client-popmenu';
+  menu.innerHTML = '<button type="button" class="client-popmenu-item danger" onclick="event.stopPropagation();if(confirm(\'确定删除该客户吗？此操作不可恢复\'))deleteClient(\''+id+'\')">🗑 删除</button>';
+  menu.addEventListener('click', function(e){ e.stopPropagation(); });
+  card.appendChild(menu);
+  // 点击外部关闭
+  setTimeout(function(){
+    document.addEventListener('click', function closeMe(ev){
+      if(!menu.contains(ev.target) && !btn.contains(ev.target)){
+        menu.remove();
+        document.removeEventListener('click', closeMe, true);
+      }
+    }, true);
+  }, 0);
 }
 // 通用左滑删除：容器内 .swipe-card 左滑露出背后的删除按钮
 // 触摸端用 touch 事件；电脑端改用鼠标按住拖拽（不再 hover 自动滑出，需手动左滑）
@@ -4479,7 +4471,7 @@ function renderClients(){
       +   ownerBadge
       +   stBadge
       +   '<button type="button" class="client-icon-btn" onclick="event.stopPropagation();openClientForm(\''+c.id+'\')" title="编辑">✏️</button>'
-      +   '<button type="button" class="client-icon-btn del" onclick="event.stopPropagation();deleteClient(\''+c.id+'\')" title="删除">🗑</button>'
+      +   '<button type="button" class="client-icon-btn more" onclick="event.stopPropagation();toggleClientMenu(\''+c.id+'\',this)" title="更多">⋮</button>'
       + '</div>'
       + '</div>';
     // Row2：信息（车牌/车架号/电话 仅 财险；其他显示 公司/职位/电话）
@@ -4683,11 +4675,11 @@ function openClientForm(id){
     '<div class="modal-form" style="margin-top:12px">'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clLblName">'+lblName+'</label><input id="clName" value="'+esc(c.name||'')+'"></div>'+
     '<div class="form-group" style="flex:1"><label id="clLblTitle">'+lblTitle+'</label><input id="clTitle" value="'+esc(c.title||'')+'"></div></div>'+
+    '<div class="form-group"><label>电话<span class="req">*</span></label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
     '<div class="form-group"><label id="clLblCompany">'+lblCompany+'</label><input id="clCompany" maxlength="17" autocapitalize="characters" value="'+esc(c.company||'')+'"></div>'+
     '<div class="form-group"><label>地址</label><input id="clAddress" value="'+esc(c.address||'')+'"></div>'+
-    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话<span class="req">*</span></label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
-    '<div class="form-group" style="flex:1"><label>类型<span class="req">*</span></label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
-    '<div class="form-group"><label>标签（分级单选：一级/二级必选，其他可选）</label>'+tagHTML+'</div>'+
+    '<div class="form-group"><label>类型<span class="req">*</span></label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div>'+
+    '<div class="form-group">'+tagHTML+'</div>'+
     '<div class="form-group"><label>日期<span class="req">*</span></label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
     '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px;margin-top:8px">'+
@@ -4699,7 +4691,6 @@ function openClientForm(id){
     '<div class="form-group"><label>备注</label><textarea id="clNote" rows="2">'+esc(c.note||'')+'</textarea></div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
-      (isEdit?'<button class="btn-primary" style="flex:1;background:#ff4d4f" onclick="deleteClient(\''+c.id+'\');closeModal(\'clientModal\')">删除</button>':'')+
       '<button class="btn-primary" style="flex:1" onclick="saveClient(\''+c.id+'\','+isEdit+')">保存</button>'+
       '<button class="btn-primary" style="flex:1;background:#999" onclick="closeModal(\'clientModal\')">取消</button>'+
     '</div></div>';
@@ -6923,13 +6914,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 158;                         // v158：客户编辑表单「标签」从三组 chip 多选按钮改为三个独立下拉单选（贴合截图样式：一级 A/B/C/D、二级 8 个阶段、其他 已结算/未结算），原生 <select> 自动单选、保留必填校验、扁平数组存储不变
+const WB_VERSION = 159;                         // v159：客户中心 UI 调整——①编辑表单电话移到姓名下方独立整行、去掉标签说明文案；②一级标签改名为「跟进状态」、二级改名为「跟进等级」；③编辑弹窗底部删除按钮隐藏（防误删）；④卡片删除由 🗑 改为右上角 ⋮ 菜单点开删除；⑤移除卡片左滑删除残留交互、卡片内容统一左对齐
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 75;                  // v158 发版：74→75（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 76;                  // v159 发版：75→76（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
