@@ -13,7 +13,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
-<!-- v167-cachebust: 强制刷新所有客户端缓存（v166 的区间标题已上线，部分手机端仍持旧缓存） -->
+<!-- v168-cachebust: 生活密码改为"生成即保存"，移除保存设置按钮，强制刷新 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1392,11 +1392,11 @@ function toggleSbCollapse(){
     <!-- 手机端 / 强制设置：设置面板 -->
     <div id="lpSetupPanel">
       <div style="font-size:12px;color:var(--text-light);line-height:1.6;margin-bottom:12px">
-        生成一个 6 位随机数字，电脑端打开「日记 / 作息 / 运动旅行 / 记账」等生活功能时需输入此密码。请牢记或在手机上查看。
+        生成一个 6 位随机数字，电脑端打开「日记 / 作息 / 运动旅行 / 记账」等生活功能时需输入此密码。点击「生成新的随机密码」即自动保存生效，无需再点保存；生成前以 ------ 掩码显示。
       </div>
       <div style="background:#f7f8fa;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
         <div style="font-size:11px;color:var(--text-light);margin-bottom:4px">当前生活密码</div>
-        <div style="font-size:28px;font-weight:800;letter-spacing:6px;color:var(--primary)" id="lpCurrent">未设置</div>
+        <div style="font-size:28px;font-weight:800;letter-spacing:6px;color:var(--primary)" id="lpCurrent">------</div>
         <div id="lpPassTip" style="font-size:11px;color:var(--text-light);margin-top:6px;min-height:14px"></div>
       </div>
       <button class="btn-primary" style="width:100%;margin-bottom:10px" onclick="lpGenerate()">🎲 生成新的 6 位随机密码</button>
@@ -1404,7 +1404,6 @@ function toggleSbCollapse(){
       <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:10px 0 8px">需要密码保护的功能</div>
       <div id="lpPages" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
       <div class="login-msg" id="lpMsg" style="min-height:18px"></div>
-      <button class="login-btn" onclick="lpSave()">保存设置</button>
     </div>
     <!-- 电脑端：状态 / 验证面板 -->
     <div id="lpStatusPanel" style="display:none">
@@ -6981,13 +6980,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 167;                         // v167：v166 已推送 22 分钟仍被部分手机浏览器持旧缓存；改一行 head 注释强制重新拉取，确保区间标题生效
+const WB_VERSION = 168;                         // v168：生活密码改为"生成即保存"，移除保存设置按钮，生成前以 ------ 掩码
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 84;                  // v167 发版：83→84（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 85;                  // v168 发版：84→85（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10565,15 +10564,14 @@ function lpRenderSetup(){
   var cur = document.getElementById('lpCurrent');
   var tip = document.getElementById('lpPassTip');
   var copyBtn = document.getElementById('lpCopyBtn');
-  // 优先展示已生成但未保存的候选码，其次展示已保存的明文密码
-  var shown = (cur.dataset.gen || _lifePassCurrent || '');
-  if(shown){
-    cur.textContent = shown;
-    if(tip) tip.textContent = cur.dataset.gen ? '（新生成的候选密码，保存后生效）' : '（已设置，点「复制」可复制；生成新密码将覆盖）';
+  // 生成之前一律掩码；仅本次会话点过「生成」才显示明文（生成即保存生效）
+  if(cur.dataset.gen){
+    cur.textContent = cur.dataset.gen;
+    if(tip) tip.textContent = '✅ 已生成并保存，请记好（点「复制」可复制）';
     if(copyBtn) copyBtn.style.display = '';
   } else {
-    cur.textContent = '未设置';
-    if(tip) tip.textContent = '点击下方「生成」获取 6 位随机密码';
+    cur.textContent = '------';
+    if(tip) tip.textContent = '点击下方「生成新的随机密码」获取 6 位密码';
     if(copyBtn) copyBtn.style.display = 'none';
   }
   var box = document.getElementById('lpPages');
@@ -10585,30 +10583,28 @@ function lpRenderSetup(){
   }).join('');
   var msg = document.getElementById('lpMsg'); msg.textContent=''; msg.style.color='#FF4D4F';
 }
-function lpGenerate(){
+async function lpGenerate(){
   var code = lpGen6();
   var cur = document.getElementById('lpCurrent');
   cur.textContent = code; cur.dataset.gen = code;
+  var tip = document.getElementById('lpPassTip');
+  if(tip) tip.textContent = '✅ 已生成并保存，请记好（点「复制」可复制）';
+  var copyBtn = document.getElementById('lpCopyBtn'); if(copyBtn) copyBtn.style.display='';
   var msg = document.getElementById('lpMsg'); msg.style.color='#52C41A';
-  msg.textContent='已生成新密码（保存后生效，请记好）';
+  msg.textContent='正在保存…';
+  await lpCommitSave(code);
 }
-async function lpSave(){
-  var cur = document.getElementById('lpCurrent');
-  var gen = cur.dataset.gen || '';
-  var pass = gen;
-  if(!gen){
-    pass = (prompt('请输入要设置的 6 位生活密码（留空则使用上方生成的随机码）：')||'').trim();
-    if(!pass) pass = gen;
-  }
+// 生成后自动保存（含受保护页面选择）。无需「保存设置」按钮：生成即生效。
+async function lpCommitSave(pass){
   if(!/^\d{6}$/.test(pass)){ alert('生活密码必须是 6 位数字'); return; }
   var pages = [];
   document.querySelectorAll('#lpPages input[data-lp]').forEach(function(cb){ if(cb.checked) pages.push(cb.getAttribute('data-lp')); });
   ['diary','routine','fitness','money'].forEach(function(p){ if(pages.indexOf(p)<0) pages.push(p); });
+  var msg = document.getElementById('lpMsg');
   if(!API_TOKEN){
     _lifeProtected = pages; _lifeHasPass = true; _lifePassCurrent = pass;
     localStorage.setItem(lpCfgKey(), JSON.stringify({protectedPages:pages, hasPass:true, pass:pass}));
-    var m0=document.getElementById('lpMsg'); m0.style.color='#FAAD14'; m0.textContent='⚠️ 离线模式：仅本机生效，联网后请重新保存';
-    lpRenderSetup();
+    msg.style.color='#FAAD14'; msg.textContent='⚠️ 离线模式：仅本机生效，联网后请重新保存';
     return;
   }
   try {
@@ -10616,12 +10612,11 @@ async function lpSave(){
     if(d && d.ok){
       _lifeProtected = pages; _lifeHasPass = true; _lifePassCurrent = pass;
       localStorage.setItem(lpCfgKey(), JSON.stringify({protectedPages:pages, hasPass:true, pass:pass}));
-      var m1=document.getElementById('lpMsg'); m1.style.color='#52C41A'; m1.textContent='✅ 已保存';
-      lpRenderSetup(); // 刷新：继续显示已保存的密码 + 复制按钮
+      msg.style.color='#52C41A'; msg.textContent='✅ 已生成并保存，请记好';
     } else {
-      var m2=document.getElementById('lpMsg'); m2.style.color='#FF4D4F'; m2.textContent=(d&&d.error)||'保存失败';
+      msg.style.color='#FF4D4F'; msg.textContent=(d&&d.error)||'保存失败';
     }
-  } catch(e){ var m3=document.getElementById('lpMsg'); m3.style.color='#FF4D4F'; m3.textContent=e.message||'保存失败'; }
+  } catch(e){ msg.style.color='#FF4D4F'; msg.textContent=e.message||'保存失败'; }
 }
 function lpRenderStatus(){
   if(_lifeUnlocked){
