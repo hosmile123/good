@@ -365,7 +365,13 @@ body.sb-collapsed .sidebar-item:hover::after {
 .filter-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
 .date-filter-input { font-size:12px; padding:4px 8px; border:1px solid var(--border); border-radius:16px; outline:none; font-family:inherit; color:var(--text-primary); background:#fff; min-width:0; }
 /* 客户中心筛选行：保留 <select> 节点供 JS 读写状态，默认隐藏以防误显 */
-.filter-select { display: none; }
+.filter-select { display: none; width: 100%; max-width: 100%; padding: 8px 12px; border-radius: 18px; border: 1px solid var(--border); background: #fff; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; box-sizing: border-box; }
+.filter-select:focus { border-color: var(--primary); }
+/* 仅带 mobile-select 的行（人员筛选）在窄屏切换为下拉单选，节省空间；其余行仍用胶囊按钮 */
+@media (max-width: 768px) {
+  .filter-row.mobile-select .filter-tab { display: none; }
+  .filter-row.mobile-select .filter-select { display: block; }
+}
 
 /* ===== Hero Banner ===== */
 .hero-banner {
@@ -1887,7 +1893,7 @@ function toggleSbCollapse(){
   </div>
 
   <!-- 人员筛选（管理员可见全部人员；员工仅见自己） -->
-  <div class="filter-row" id="clientPersonFilter" style="margin-top:8px"></div>
+  <div class="filter-row mobile-select" id="clientPersonFilter" style="margin-top:8px"></div>
 
   <!-- 日期筛选 -->
   <div class="date-filter-row" id="clientDateFilter" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -6961,13 +6967,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 162;                         // v162：撤销 v161 移动端「跟进状态/人员」行下拉单选——两端统一使用原来的胶囊 chip 按钮（用户反馈移动端下拉体验不直观）；保留隐藏的 <select> 节点以维持 JS 状态读写逻辑
+const WB_VERSION = 163;                         // v163：仅「人员」筛选行（#clientPersonFilter）在窄屏改为下拉单选，跟进状态行保持胶囊按钮；恢复 .filter-select 外观样式与 @media 局部切换
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 79;                  // v162 发版：78→79（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 80;                  // v163 发版：79→80（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
