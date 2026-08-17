@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>工作台 · 智能入口</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:#f5f7fa;color:#1f2d3d}
+  .card{width:min(92vw,420px);background:#fff;border-radius:16px;padding:28px 24px;
+        box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center}
+  .spin{width:34px;height:34px;margin:0 auto 16px;border:4px solid #d3d1c7;
+        border-top-color:#378add;border-radius:50%;
+        animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .t{font-size:16px;font-weight:500;margin-bottom:6px}
+  .s{font-size:13px;color:#5f5e5a;line-height:1.6}
+  .links{margin-top:18px;display:none;flex-direction:column;gap:10px}
+  .links.show{display:flex}
+  .links a{display:block;text-decoration:none;padding:11px 14px;border-radius:10px;
+           background:#e6f1fb;color:#0c447c;font-size:14px;border:1px solid #b5d4f4}
+  .links a small{display:block;color:#185fa5;font-size:12px;margin-top:2px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="spin" id="spin"></div>
+    <div class="t">正在为你选择最快入口…</div>
+    <div class="s" id="msg">并发探测中</div>
+    <div class="links" id="links">
+      <div class="s" style="margin-bottom:4px">三个镜像暂不可达，请手动选择：</div>
+    </div>
+  </div>
+<script>
+(function(){
+  // 三个镜像（与 App 内容一致）。CloudStudio 链接会随部署变化，不可达时自动跳过。
+  var MIRRORS=[
+    {name:"GitHub Pages", url:"https://hosmile123.github.io/workbench/"},
+    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"},
+    {name:"CloudStudio",  url:"https://2a98e3f6a2484a8297f6657e0bd16030.app.workbuddy.link/"}
+  ];
+  var TIMEOUT=2600;
+  var msg=document.getElementById("msg");
+
+  // 当前页面若本身就在某镜像的根路径，记下它，避免跳回自己造成循环
+  function hereRoot(){
+    var h=location.href;
+    for(var i=0;i<MIRRORS.length;i++){
+      if(h.indexOf(MIRRORS[i].url)===0) return MIRRORS[i].url;
+    }
+    return null;
+  }
+
+  function ping(m){
+    var start=performance.now();
+    var ctrl=new AbortController();
+    var to=setTimeout(function(){ctrl.abort();},TIMEOUT);
+    return fetch(m.url+"?_="+Date.now(),{mode:"no-cors",cache:"no-store",signal:ctrl.signal})
+      .then(function(){clearTimeout(to);return {m:m,ok:true,ms:performance.now()-start};})
+      .catch(function(){clearTimeout(to);return {m:m,ok:false,ms:TIMEOUT};});
+  }
+
+  var here=hereRoot();
+
+  Promise.all(MIRRORS.map(ping)).then(function(res){
+    var good=res.filter(function(r){return r.ok;});
+    if(!good.length){
+      msg.textContent="三个镜像暂不可达";
+      document.getElementById("spin").style.display="none";
+      var box=document.getElementById("links");
+      box.classList.add("show");
+      MIRRORS.forEach(function(m){
+        var a=document.createElement("a");
+        a.href=m.url;
+        a.innerHTML=m.name+"<small>"+m.url+"</small>";
+        box.appendChild(a);
+      });
+      return;
+    }
+    good.sort(function(a,b){return a.ms-b.ms;});
+    var best=good[0];
+    msg.textContent="已选 "+best.m.name+"（"+Math.round(best.ms)+"ms）";
+    if(here && here===best.m.url){
+      // 当前已是最快可达镜像：直接进应用根路径（去掉路由页，避免循环）
+      location.replace(best.m.url);
+      return;
+    }
+    setTimeout(function(){ location.replace(best.m.url); }, 450);
+  });
+})();
+</script>
+</body>
+</html>
