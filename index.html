@@ -614,6 +614,9 @@ body.sb-collapsed .sidebar-item:hover::after {
 .client-row1 .client-head .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .client-row1 .client-head .client-sub { font-size: 12px; color: var(--text-light); font-weight: 400; }
 .client-type-chip { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0f5ff; color: #2b6fd6; vertical-align: middle; margin-left: 4px; font-weight: 500; }
+.client-tag-badge { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 8px; margin-left: 4px; font-weight: 500; vertical-align: middle; border: 1px solid transparent; line-height: 1.6; }
+.client-tag-badge.l1 { background: #fff7e6; color: #d46b08; border-color: #ffd591; }
+.client-tag-badge.l2 { background: #e6f7ff; color: #096dd9; border-color: #91d5ff; }
 .client-row1 .client-head .client-edit { margin-left: auto; color: var(--text-light); font-size: 16px; padding: 2px 4px; cursor: pointer; }
 .client-row1 .client-head .client-edit:hover { color: var(--primary); }
 .client-row2 { font-size: 12px; color: var(--text-secondary); line-height: 1.6; word-break: break-all; }
@@ -4204,10 +4207,10 @@ function selectMood(btn) {
 // 标签三级分组：一级（优先级·必选）、二级（阶段·必选）、其他（可选，选 0 或 1）
 // 每类内只能选一个；一级、二级为必选标签，其他可选可不选。
 var CL_TAG_GROUPS = [
-  {key:'l1', name:'跟进状态（必选）', required:true, opts:[
+  {key:'l1', name:'跟进等级（必选）', required:true, opts:[
     {v:'A(高)', cls:'t-l1a'}, {v:'B(中)', cls:'t-l1b'}, {v:'C(低)', cls:'t-l1c'}, {v:'D', cls:'t-l1d'}
   ]},
-  {key:'l2', name:'跟进等级（必选）', required:true, opts:[
+  {key:'l2', name:'跟进状态（必选）', required:true, opts:[
     {v:'成交', cls:'t-deal'}, {v:'已报价', cls:'t-quote'}, {v:'考虑', cls:'t-consider'}, {v:'拒绝', cls:'t-reject'},
     {v:'加微', cls:'t-wx'}, {v:'预约', cls:'t-appt'}, {v:'无人', cls:'t-noans'}, {v:'战败', cls:'t-lost'}
   ]},
@@ -4452,20 +4455,24 @@ function renderClients(){
     // 紧急度（用于卡片左边框色）
     var lvl = clientUrgencyLevel(c, todayStr);
     var clsUrg = lvl ? (' client-' + lvl) : '';
-    var avatar = (c.name||'?').slice(0,1);
-    var av = CL_TYPE_COLOR[c.type] ? 'background:'+CL_TYPE_COLOR[c.type] : '';
+    // 跟进等级（l1：A(高)/B(中)/C(低)/D）与跟进状态（l2：成交/已报价/...）
+    var tags = c.tags||[];
+    var l1 = tags.filter(function(t){ return CL_TAG_GROUP_OF[t]==='l1'; })[0] || '';
+    var l2 = tags.filter(function(t){ return CL_TAG_GROUP_OF[t]==='l2'; })[0] || '';
+    var l1Badge = l1 ? '<span class="client-tag-badge l1 '+CL_TAG_CLASS[l1]+'">'+esc(l1)+'</span>' : '';
+    var l2Badge = l2 ? '<span class="client-tag-badge l2 '+CL_TAG_CLASS[l2]+'">'+esc(l2)+'</span>' : '';
     // 派生状态徽章
     var st = clientDerivedStatus(c, todayStr);
     var stBadge = st ? '<span class="client-status '+st.cls+'"><span>'+(st.icon||'')+'</span><span>'+esc(st.label)+'</span></span>' : '';
     // 归属徽章（管理员查看全部时显示客户属于哪位人员）
     var ownerBadge = (wbIsAdmin() && c.ownerUid && c.ownerUid!==WB_SESSION) ? '<span class="client-owner-badge" title="归属人员">@'+esc(accountNick(c.ownerUid))+'</span>' : '';
-    // Row1：头像 + 姓名 + 类型 + 状态徽章 + 编辑/删除
+    // Row1：姓名 + 类型 + 跟进等级/状态徽章 + 编辑/更多
     var row1 =
       '<div class="client-row1">'
-      + '<div class="client-avatar" style="'+av+'">'+esc(avatar)+'</div>'
       + '<div class="client-name-block">'
       +   '<span class="client-name">'+esc(c.name||'')+'</span>'
       +   (c.type? '<span class="client-type-chip">'+esc(c.type)+'</span>':'')
+      +   l1Badge + l2Badge
       + '</div>'
       + '<div class="client-row1-right">'
       +   ownerBadge
@@ -4680,14 +4687,14 @@ function openClientForm(id){
     '<div class="form-group"><label>地址</label><input id="clAddress" value="'+esc(c.address||'')+'"></div>'+
     '<div class="form-group"><label>类型<span class="req">*</span></label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div>'+
     '<div class="form-group">'+tagHTML+'</div>'+
-    '<div class="form-group"><label>日期<span class="req">*</span></label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
+    '<div class="form-group"><label>联系日期<span class="req">*</span></label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
     '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px;margin-top:8px">'+
       '<div class="form-group" style="margin:0"><label style="color:#EB2F96;font-weight:600">下次需要联系的日期</label><input id="clApptDate" type="date" value="'+(c.apptDate||'')+'"></div>'+
     '</div>'+
     '<div class="form-group"><label>成交金额(元)</label><input id="clAmount" type="number" value="'+(+c.amount||0)+'"></div>'+
-    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelA">'+(c.type==='TOB'?'保函手续费A(元)':'手续费A(元)')+'</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
-    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">'+(c.type==='TOB'?'保函手续费B(元)':'手续费B(元)')+'</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div></div>'+
+    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelA">手续费A(元)</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
+    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">手续费B(元)</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div></div>'+
     '<div class="form-group"><label>备注</label><textarea id="clNote" rows="2">'+esc(c.note||'')+'</textarea></div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
@@ -4725,8 +4732,8 @@ function clTagPick(group, value, el){ /* v158 已改下拉单选，此函数保�
 function clTypeChange(){
   var t = (document.getElementById('clType')||{}).value||'财险';
   var lA = document.getElementById('clFeeLabelA'), lB = document.getElementById('clFeeLabelB');
-  if(t === 'TOB'){ if(lA) lA.textContent = '保函手续费A(元)'; if(lB) lB.textContent = '保函手续费B(元)'; }
-  else { if(lA) lA.textContent = '手续费A(元)'; if(lB) lB.textContent = '手续费B(元)'; }
+  if(lA) lA.textContent = '手续费A(元)';
+  if(lB) lB.textContent = '手续费B(元)';
   var ln = document.getElementById('clLblName'), lt = document.getElementById('clLblTitle'), lc = document.getElementById('clLblCompany');
   if(t === '财险'){ if(ln) ln.innerHTML='车主<span class="req">*</span>'; if(lt) lt.innerHTML='车牌<span class="req">*</span>'; if(lc) lc.innerHTML='车架号<span class="req">*</span>'; }
   else { if(ln) ln.innerHTML='姓名<span class="req">*</span>'; if(lt) lt.innerHTML='职务<span class="req">*</span>'; if(lc) lc.innerHTML='公司<span class="req">*</span>'; }
@@ -6914,13 +6921,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 159;                         // v159：客户中心 UI 调整——①编辑表单电话移到姓名下方独立整行、去掉标签说明文案；②一级标签改名为「跟进状态」、二级改名为「跟进等级」；③编辑弹窗底部删除按钮隐藏（防误删）；④卡片删除由 🗑 改为右上角 ⋮ 菜单点开删除；⑤移除卡片左滑删除残留交互、卡片内容统一左对齐
+const WB_VERSION = 160;                         // v160：①互换跟进状态/跟进等级标题（一级=跟进等级 A(高)/B(中)/C(低)/D，二级=跟进状态 成交/已报价/考虑/拒绝/加微/预约/无人/战败）；②客户卡片在姓名/类型旁显示跟进等级与跟进状态徽章（红框位置）；③编辑表单「日期」label 改为「联系日期」；④TOB 类型时手续费 A/B 也统一显示为「手续费A(元)/手续费B(元)」（去掉「保函」二字）；⑤客户卡片移除左侧头像圆
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 76;                  // v159 发版：75→76（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 77;                  // v160 发版：76→77（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
