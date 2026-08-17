@@ -534,6 +534,33 @@ body.sb-collapsed .sidebar-item:hover::after {
 .tg-title { font-size: 12px; color: var(--text); font-weight: 600; margin-bottom: 6px; }
 .tg-req { color: #FF4D4F; margin-left: 2px; }
 .tg-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+/* v158：客户标签改下拉单选样式（圆角矩形 + 自绘下拉箭头） */
+.cl-tag-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 38px 14px 14px;
+  font-size: 16px;
+  line-height: 1.4;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  /* 自绘下拉箭头，避免浏览器默认箭头在不同系统中位置/粗细不一致 */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px 14px;
+}
+.cl-tag-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,108,249,.12); }
+.cl-tag-select:invalid { color: #999; }
+.tag-group { margin-bottom: 12px; }
 .tag-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 16px; font-size: 13px; border: 1px solid var(--border); background: #fff; cursor: pointer; transition: .15s; color: var(--text); }
 .tag-chip:hover { border-color: var(--primary); }
 .tag-chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -4689,26 +4716,21 @@ function clTagGroupsHTML(c){
   var tags = c.tags||[];
   var html = '<div class="tag-groups">';
   CL_TAG_GROUPS.forEach(function(g){
-    html += '<div class="tag-group"><div class="tg-title">'+g.name+(g.required?'<span class="tg-req">*</span>':'')+'</div><div class="tg-opts" id="clTagGroup_'+g.key+'">';
+    var sel = tags.filter(function(t){ return CL_TAG_GROUP_OF[t]===g.key; })[0] || '';
+    html += '<div class="tag-group"><div class="tg-title">'+g.name+(g.required?'<span class="tg-req">*</span>':'')+'</div>';
+    html += '<select id="clTagSel_'+g.key+'" class="cl-tag-select">'+(g.required?'':'<option value="">未选择</option>');
+    if(g.required) html += '<option value="" disabled>请选择</option>';
     g.opts.forEach(function(o){
-      var on = tags.indexOf(o.v)>=0 ? ' on':'';
-      html += '<button type="button" class="tag-chip '+o.cls+on+'" data-value="'+o.v+'" onclick="clTagPick(\''+g.key+'\',\''+o.v+'\',this)">'+o.v+'</button>';
+      var on = sel===o.v ? ' selected' : '';
+      html += '<option value="'+esc(o.v)+'"'+on+'>'+esc(o.v)+'</option>';
     });
-    html += '</div></div>';
+    html += '</select></div>';
   });
   html += '</div>';
   return html;
 }
-// 分级单选：每类内只能选一个；必选类（一级/二级）不允许清空，可选类（其他）可切换
-function clTagPick(group, value, el){
-  var wrap = document.getElementById('clTagGroup_'+group);
-  if(!wrap) return;
-  var grp=null; CL_TAG_GROUPS.forEach(function(g){ if(g.key===group) grp=g; });
-  var isOn = el.classList.contains('on');
-  wrap.querySelectorAll('.tag-chip').forEach(function(chip){ chip.classList.remove('on'); });
-  if(grp && grp.required){ el.classList.add('on'); }
-  else if(!isOn){ el.classList.add('on'); }
-}
+// 分级单选已由原生 <select> 承担，clTagPick 留为空函数防止旧链接误报
+function clTagPick(group, value, el){ /* v158 已改下拉单选，此函数保留为空 */ }
 function clTypeChange(){
   var t = (document.getElementById('clType')||{}).value||'财险';
   var lA = document.getElementById('clFeeLabelA'), lB = document.getElementById('clFeeLabelB');
@@ -4735,11 +4757,14 @@ function saveClient(id, isEdit){
   var orig = isEdit ? getClients().find(function(x){return x.id===id;}) : null;
   var tags=[];
   ['l1','l2','other'].forEach(function(g){
-    var wrap = document.getElementById('clTagGroup_'+g);
-    if(wrap){ var on = wrap.querySelector('.tag-chip.on'); if(on) tags.push(on.getAttribute('data-value')); }
+    var sel = document.getElementById('clTagSel_'+g);
+    var v = sel ? (sel.value||'') : '';
+    if(v) tags.push(v);
   });
-  if(!document.querySelector('#clTagGroup_l1 .tag-chip.on')){ toast('请选择「一级标签」（优先级，必选）'); return; }
-  if(!document.querySelector('#clTagGroup_l2 .tag-chip.on')){ toast('请选择「二级标签」（阶段，必选）'); return; }
+  var selL1 = document.getElementById('clTagSel_l1');
+  var selL2 = document.getElementById('clTagSel_l2');
+  if(!selL1 || !selL1.value){ toast('请选择「一级标签」（优先级，必选）'); return; }
+  if(!selL2 || !selL2.value){ toast('请选择「二级标签」（阶段，必选）'); return; }
   var c={
     id:id, name:name.trim(), title:(document.getElementById('clTitle')||{}).value||'',
     company:(document.getElementById('clCompany')||{}).value||'', address:(document.getElementById('clAddress')||{}).value||'', phone:(document.getElementById('clPhone')||{}).value||'',
@@ -6898,13 +6923,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 157;                         // v157：修复「是否抽烟=是」设置保存后重新打开应用、作息习惯页子标签仍显示「经期」的问题（进入作息页时立即同步标签与子页内容）
+const WB_VERSION = 158;                         // v158：客户编辑表单「标签」从三组 chip 多选按钮改为三个独立下拉单选（贴合截图样式：一级 A/B/C/D、二级 8 个阶段、其他 已结算/未结算），原生 <select> 自动单选、保留必填校验、扁平数组存储不变
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 74;                  // v157 发版：73→74（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 75;                  // v158 发版：74→75（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
