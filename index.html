@@ -673,6 +673,15 @@ body.sb-collapsed .sidebar-item:hover::after {
 .modal-form .form-group { margin-bottom: 12px; }
 .modal-form label { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; }
 .modal-form label .req { color: #ff4d4f; margin-left: 2px; }
+/* 戒烟里程碑（按已坚持天数显示对应阶段内容） */
+.qm-head{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:10px; border-bottom:1px dashed var(--border); padding-bottom:8px; }
+.qm-day{ font-size:22px; font-weight:800; color:#389E0D; line-height:1; }
+.qm-stage{ font-size:14px; font-weight:700; color:#333; }
+.qm-sec{ margin-top:11px; }
+.qm-sec-t{ font-size:13px; font-weight:700; margin-bottom:3px; display:flex; align-items:center; gap:4px; }
+.qm-sec-c{ font-size:13px; line-height:1.8; color:var(--text-secondary); }
+.qm-health{ color:#1890FF; } .qm-mind{ color:#722ED1; } .qm-good{ color:#52C41A; } .qm-hard{ color:#FA8C16; } .qm-tip{ color:#389E0D; }
+.qm-empty{ font-size:13px; color:var(--text-light); line-height:1.85; }
 .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; outline: none; box-sizing: border-box; }
 .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,108,249,.12); }
 
@@ -2409,6 +2418,10 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         <div class="ss-item"><div class="ss-num green" id="rtSmokeSave">¥0</div><div class="ss-label">省下(元)</div></div>
         <div class="ss-item"><div class="ss-num green" id="rtSmokeStreak">0</div><div class="ss-label">连续(天)</div></div>
       </div>
+
+      <!-- 戒烟里程碑（按已坚持天数显示对应阶段内容） -->
+      <div class="section-label">📖 戒烟里程碑（按已坚持天数）</div>
+      <div class="card" id="quitMilestone" style="padding:14px"></div>
 
       <!-- 打卡 -->
       <div class="section-label">✏️ 今日打卡</div>
@@ -6884,13 +6897,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 155;                         // v155：①修复编辑客户弹窗拖动（左滑到遮罩）误关问题；②财险车架号校验改为 17 位字母或数字；③客户筛选两行标签（阶段行 + 优先级/结算行）相互独立，可各选一个组合筛选
+const WB_VERSION = 156;                         // v156：客户中心新增「戒烟里程碑」卡片（按已坚持天数显示对应阶段内容与应对建议：3/7/15/30/90/120/180/270/365 天），置于「今日打卡」上方，复用设置中的开始戒烟日期
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 72;                  // v155 发版：71→72（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 73;                  // v156 发版：72→73（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -8921,6 +8934,7 @@ function renderRoutine(){
   var left=Math.max(0, goal-days);
   setText('smokeGoalText', left>0? ('距目标 '+goal+' 天还有 '+left+' 天，加油！🚭') : '🎉 已达成 '+goal+' 天戒烟目标！');
   renderSmokeList(r); renderSmokeChart(r, days);
+  renderQuitMilestone(days);
   }
   // 体重
   var wkeys=Object.keys(r.weight.log).sort();
@@ -9073,6 +9087,75 @@ function renderRiseChart(r){
   if(!keys.length){ box.innerHTML='<div class="empty-state"><p>记录早起后查看趋势</p></div>'; return; }
   var vals=keys.map(function(k){ var b=r.rise.log[k].time||'06:30'; var p=b.split(':'); return (+p[0])*60+(+p[1]); });
   box.innerHTML=sparkline(vals,{h:110,color:'#FA8C16',fill:'rgba(250,140,22,.12)'});
+}
+// ===== 戒烟里程碑：按已坚持天数显示对应阶段内容与应对建议 =====
+// 阈值按天数从大到小排列；取「不超过当前天数」的最大里程碑。例：第 15~29 天显示 15 天内容，第 30~89 天显示 30 天内容，以此类推。
+var QUIT_MILESTONES = [
+  {d:365, title:'戒烟365天（满一年）', body:{
+    health:'冠心病发病风险相比吸烟者降低一半；很多由吸烟带来的身体损伤持续修复；运动耐力、体力显著优于吸烟时期。',
+    mind:'抽烟成为过去式，日常几乎没有渴望。',
+    good:'大病风险大幅下降；经济收益明显，自我认同感强。',
+    hard:'成瘾记忆不会彻底抹除，人生重大打击、极度醉酒时，依然会冒出想抽烟的念头；只要不点燃第一支，就不会复吸烟。'}},
+  {d:270, title:'戒烟270天（9个月）', body:{
+    health:'肺部损伤持续修复；咳痰、咽部异物感基本消失；全身血管状态持续改善；感冒后咳嗽恢复期变短。',
+    mind:'抽烟已经属于过往的生活；大部分时间完全忘记烟这件事。',
+    good:'身体多器官持续降低患病风险；精气神整体提升。',
+    hard:'醉酒、旧烟友的引诱，是仅存的主要风险。'}},
+  {d:180, title:'戒烟180天（半年）', body:{
+    health:'支气管黏膜修复完成；反复咽炎、支气管炎发作明显减少；口臭完全消失；血液循环进一步修复。',
+    mind:'香烟远离日常生活；极少主动想烟；偶尔触景生情闪过念头；自信心明显提升，为自己骄傲。',
+    good:'慢性呼吸道不适显著改善；情绪稳定性变好。',
+    hard:'怀旧心理，回忆过去抽烟的感觉；极端压力事件依旧有复吸隐患。'}},
+  {d:120, title:'戒烟120天（4个月）', body:{
+    health:'呼吸道持续修复；气短几乎感受不到；心率平稳；体重逐步趋于稳定，如果控制饮食，体重不会持续上涨。',
+    mind:'抽烟已经不再是本能反应；只有特定场景才会一闪而过念头；心态更平和。',
+    good:'整体身体状态持续向上，疲劳感减少。',
+    hard:'遇到巨大负面情绪，容易把抽烟当成唯一解压方式。'}},
+  {d:90, title:'戒烟90天（3个月，重要分水岭）', body:{
+    health:'肺功能大约提升30%；气短胸闷基本消失；皮肤暗沉发黄改善；血液循环稳定；咳嗽基本消失；睡眠基本回归正常。',
+    mind:'烟瘾发作次数显著变少，每次冲动几分钟就过去；闻到烟味会觉得呛；焦虑烦躁大幅减轻。',
+    good:'运动耐力明显变好；免疫力提升；心血管风险持续下降。',
+    hard:'遇到重大挫折、醉酒，旧记忆会被唤醒；很多人觉得“我已经戒成了”，放松警惕。'}},
+  {d:30, title:'戒烟30天（1个月里程碑）', body:{
+    health:'肺部纤毛修复，咳痰基本消失；口臭大幅改善；牙齿烟渍变淡；呼吸道抵抗力提升，嗓子发炎变少；食欲旺盛，体重上涨风险高。',
+    mind:'生理依赖基本结束，全部剩下心理、场景记忆；大部分时间生活正常。',
+    good:'呼吸清爽，睡眠质量明显变好；身体炎症水平下降。',
+    hard:'重大压力、饭局喝酒是复吸高危点；容易自我松懈，千万不要尝试第一口。'}},
+  {d:15, title:'戒烟第15天', body:{
+    health:'心肺耐力提升，爬楼、快走没那么喘；咳痰明显变少；睡眠逐步好转；便秘缓解；血压心率趋向稳定；体重开始有上涨趋势。',
+    mind:'生理烟瘾大幅减弱，剩下心理习惯；不会时时刻刻想烟，但特定场景会触发冲动；开始有微弱成就感。',
+    good:'气短胸闷减轻，整体精力开始回升。',
+    hard:'压力、喝酒、烦心事，很容易勾起抽烟欲望；容易产生“我已经扛过来，可以偶尔抽一根”的危险想法。'}},
+  {d:7, title:'戒烟第7天', body:{
+    health:'味觉、嗅觉明显复苏；咳嗽还有但比3天轻；失眠稍有缓解，容易犯困；很多人出现便秘；手脚冰凉改善，末梢循环变好。',
+    mind:'生理渴求下降，但条件反射瘾很强；饭后、上厕所、压力大，下意识想摸烟；情绪时而低落。',
+    good:'感官恢复，吃饭能吃出更多味道；血液循环持续改善。',
+    hard:'习惯性想抽烟，不是身体需要，是旧习惯；无聊感很重；应酬看到别人抽烟内心煎熬。'}},
+  {d:3, title:'戒烟第3天｜戒断反应最高峰', body:{
+    health:'体内尼古丁基本代谢完毕；心率、血压开始回落；会心慌胸闷、坐立不安；口干口苦，咳嗽增多（肺部排出焦油黏液）；失眠、易惊醒；食欲暴涨；部分人头晕、手脚发麻。',
+    mind:'烟瘾频繁袭来，情绪暴躁、焦虑、空虚；容易沮丧，脑子反复回想抽烟的舒服感；意志力被大量消耗。',
+    good:'一氧化碳排出体外，血氧含量回升，身体已经停止继续被尼古丁毒害。',
+    hard:'生理渴求最强，极易想“抽一口缓解下”；睡眠崩盘；一点小事就容易发火，和家人容易起矛盾。'}}
+];
+function renderQuitMilestone(days){
+  var box=document.getElementById('quitMilestone'); if(!box) return;
+  if(days==null || !isFinite(days) || days<0){
+    box.innerHTML='<div class="qm-empty">在「设置」中填写开始戒烟日期后，这里会根据你已坚持的天数，自动显示对应的阶段变化与应对建议。</div>'; return;
+  }
+  var m=null;
+  for(var i=0;i<QUIT_MILESTONES.length;i++){ if(days>=QUIT_MILESTONES[i].d){ m=QUIT_MILESTONES[i]; break; } }
+  var head='<div class="qm-head"><span class="qm-day">第 '+days+' 天</span><span class="qm-stage">'+(m?m.title:'起步阶段')+'</span></div>';
+  var bodyHtml;
+  if(!m){
+    bodyHtml='<div class="qm-sec"><div class="qm-sec-t qm-tip">🚀 戒烟刚起步（未满 3 天）</div><div class="qm-sec-c">你已经迈出了最关键的一步！前 3 天是适应期，身体正在开始排出尼古丁。坚持住，第 3 天起会显示详细的阶段内容。若还未设置「开始戒烟日期」，请到「设置」中填写。</div></div>';
+  } else {
+    bodyHtml=''
+      +'<div class="qm-sec"><div class="qm-sec-t qm-health">🫀 身体变化</div><div class="qm-sec-c">'+esc(m.body.health)+'</div></div>'
+      +'<div class="qm-sec"><div class="qm-sec-t qm-mind">🧠 心理变化</div><div class="qm-sec-c">'+esc(m.body.mind)+'</div></div>'
+      +'<div class="qm-sec"><div class="qm-sec-t qm-good">✅ 积极影响</div><div class="qm-sec-c">'+esc(m.body.good)+'</div></div>'
+      +'<div class="qm-sec"><div class="qm-sec-t qm-hard">⚠️ 主要困难</div><div class="qm-sec-c">'+esc(m.body.hard)+'</div></div>';
+  }
+  box.innerHTML=head+bodyHtml;
 }
 function renderSmokeList(r){
   var box=document.getElementById('smokeList'); if(!box) return;
