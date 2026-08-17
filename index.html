@@ -672,6 +672,7 @@ body.sb-collapsed .sidebar-item:hover::after {
 }
 .modal-form .form-group { margin-bottom: 12px; }
 .modal-form label { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px; }
+.modal-form label .req { color: #ff4d4f; margin-left: 2px; }
 .modal-form input, .modal-form select, .modal-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; outline: none; box-sizing: border-box; }
 .modal-form input:focus, .modal-form select:focus, .modal-form textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(91,108,249,.12); }
 
@@ -1781,7 +1782,7 @@ function toggleSbCollapse(){
   <div class="page-header">
     <div>
       <div class="page-title">客户中心</div>
-      <div class="page-subtitle">客户 · 保单 · 保函 · 拜访 统一管理</div>
+      <div class="page-subtitle">客户 · 跟进 · 维护 · 拜访 统一管理</div>
     </div>
     <button class="badge-btn" onclick="openClientForm()">+ 新增</button>
     <button class="badge-btn" style="background:#217346;color:#fff;margin-left:6px" onclick="exportClientsExcel()">📤 导出</button>
@@ -1803,6 +1804,15 @@ function toggleSbCollapse(){
     <button class="filter-tab" onclick="clientSetTag(this,'预约')">📅 预约</button>
     <button class="filter-tab" onclick="clientSetTag(this,'无人')">📵 无人</button>
     <button class="filter-tab" onclick="clientSetTag(this,'战败')">💔 战败</button>
+  </div>
+  <!-- 第二行标签筛选：一级优先级（A/B/C/D）+ 其他（已结算/未结算） -->
+  <div class="filter-row" id="clientTagFilter2" style="margin-top:6px">
+    <button class="filter-tab" onclick="clientSetTag(this,'A')">🅰️ A(高)</button>
+    <button class="filter-tab" onclick="clientSetTag(this,'B')">🅱️ B(中)</button>
+    <button class="filter-tab" onclick="clientSetTag(this,'C')">©️ C(低)</button>
+    <button class="filter-tab" onclick="clientSetTag(this,'D')">Ⓓ D</button>
+    <button class="filter-tab" onclick="clientSetTag(this,'已结算')">💰 已结算</button>
+    <button class="filter-tab" onclick="clientSetTag(this,'未结算')">⏳ 未结算</button>
   </div>
   <div class="filter-row" id="clientTypeFilter" style="margin-top:8px">
     <button class="filter-tab active" onclick="clientSetType(this,'全部')">分类</button>
@@ -4225,7 +4235,11 @@ function clientFiltered(list){
   var apptTo = ((document.getElementById('clientApptTo')||{}).value)||'';
   return list.filter(function(c){
     if(_clState.type!=='全部' && c.type!==_clState.type) return false;
-    if(_clState.tag!=='全部' && (c.tags||[]).indexOf(_clState.tag)<0) return false;
+    if(_clState.tag!=='全部'){
+      var allow = _resolveTagFilter(_clState.tag);
+      var has=false; for(var i=0;i<allow.length;i++) if((c.tags||[]).indexOf(allow[i])>=0){ has=true; break; }
+      if(!has) return false;
+    }
     if(_clState.person!=='all' && (c.ownerUid||'guest')!==_clState.person) return false;
     if(_clState.appt==='today' && c.apptDate!==_today()) return false;
     if(_clState.appt==='week' && !inCurrentWeek(c.apptDate)) return false;
@@ -4555,8 +4569,22 @@ function dateUrgencyLevel(ds, todayStr, mode){
   return '';
 }
 function clientSetTag(btn, tag){
-  if(btn){ document.querySelectorAll('#clientTagFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active'); }
+  if(btn){
+    ['#clientTagFilter','#clientTagFilter2'].forEach(function(sel){
+      document.querySelectorAll(sel+' .filter-tab').forEach(function(t){t.classList.remove('active');});
+    });
+    btn.classList.add('active');
+  }
   _clState.tag = tag; _clState.appt = null; renderClients();
+}
+// 将筛选短标签（A/B/C/D）映射到存储的实际值（A(高)/B(中)/C(低)/D），
+// 已结算/未结算/成交/已报价 等直接按原值匹配。
+function _resolveTagFilter(tag){
+  if(tag==='A') return ['A(高)'];
+  if(tag==='B') return ['B(中)'];
+  if(tag==='C') return ['C(低)'];
+  if(tag==='D') return ['D'];
+  return [tag];
 }
 function clientSetType(btn, type){
   document.querySelectorAll('#clientTypeFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active');
@@ -4586,6 +4614,7 @@ function clientSetAppt(scope){
   _clState.appt = (_clState.appt===scope) ? null : scope;
   _clState.tag = '全部'; _clState.type = '全部';
   var tf=document.querySelectorAll('#clientTagFilter .filter-tab'); tf.forEach(function(t){t.classList.remove('active');}); if(tf[0]) tf[0].classList.add('active');
+  var tf2=document.querySelectorAll('#clientTagFilter2 .filter-tab'); tf2.forEach(function(t){t.classList.remove('active');});
   var yf=document.querySelectorAll('#clientTypeFilter .filter-tab'); yf.forEach(function(t){t.classList.remove('active');}); if(yf[0]) yf[0].classList.add('active');
   renderClients();
 }
@@ -4602,7 +4631,7 @@ function openClientForm(id){
   var isEdit = !!c;
   c = c || {id:_uid(), name:'', title:'', company:'', phone:'', type:'财险', tags:[], amount:0, dealType:'财险', dealDate:_today(), feeA:0, feeB:0, note:'', date:_today(), expireDate:'', apptDate:''};
   var isProp = c.type==='财险';
-  var lblName = isProp?'车主':'姓名', lblTitle = isProp?'车牌':'职务', lblCompany = isProp?'车架号':'公司';
+  var lblName = (isProp?'车主':'姓名')+'<span class="req">*</span>', lblTitle = (isProp?'车牌':'职务')+'<span class="req">*</span>', lblCompany = (isProp?'车架号':'公司')+'<span class="req">*</span>';
   var tagHTML = clTagGroupsHTML(c);
   var html = '<div class="modal-card"><div class="modal-title">'+(isEdit?'✏️ 编辑客户':'➕ 新增客户')+'</div>'+
     '<div class="modal-form" style="margin-top:12px">'+
@@ -4610,10 +4639,10 @@ function openClientForm(id){
     '<div class="form-group" style="flex:1"><label id="clLblTitle">'+lblTitle+'</label><input id="clTitle" value="'+esc(c.title||'')+'"></div></div>'+
     '<div class="form-group"><label id="clLblCompany">'+lblCompany+'</label><input id="clCompany" value="'+esc(c.company||'')+'"></div>'+
     '<div class="form-group"><label>地址</label><input id="clAddress" value="'+esc(c.address||'')+'"></div>'+
-    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话</label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
-    '<div class="form-group" style="flex:1"><label>类型</label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
+    '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>电话<span class="req">*</span></label><input id="clPhone" value="'+esc(c.phone||'')+'"></div>'+
+    '<div class="form-group" style="flex:1"><label>类型<span class="req">*</span></label><select id="clType" onchange="clTypeChange()"><option'+(c.type==='财险'?' selected':'')+'>财险</option><option'+(c.type==='TOB'?' selected':'')+'>TOB</option><option'+(c.type==='TOC'?' selected':'')+'>TOC</option><option'+(c.type==='团险'?' selected':'')+'>团险</option></select></div></div>'+
     '<div class="form-group"><label>标签（分级单选：一级/二级必选，其他可选）</label>'+tagHTML+'</div>'+
-    '<div class="form-group"><label>日期</label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
+    '<div class="form-group"><label>日期<span class="req">*</span></label><input id="clDealDate" type="date" value="'+(c.dealDate||c.date||_today())+'"></div>'+
     '<div class="form-group" id="clExpireWrap" style="display:block;margin-top:4px"><label>到期日</label><input id="clExpireDate" type="date" value="'+(c.expireDate||'')+'"></div>'+
     '<div id="clApptFields" style="display:block;background:#FFF0F6;border-radius:10px;padding:12px;margin-bottom:4px;margin-top:8px">'+
       '<div class="form-group" style="margin:0"><label style="color:#EB2F96;font-weight:600">下次需要联系的日期</label><input id="clApptDate" type="date" value="'+(c.apptDate||'')+'"></div>'+
@@ -4661,13 +4690,23 @@ function clTypeChange(){
   if(t === 'TOB'){ if(lA) lA.textContent = '保函手续费A(元)'; if(lB) lB.textContent = '保函手续费B(元)'; }
   else { if(lA) lA.textContent = '手续费A(元)'; if(lB) lB.textContent = '手续费B(元)'; }
   var ln = document.getElementById('clLblName'), lt = document.getElementById('clLblTitle'), lc = document.getElementById('clLblCompany');
-  if(t === '财险'){ if(ln) ln.textContent='车主'; if(lt) lt.textContent='车牌'; if(lc) lc.textContent='车架号'; }
-  else { if(ln) ln.textContent='姓名'; if(lt) lt.textContent='职务'; if(lc) lc.textContent='公司'; }
+  if(t === '财险'){ if(ln) ln.innerHTML='车主<span class="req">*</span>'; if(lt) lt.innerHTML='车牌<span class="req">*</span>'; if(lc) lc.innerHTML='车架号<span class="req">*</span>'; }
+  else { if(ln) ln.innerHTML='姓名<span class="req">*</span>'; if(lt) lt.innerHTML='职务<span class="req">*</span>'; if(lc) lc.innerHTML='公司<span class="req">*</span>'; }
   // 到期日所有类型均显示（不再仅限财产险）
 }
 function saveClient(id, isEdit){
-  var name=(document.getElementById('clName')||{}).value||'';
-  if(!name.trim()){ toast('请输入客户姓名'); return; }
+  var elVal=function(id){ return (document.getElementById(id)||{}).value||''; };
+  var type = elVal('clType')||'财险';
+  var name = elVal('clName');
+  if(!name.trim()){ toast('请输入'+(type==='财险'?'车主':'姓名')+'（必填项）'); return; }
+  var title = elVal('clTitle');
+  if(!title.trim()){ toast('请输入'+(type==='财险'?'车牌':'职务')+'（必填项）'); return; }
+  var company = elVal('clCompany');
+  if(!company.trim()){ toast('请输入'+(type==='财险'?'车架号':'公司')+'（必填项）'); return; }
+  if(type==='财险' && company.trim().length!==17){ toast('车架号必须为 17 位（当前 '+company.trim().length+' 位）'); return; }
+  var phone = elVal('clPhone');
+  if(!phone.trim()){ toast('请输入电话（必填项）'); return; }
+  if(!/^\d{11}$/.test(phone.trim())){ toast('电话必须为 11 位数字'); return; }
   var orig = isEdit ? getClients().find(function(x){return x.id===id;}) : null;
   var tags=[];
   ['l1','l2','other'].forEach(function(g){
@@ -6834,13 +6873,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 153;                         // v153：客户标签重构为三级分级单选（一级优先级A高/B中/C低/D·必选、二级阶段·必选、其他已结算/未结算·可选）
+const WB_VERSION = 154;                         // v154：①客户中心副标题改为「客户·跟进·维护·拜访 统一管理」；②标签筛选新增第二行（A(高)/B(中)/C(低)/D/已结算/未结算）；③客户表单必填校验（车主/姓名、职务/车牌、公司/车架号、电话、类型、日期 加 *）+ 车架号 17 位、电话 11 位 约束
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 70;                  // v153 发版：69→70（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 71;                  // v154 发版：70→71（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
