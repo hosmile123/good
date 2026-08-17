@@ -4011,6 +4011,7 @@ async function switchPage(pageId) {
   if(pageId === 'notes') renderNotesList();
   if(pageId === 'todo') renderAppointmentsTodos();
   if(pageId === 'cloud') renderCloudSheets();
+  if(pageId === 'routine'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入作息页时立即同步「经期/戒烟」标签与子页内容
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
   window.scrollTo(0, 0);
 }
@@ -6897,13 +6898,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 156;                         // v156：客户中心新增「戒烟里程碑」卡片（按已坚持天数显示对应阶段内容与应对建议：3/7/15/30/90/120/180/270/365 天），置于「今日打卡」上方，复用设置中的开始戒烟日期
+const WB_VERSION = 157;                         // v157：修复「是否抽烟=是」设置保存后重新打开应用、作息习惯页子标签仍显示「经期」的问题（进入作息页时立即同步标签与子页内容）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 73;                  // v156 发版：72→73（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 74;                  // v157 发版：73→74（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
