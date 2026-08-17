@@ -373,6 +373,11 @@ body.sb-collapsed .sidebar-item:hover::after {
   .filter-row.mobile-select .filter-select { display: block; width: calc(100% / 3); max-width: 180px; margin-right: auto; }
 }
 
+/* 早睡早起合并卡片：手机端 1 列，桌面端 2 列（已在 inline 实现） */
+@media (max-width: 768px) {
+  .sleep-rise-card > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; gap: 10px !important; }
+}
+
 /* ===== Hero Banner ===== */
 .hero-banner {
   background: linear-gradient(135deg, #4A90D9 0%, #5B6CF9 100%);
@@ -402,7 +407,7 @@ body.sb-collapsed .sidebar-item:hover::after {
 /* ===== Today Grid ===== */
 .section-label {
   font-size: 14px; font-weight: 600; color: var(--text-primary);
-  margin: 16px 0 10px; display: flex; align-items: center; justify-content: space-between;
+  margin: 12px 0 6px; display: flex; align-items: center; justify-content: space-between;
 }
 .section-label .date-info { font-size: 12px; color: var(--text-light); font-weight: 400; }
 .today-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
@@ -481,10 +486,10 @@ body.sb-collapsed .sidebar-item:hover::after {
 .todo-delete { color: var(--text-light); cursor: pointer; font-size: 16px; padding: 4px; }
 
 /* ===== Client ===== */
-.client-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-.cs-item { text-align: center; padding: 12px 8px; background: linear-gradient(135deg, #f8fafc, #eef3ff); border-radius: var(--radius); }
-.cs-num { font-size: 22px; font-weight: 700; color: var(--primary); }
-.cs-label { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.client-summary { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
+.cs-item { text-align: center; padding: 10px 4px; background: linear-gradient(135deg, #f8fafc, #eef3ff); border-radius: var(--radius); }
+.cs-num { font-size: 20px; font-weight: 700; color: var(--primary); }
+.cs-label { font-size: 10px; color: var(--text-light); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
 .search-bar input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 24px; font-size: 14px; outline: none; }
 .client-card { position: relative; overflow: hidden; border-bottom: 1px solid #F5F5F5; background: #fff; }
@@ -817,12 +822,12 @@ body.sb-collapsed .sidebar-item:hover::after {
 .ss-num.pink { color: #EB2F96; }
 .ss-label { font-size: 10px; color: var(--text-light); margin-top: 2px; }
 
-.finance-overview { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.fo-item { text-align: center; padding: 12px 6px; border-radius: var(--radius); }
+.finance-overview { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.fo-item { text-align: center; padding: 9px 6px; border-radius: var(--radius); }
 .fo-item.income { background: #F6FFED; }
 .fo-item.commission { background: #E6F7FF; }
 .fo-item.guarantee-fee { background: #FFF7E6; }
-.fo-value { font-size: 18px; font-weight: 700; }
+.fo-value { font-size: 17px; font-weight: 700; }
 .fo-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
 .journal-mood { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -1070,11 +1075,15 @@ body.sb-collapsed .sidebar-item:hover::after {
 @media (min-width: 769px) and (max-width: 1024px) {
   .client-grid { grid-template-columns: repeat(2, 1fr); }
   .study-stats { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .client-summary { grid-template-columns: repeat(4, 1fr); }
 }
 @media (min-width: 1025px) {
   .main-content { padding: 24px 40px; }
   .client-grid { grid-template-columns: repeat(3, 1fr); }
   .study-stats { gap: 12px; }
+  .client-summary { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .cs-num { font-size: 20px; }
+  .cs-label { font-size: 10px; }
 }
 
 /* 移动端顶部栏 */
@@ -1843,8 +1852,10 @@ function toggleSbCollapse(){
       <div class="page-subtitle">客户 · 跟进 · 维护 · 拜访 统一管理</div>
     </div>
     <button class="badge-btn" onclick="openClientForm()">+ 新增</button>
-    <button class="badge-btn" style="background:#217346;color:#fff;margin-left:6px" onclick="exportClientsExcel()">📤 导出</button>
-    <button class="badge-btn" style="background:#2B579A;color:#fff;margin-left:6px" onclick="showImportMenu()">📥 导入</button>
+    <div style="display:inline-flex;gap:6px;margin-left:6px">
+      <button class="badge-btn" style="background:#217346;color:#fff" onclick="exportClientsExcel()">📤 导出</button>
+      <button class="badge-btn" style="background:#2B579A;color:#fff" onclick="showImportMenu()">📥 导入</button>
+    </div>
     <button class="badge-btn" id="clientAssignBtn" style="background:#722ED1;color:#fff;margin-left:6px;display:none" onclick="openAssignModal()">🔀 客户分配</button>
     <!-- 视觉隐藏（非 display:none）：保证微信/移动端 WebView 能通过 <label for> 原生弹出文件选择面板 -->
     <input type="file" id="clientImportFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;left:-9999px;top:-9999px" onchange="closeModal('clientModal'); importClientsExcel(this)">
@@ -2319,38 +2330,40 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
   <!-- 早睡早起（合并） -->
   <div class="subtab-content active" id="rt-sleeprise">
-    <!-- 合并 Hero：早睡（上/紫）+ 早起（下/橙）一体化卡片 -->
-    <div class="hero-banner" style="background:linear-gradient(180deg,#6366F1 0%,#8B5CF6 40%,#F59E0B 75%,#F97316 100%);border-radius:16px;overflow:hidden;position:relative">
+    <!-- 合并 Hero：早睡（左/紫）+ 早起（右/橙）一体化卡片，桌面端左右并排 -->
+    <div class="hero-banner sleep-rise-card" style="background:linear-gradient(135deg,#6366F1 0%,#8B5CF6 50%,#F59E0B 100%);border-radius:16px;overflow:hidden;position:relative;padding:14px 16px">
       <!-- 装饰圆 -->
-      <div style="position:absolute;top:-30px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
-      <div style="position:absolute;bottom:-20px;left:-10px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+      <div style="position:absolute;top:-30px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none"></div>
+      <div style="position:absolute;bottom:-20px;left:-10px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none"></div>
 
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:22px">🌙</span>
-          <div><div style="font-size:14px;font-weight:600;color:rgba(255,255,255,.9)">早睡</div><div class="main-text" id="sleepHeroMain" style="margin-top:2px">距离就寝</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;position:relative">
+        <!-- 早睡 -->
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:18px">🌙</span>
+            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.9)">早睡</div>
+          </div>
+          <div class="main-text" id="sleepHeroMain" style="margin-top:4px;color:#fff">距离就寝</div>
+          <div style="display:flex;align-items:baseline;gap:4px;margin-top:2px">
+            <div class="countdown-num" style="color:white;font-size:24px;line-height:1.1" id="sleepHeroNum">--:--</div>
+            <div class="countdown-label" style="color:rgba(255,255,255,.7);font-size:10px">倒计时</div>
+          </div>
+          <div class="sub-text" id="sleepHeroSub" style="color:rgba(255,255,255,.75);margin-top:2px">--</div>
         </div>
-        <div style="text-align:right">
-          <div class="countdown-num" style="color:white;font-size:32px" id="sleepHeroNum">--:--</div>
-          <div class="countdown-label" style="color:rgba(255,255,255,.7);font-size:11px">倒计时</div>
+        <!-- 早起 -->
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:18px">🌅</span>
+            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.95)">早起</div>
+          </div>
+          <div class="main-text" id="riseHeroMain" style="margin-top:4px;color:rgba(255,255,255,.9)">今日起床目标</div>
+          <div style="display:flex;align-items:baseline;gap:4px;margin-top:2px">
+            <div class="countdown-num" style="color:white;font-size:24px;line-height:1.1" id="riseHeroNum">--:--</div>
+            <div class="countdown-label" style="color:rgba(255,255,255,.7);font-size:10px">起床时间</div>
+          </div>
+          <div class="sub-text" id="riseHeroSub" style="color:rgba(255,255,255,.7);margin-top:2px">计划 -- 起床</div>
         </div>
       </div>
-      <div style="padding:0 18px 8px"><div class="sub-text" id="sleepHeroSub" style="color:rgba(255,255,255,.75)">--</div></div>
-
-      <!-- 分割线 -->
-      <div style="margin:0 18px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent)"></div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px 18px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:22px">🌅</span>
-          <div><div style="font-size:14px;font-weight:600;color:rgba(255,255,255,.95)">早起</div><div class="main-text" id="riseHeroMain" style="margin-top:2px;color:rgba(255,255,255,.85)">今日起床目标</div></div>
-        </div>
-        <div style="text-align:right">
-          <div class="countdown-num" style="color:white;font-size:32px" id="riseHeroNum">--:--</div>
-          <div class="countdown-label" style="color:rgba(255,255,255,.7);font-size:11px">起床时间</div>
-        </div>
-      </div>
-      <div style="padding:0 18px 4px"><div class="sub-text" id="riseHeroSub" style="color:rgba(255,255,255,.7)">计划 -- 起床</div></div>
     </div>
     <!-- 合并统计卡片：平均起床 / 平均入睡 / 平均睡眠 -->
     <div class="study-stats">
@@ -2448,31 +2461,31 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
     <!-- 戒烟页（抽烟时显示，v128 新增：恢复原 renderSmoke* 死代码对应的 DOM） -->
     <div id="rt-smoke-smoke" style="display:none">
-      <!-- Hero：戒烟天数 + 目标进度 -->
-      <div style="background:linear-gradient(135deg,#52C41A 0%,#389E0D 100%);border-radius:16px;padding:18px;color:white;position:relative;overflow:hidden">
-        <div style="position:absolute;top:-30px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
+      <!-- Hero：戒烟天数 + 目标进度（紧凑：padding/gap 减半） -->
+      <div style="background:linear-gradient(135deg,#52C41A 0%,#389E0D 100%);border-radius:16px;padding:10px 14px;color:white;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-30px;right:-20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;position:relative">
           <div>
             <div style="font-size:14px;font-weight:600;opacity:.95">🚭 戒烟进度</div>
             <div style="font-size:12px;opacity:.85;margin-top:2px" id="smokeHeroDays">戒烟第 0 天</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:36px;font-weight:700;line-height:1" id="smokeHeroNum">0</div>
+            <div style="font-size:30px;font-weight:700;line-height:1" id="smokeHeroNum">0</div>
             <div style="font-size:11px;opacity:.8">天</div>
           </div>
         </div>
-        <div style="margin-top:14px;background:rgba(255,255,255,.22);border-radius:6px;height:8px;overflow:hidden;position:relative">
+        <div style="margin-top:7px;background:rgba(255,255,255,.22);border-radius:6px;height:6px;overflow:hidden;position:relative">
           <div id="smokeGoalBar" style="height:100%;background:#fff;border-radius:6px;width:0%;transition:width .4s"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:rgba(255,255,255,.9);position:relative">
+        <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:11px;color:rgba(255,255,255,.9);position:relative">
           <span>目标 <b id="smokeGoalDays">365</b> 天</span>
           <span><b id="smokeGoalPct">0%</b></span>
         </div>
-        <div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.92);position:relative" id="smokeGoalText">在「设置」中填写开始戒烟日期后开始计算</div>
+        <div style="margin-top:4px;font-size:12px;color:rgba(255,255,255,.92);position:relative" id="smokeGoalText">在「设置」中填写开始戒烟日期后开始计算</div>
       </div>
 
-      <!-- 4 个统计 -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0">
+      <!-- 4 个统计（紧凑：margin/gap 减半） -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:7px 0">
         <div class="ss-item"><div class="ss-num green" id="rtSmokeDays">0</div><div class="ss-label">戒烟(天)</div></div>
         <div class="ss-item"><div class="ss-num green" id="rtSmokeNot">0</div><div class="ss-label">少抽(支)</div></div>
         <div class="ss-item"><div class="ss-num green" id="rtSmokeSave">¥0</div><div class="ss-label">省下(元)</div></div>
@@ -2892,21 +2905,21 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   </div>
 
   <div class="subtab-content active" id="fit-sport">
-  <div class="hero-banner" style="background:linear-gradient(135deg,#FA8C16,#FA541C)">
-    <div class="greeting">💪 今天动一动？</div>
-    <div class="main-text">本周运动</div>
-    <div class="sub-text">已完成 3 次 · 目标 4 次</div>
+  <div class="hero-banner" style="background:linear-gradient(135deg,#FA8C16,#FA541C);padding:14px 16px">
+    <div class="greeting" style="font-size:12px">💪 今天动一动？</div>
+    <div class="main-text" style="font-size:15px;margin:2px 0">本周运动</div>
+    <div class="sub-text" style="font-size:12px">已完成 3 次 · 目标 4 次</div>
     <div class="countdown-box" style="position:absolute;right:16px;top:50%;transform:translateY(-50%)">
-      <div class="countdown-num" id="fitHeroNum" style="color:white">0/4</div>
-      <div class="countdown-label" style="color:white;opacity:.8">本周次数</div>
+      <div class="countdown-num" id="fitHeroNum" style="color:white;font-size:22px">0/4</div>
+      <div class="countdown-label" style="color:white;opacity:.8;font-size:10px">本周次数</div>
     </div>
   </div>
 
-  <div class="study-stats">
-    <div class="ss-item"><div class="ss-num orange" id="fitWeek">0</div><div class="ss-label">本周(次)</div></div>
-    <div class="ss-item"><div class="ss-num blue" id="fitDist">0</div><div class="ss-label">累计(km)</div></div>
-    <div class="ss-item"><div class="ss-num green" id="fitMin">0</div><div class="ss-label">累计(分)</div></div>
-    <div class="ss-item"><div class="ss-num purple" id="fitMonth">0</div><div class="ss-label">本月(次)</div></div>
+  <div class="study-stats" style="gap:4px;margin-bottom:8px">
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num orange" id="fitWeek">0</div><div class="ss-label">本周(次)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num blue" id="fitDist">0</div><div class="ss-label">累计(km)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num green" id="fitMin">0</div><div class="ss-label">累计(分)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num purple" id="fitMonth">0</div><div class="ss-label">本月(次)</div></div>
   </div>
 
   <div class="section-label">运动类型</div>
@@ -4587,9 +4600,9 @@ function clientDerivedStatus(c, todayStr){
   if(hasWx && !hasDeal){
     return { key:'add', label:'加保', cls:'s-add', icon:'➕' };
   }
-  // 3) 在保：成交承保
+  // 3) 成交承保：不显式展示（与"在保"含义接近，混淆；跟进状态由左侧 l2 徽章承担）
   if(c.dealStatus==='承保' || (c.tags||[]).indexOf('成交')>=0){
-    return { key:'active', label:'在保', cls:'s-active', icon:'✓' };
+    return null;
   }
   // 4) 已出具：保函已发出
   if(c.dealStatus==='已出具'){
@@ -6967,13 +6980,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 164;                         // v164：手机端「人员」下拉宽度由 100% 缩为 1/3（max-width:180px，margin-right:auto 左贴），节省横向空间
+const WB_VERSION = 165;                         // v165：电脑端 5 项紧凑优化 — ①8 卡统计合并为 1 排（1025+ 8 列 / 769~1024 4 列 / 移动 4 列）；②隐藏客户卡"在保"徽章（跟进状态由左侧 l2 徽章承担）；③客户中心「+新增/📤导出/📥导入」三按钮合并为右侧 flex 容器紧挨；④作息 hero 改为左右并排紧凑版（移动端回 1 列）；⑤戒烟 hero/4 统计、运动 hero/4 统计、记账 finance-overview、section-label 全部 padding/gap/margin 减半
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 81;                  // v164 发版：80→81（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 82;                  // v165 发版：81→82（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
