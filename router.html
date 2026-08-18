@@ -30,21 +30,22 @@
     <div class="t">正在为你选择最快入口…</div>
     <div class="s" id="msg">并发探测中</div>
     <div class="links" id="links">
-      <div class="s" style="margin-bottom:4px">三个镜像暂不可达，请手动选择：</div>
+      <div class="s" style="margin-bottom:4px">暂不可达，请手动选择：</div>
     </div>
   </div>
 <script>
 (function(){
-  // 三个镜像（与 App 内容一致）。CloudStudio 链接会随部署变化，不可达时自动跳过。
+  // 两个稳定镜像（CloudStudio 链接一次性、每次部署变，不纳入路由）
   var MIRRORS=[
     {name:"GitHub Pages", url:"https://hosmile123.github.io/workbench/"},
-    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"},
-    {name:"CloudStudio",  url:"https://2a98e3f6a2484a8297f6657e0bd16030.app.workbuddy.link/"}
+    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"}
   ];
-  var TIMEOUT=2600;
+  var TIMEOUT=3000;   // 单镜像探测超时
+  var SAFETY=5000;    // 全局安全兜底：超过此时间必定显示手动链接
   var msg=document.getElementById("msg");
+  var resolved=false; // 防止重复处理
 
-  // 当前页面若本身就在某镜像的根路径，记下它，避免跳回自己造成循环
+  // 当前页面若本身就在某镜像上，记下它，避免跳回自己造成循环
   function hereRoot(){
     var h=location.href;
     for(var i=0;i<MIRRORS.length;i++){
@@ -53,42 +54,63 @@
     return null;
   }
 
-  function ping(m){
-    var start=performance.now();
-    var ctrl=new AbortController();
-    var to=setTimeout(function(){ctrl.abort();},TIMEOUT);
-    return fetch(m.url+"?_="+Date.now(),{mode:"no-cors",cache:"no-store",signal:ctrl.signal})
-      .then(function(){clearTimeout(to);return {m:m,ok:true,ms:performance.now()-start};})
-      .catch(function(){clearTimeout(to);return {m:m,ok:false,ms:TIMEOUT};});
+  // 显示手动链接兜底
+  function showFallback(reason){
+    if(resolved) return;
+    resolved=true;
+    msg.textContent=reason||"暂不可达，请手动选择";
+    document.getElementById("spin").style.display="none";
+    var box=document.getElementById("links");
+    box.classList.add("show");
+    MIRRORS.forEach(function(m){
+      var a=document.createElement("a");
+      a.href=m.url;
+      a.innerHTML=m.name+"<small>"+m.url+"</small>";
+      box.appendChild(a);
+    });
   }
+
+  // Image 探测法：全浏览器兼容（含微信 WebView / 老式浏览器）
+  // onload 和 onerror 都表示"服务器有响应 = 可达"，仅超时 = 不可达
+  function ping(m){
+    return new Promise(function(resolve){
+      var start=Date.now();
+      var img=new Image();
+      var done=false;
+      function finish(ok){
+        if(done) return;
+        done=true;
+        resolve({m:m,ok:ok,ms:Date.now()-start});
+      }
+      var to=setTimeout(function(){finish(false);},TIMEOUT);
+      img.onload=function(){clearTimeout(to);finish(true);};
+      img.onerror=function(){clearTimeout(to);finish(true);};  // 非图片也算可达
+      img.src=m.url+"?_="+Date.now();
+    });
+  }
+
+  // 全局安全兜底：无论探测结果如何，超过 SAFETY 毫秒必定显示手动链接
+  setTimeout(function(){showFallback("探测超时，请手动选择");},SAFETY);
 
   var here=hereRoot();
 
+  // 如果浏览器连 Promise 都不支持，直接显示手动链接
+  if(typeof Promise==="undefined"){showFallback("浏览器版本较低，请手动选择");return;}
+
   Promise.all(MIRRORS.map(ping)).then(function(res){
+    if(resolved) return;
     var good=res.filter(function(r){return r.ok;});
-    if(!good.length){
-      msg.textContent="三个镜像暂不可达";
-      document.getElementById("spin").style.display="none";
-      var box=document.getElementById("links");
-      box.classList.add("show");
-      MIRRORS.forEach(function(m){
-        var a=document.createElement("a");
-        a.href=m.url;
-        a.innerHTML=m.name+"<small>"+m.url+"</small>";
-        box.appendChild(a);
-      });
-      return;
-    }
+    if(!good.length){showFallback("两个镜像暂不可达");return;}
     good.sort(function(a,b){return a.ms-b.ms;});
     var best=good[0];
     msg.textContent="已选 "+best.m.name+"（"+Math.round(best.ms)+"ms）";
     if(here && here===best.m.url){
-      // 当前已是最快可达镜像：直接进应用根路径（去掉路由页，避免循环）
+      // 当前已是最快可达镜像：直接进应用根路径（避免循环）
       location.replace(best.m.url);
       return;
     }
-    setTimeout(function(){ location.replace(best.m.url); }, 450);
-  });
+    setTimeout(function(){if(!resolved)location.replace(best.m.url);},450);
+  }).catch(function(){showFallback("探测出错，请手动选择");});
 })();
 </script>
 </body>
