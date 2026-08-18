@@ -13,7 +13,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
-<!-- v168-cachebust: 生活密码改为"生成即保存"，移除保存设置按钮，强制刷新 -->
+<!-- v169-cachebust: 客户导入模板与当前字段对齐（新增预约日、日期改名联系日期），强制刷新 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4953,7 +4953,9 @@ function _crc32(data){
   return (crc^0xFFFFFFFF)>>>0;
 }
 // ===== Excel 导出 (.xlsx) —— 纯前端 STORED 打包生成（Excel/WPS 全平台均可打开，不依赖服务端） =====
-var CLIENT_HEADERS = ['序号','姓名','职务','公司','电话','类型','标签','成交金额(元)','状态','手续费A(元)','手续费B(元)','日期','到期日','备注','地址'];
+// 与当前客户表单字段对齐：序号(仅展示) + 姓名/职务/公司/电话/地址/类型/标签/联系日期/预约日/到期日/成交金额/手续费A/手续费B/状态/备注
+// 2026-08-18 更新：新增「预约日」(apptDate)，「日期」改名为「联系日期」以匹配表单
+var CLIENT_HEADERS = ['序号','姓名','职务','公司','电话','地址','类型','标签','联系日期','预约日','到期日','成交金额(元)','手续费A(元)','手续费B(元)','状态','备注'];
 function recordExportLog(count, scope){
   if(wbIsAdmin()) return; // 管理员拥有全局权限，不记录单独限制
   var acc = wbCurrentAccount(); if(!acc) return;
@@ -4990,8 +4992,12 @@ async function exportClientsExcel(){
 }
 async function downloadClientTemplate(){
   try{
-    // 示例行：财产险时用"职务"填车牌、"公司"填车架号
-    var sample = [{ name:'示例客户', title:'沪A12345', company:'LVWABC1234567890', phone:'13800000000', type:'财险', tags:['成交'], amount:10000, dealType:'财险', dealStatus:'承保', feeA:100, feeB:20, dealDate:'2026-01-01', expireDate:'2026-12-31', note:'财险：职务列填车牌、公司列填车架号' }];
+    // 示例行：与当前客户字段对齐（含预约日、标签用「跟进等级、跟进状态」）
+    // 财险：职务列填车牌、公司列填车架号；TOB/TOC：职务填职位、公司填单位
+    var sample = [
+      { name:'示例客户A', title:'沪A12345', company:'LVWABC1234567890', phone:'13800000000', address:'上海市浦东新区', type:'财险', tags:['A(高)','成交'], amount:10000, dealStatus:'承保', feeA:100, feeB:20, dealDate:'2026-01-01', apptDate:'2026-02-01', expireDate:'2026-12-31', note:'财险：职务列填车牌、公司列填车架号' },
+      { name:'示例客户B', title:'项目经理', company:'某某建设集团', phone:'13900000000', address:'北京市朝阳区', type:'TOB', tags:['B(中)','已报价'], amount:5000000, dealStatus:'审批中', feeA:18000, feeB:2000, dealDate:'2026-01-05', apptDate:'2026-02-10', expireDate:'', note:'保函业务：类型填 TOB' }
+    ];
     toast('正在生成模板...');
     var filename = '客户导入模板_'+_today()+'.xlsx';
     // 前端纯 JS 生成（STORED）→ 首选
@@ -5048,11 +5054,11 @@ async function _buildXlsxBlob(list, headers){
   for(var ri=0;ri<list.length;ri++){
     var c = list[ri];
     var vals = [ri+1, si(c.name||''), si(c.title||''), si(c.company||''), si(c.phone||''),
-      si(c.type||''), si((c.tags||[]).join('、')),
-      (+c.amount||0), si(c.dealStatus||''),
-      (+c.feeA||0), (+c.feeB||0), si(c.dealDate||''), si(c.expireDate||''), si(c.note||''), si(c.address||'')];
+      si(c.address||''), si(c.type||''), si((c.tags||[]).join('、')),
+      si(c.dealDate||''), si(c.apptDate||''), si(c.expireDate||''),
+      (+c.amount||0), (+c.feeA||0), (+c.feeB||0), si(c.dealStatus||''), si(c.note||'')];
     var dc = vals.map(function(v,i){
-      var isNum = (i===0||i===7||i===9||i===10);
+      var isNum = (i===0||i===11||i===12||i===13);
       return isNum ? ('<c r="'+_numToCol(i)+(ri+2)+'" t="n"><v>'+v+'</v></c>') : ('<c r="'+_numToCol(i)+(ri+2)+'" t="s"><v>'+v+'</v></c>');
     }).join('');
     rows.push('<row r="'+(ri+2)+'">'+dc+'</row>');
@@ -5337,7 +5343,8 @@ function _importClientRows(rows){
     dealStatus: ['状态'],
     feeA: ['手续费A(元)','手续费A'],
     feeB: ['手续费B(元)','手续费B'],
-    dealDate: ['日期'],
+    dealDate: ['日期','联系日期'],
+    apptDate: ['预约日','下次需要联系的日期'],
     expireDate: ['到期日'],
     note: ['备注'],
     address: ['地址']
@@ -5376,6 +5383,7 @@ function _importClientRows(rows){
       feeA: colMap.feeA ? (parseFloat(cols[colMap.feeA]) || 0) : 0,
       feeB: colMap.feeB ? (parseFloat(cols[colMap.feeB]) || 0) : 0,
       dealDate: colMap.dealDate ? (cols[colMap.dealDate]||'').trim() : '',
+      apptDate: colMap.apptDate ? (cols[colMap.apptDate]||'').trim() : '',
       expireDate: colMap.expireDate ? (cols[colMap.expireDate]||'').trim() : '',
       note: colMap.note ? (cols[colMap.note]||'').trim() : '',
       address: colMap.address ? (cols[colMap.address]||'').trim() : '',
@@ -6980,13 +6988,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 168;                         // v168：生活密码改为"生成即保存"，移除保存设置按钮，生成前以 ------ 掩码
+const WB_VERSION = 169;                         // v169：客户导入模板与当前字段对齐（新增预约日 apptDate、日期改名联系日期），导出/导入表头同步更新
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 85;                  // v168 发版：84→85（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 86;                  // v169 发版：85→86（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
