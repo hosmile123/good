@@ -14,7 +14,7 @@
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v169-cachebust: 客户导入模板与当前字段对齐（新增预约日、日期改名联系日期），强制刷新 -->
-<!-- v170-cachebust: 客户中心 1)统计卡顺序调整(无人挪到加微后) 2)客户卡片加成交金额 3)保函 tab 改名 TOB 4)词库默认展开+默认选中待复习 -->
+<!-- v171-cachebust: 客户搜索扩展(姓名/车牌/公司/车架号/地址/备注/电话)、代办加预约回访分类、游戏音效(谁是卧底/你比我猜/数字炸弹) -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1953,7 +1953,7 @@ function toggleSbCollapse(){
       <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('week')"><div class="cs-num" style="color:#FA8C16" id="csWeekAppt">0</div><div class="cs-label">本周预约联系客户</div></div>
       <div class="cs-item" style="cursor:pointer; background: linear-gradient(135deg, #FFF7E6, #FFE7BA)" onclick="document.getElementById('clientExpireFrom').value=_today(); var d=new Date();d.setDate(d.getDate()+30); document.getElementById('clientExpireTo').value=d.toISOString().slice(0,10); renderClients()"><div class="cs-num" style="color:#FA8C16" id="csExpiring">0</div><div class="cs-label">30天内到期</div></div>
     </div>
-    <div class="search-bar"><input type="text" id="clientSearch" placeholder="搜索客户名称、公司..." oninput="renderClients()"></div>
+    <div class="search-bar"><input type="text" id="clientSearch" placeholder="搜索姓名 / 车牌 / 公司 / 车架号 / 地址 / 备注 / 电话..." oninput="renderClients()"></div>
     <div class="card" style="padding:0" id="clientCardList"></div>
     <p style="text-align:center;color:var(--text-light);font-size:12px;margin-top:12px" id="clientEmpty" hidden>该筛选下暂无客户</p>
   </div>
@@ -2275,6 +2275,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button class="cat-tab" onclick="filterCat(this,'行政事务')">📌 行政事务</button>
       <button class="cat-tab" onclick="filterCat(this,'佣金待结算')">💰 佣金待结算</button>
       <button class="cat-tab" onclick="filterCat(this,'生活')">🏠 生活</button>
+      <button class="cat-tab" data-cat-special="appt" onclick="filterCat(this,'预约回访')">📞 预约回访</button>
     </div>
     <div class="filter-row">
       <button class="filter-tab active" onclick="filterStatus(this,'all')">全部</button>
@@ -4337,7 +4338,7 @@ function clientFiltered(list){
     if(_clState.person!=='all' && (c.ownerUid||'guest')!==_clState.person) return false;
     if(_clState.appt==='today' && c.apptDate!==_today()) return false;
     if(_clState.appt==='week' && !inCurrentWeek(c.apptDate)) return false;
-    if(kw){ var hay=(c.name+' '+(c.company||'')+' '+(c.note||'')+' '+c.tags.join(' ')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
+    if(kw){ var hay=((c.name||'')+' '+(c.title||'')+' '+(c.company||'')+' '+(c.address||'')+' '+(c.phone||'')+' '+(c.note||'')+' '+(c.tags||[]).join(' ')).toLowerCase(); if(hay.indexOf(kw)<0) return false; }
     // 日期范围筛选（基于 dealDate 或 date）
     if(dateFrom || dateTo){
       var cd = new Date(c.dealDate || c.date || '');
@@ -6991,13 +6992,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 170;                         // v170：客户中心四改 + 词库默认展开到待复习分类
+const WB_VERSION = 171;                         // v171：客户搜索扩展+代办预约回访分类+游戏音效(语音+鼓掌/爆炸/滴)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 87;                  // v170 发版：86→87（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 88;                  // v171 发版：87→88（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7289,13 +7290,23 @@ function _migrateTodos(){
   return out;
 }
 function saveTodos(a){ _save('todo',a); }
-function applyTodoFilter(){
+function applyTodoFilter() {
   _qa('#todoList .swipe-front').forEach(function(item){
     var c=item.getAttribute('data-cat'); var done=item.getAttribute('data-done')==='true';
     var catOk=(currentTodoCat==='全部'||c===currentTodoCat);
     var statusOk=(currentTodoStatus==='all'||(currentTodoStatus==='done'&&done)||(currentTodoStatus==='pending'&&!done));
     item.style.display=(catOk&&statusOk)?'':'none';
   });
+  // 特殊分类：预约回访——只显示 apptTodoBox，隐藏 todoList
+  var box = document.getElementById('apptTodoBox');
+  var listEl = document.getElementById('todoList');
+  if(currentTodoCat === '预约回访'){
+    if(box) box.style.display = 'block';
+    if(listEl) listEl.style.display = 'none';
+  } else {
+    if(listEl) listEl.style.display = '';
+    // 其他分类下也保持预约回访块可见（让用户能同时看到它），仅在切到「预约回访」时独占
+  }
 }
 function renderTodo(){
   var list=getTodos(); var box=document.getElementById('todoList'); if(!box) return;
@@ -7658,6 +7669,102 @@ function _gm(id, html){
   el.innerHTML='<div class="game-modal-inner">'+html+'</div>'; el.style.display='flex';
 }
 function closeGameModal(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+
+/* ---------- 通用游戏音效（语音合成 + Web Audio API 生成音效，无需外部音频文件） ---------- */
+var _sfxMuted = false;          // 全局静音开关（默认关闭）
+var _sfxVol = 1.0;              // 全局音量（0~1），1.0 表示满音量播放
+var _ac = null;                 // 共享 AudioContext
+function _acx(){
+  if(!_ac){
+    try { _ac = new (window.AudioContext||window.webkitAudioContext)(); }
+    catch(e){ _ac = null; }
+  }
+  if(_ac && _ac.state === 'suspended'){ _ac.resume(); }
+  return _ac;
+}
+// 语音播报：使用浏览器内置 TTS，音量=_sfxVol
+function _speak(text, opts){
+  if(_sfxMuted || !('speechSynthesis' in window)) return;
+  try{
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN';
+    u.rate = (opts && opts.rate) || 1.05;
+    u.pitch = (opts && opts.pitch) || 1.0;
+    u.volume = _sfxVol;
+    window.speechSynthesis.speak(u);
+  } catch(e){}
+}
+// 合成音效：低频 noise + 振幅包络模拟爆炸声
+function _sfxExplode(){
+  if(_sfxMuted) return;
+  var ac = _acx(); if(!ac) return;
+  var dur = 0.6;
+  var buf = ac.createBuffer(1, Math.floor(ac.sampleRate*dur), ac.sampleRate);
+  var data = buf.getChannelData(0);
+  for(var i=0;i<data.length;i++){
+    var t = i/data.length;
+    // 起始白噪 + 低频正弦轰炸感 + 快速衰减
+    var env = Math.exp(-t*5);
+    data[i] = (Math.random()*2-1)*0.7*env + Math.sin(2*Math.PI*60*t)*0.5*env;
+  }
+  var src = ac.createBufferSource(); src.buffer = buf;
+  var g = ac.createGain(); g.gain.value = _sfxVol*0.9;
+  src.connect(g); g.connect(ac.destination);
+  src.start();
+}
+// 短促"滴"声：1000Hz sine + 急速包络
+function _sfxBeep(freq){
+  if(_sfxMuted) return;
+  var ac = _acx(); if(!ac) return;
+  var dur = 0.18;
+  var osc = ac.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = freq || 1000;
+  var g = ac.createGain();
+  g.gain.setValueAtTime(0, ac.currentTime);
+  g.gain.linearRampToValueAtTime(_sfxVol*0.7, ac.currentTime+0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur);
+  osc.connect(g); g.connect(ac.destination);
+  osc.start(); osc.stop(ac.currentTime+dur+0.02);
+}
+// 鼓掌声：用多个短促低频脉冲模拟"啪啪啪"
+function _sfxClap(count){
+  if(_sfxMuted) return;
+  var ac = _acx(); if(!ac) return;
+  count = count || 5;
+  for(var i=0;i<count;i++){
+    setTimeout(function(){
+      if(_sfxMuted) return;
+      var dur = 0.08;
+      var buf = ac.createBuffer(1, Math.floor(ac.sampleRate*dur), ac.sampleRate);
+      var data = buf.getChannelData(0);
+      for(var j=0;j<data.length;j++){
+        var t = j/data.length;
+        var env = Math.exp(-t*12);
+        // 高频噪声 + 短促爆破感
+        data[j] = (Math.random()*2-1)*0.5*env;
+      }
+      var src = ac.createBufferSource(); src.buffer = buf;
+      var bp = ac.createBiquadFilter(); bp.type='highpass'; bp.frequency.value=1500;
+      var g = ac.createGain(); g.gain.value = _sfxVol*0.6;
+      src.connect(bp); bp.connect(g); g.connect(ac.destination);
+      src.start();
+    }, i*140);
+  }
+}
+// 复合音效：胜利（语音 + 鼓掌）
+function sfxVictory(text){
+  _speak(text);
+  setTimeout(function(){ _sfxClap(6); }, 350);
+}
+// 复合音效：正确/鼓掌
+function sfxCorrect(){
+  _sfxBeep(880);
+  setTimeout(function(){ _sfxClap(3); }, 120);
+}
+// 复合音效：跳过
+function sfxSkip(){ _speak('跳过'); }
 function exportGameBackup(){
   var d=getGameData();
   var b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
@@ -7780,6 +7887,8 @@ function endSpyGame(civWin){
   if(d.spyHistory.length>50) d.spyHistory=d.spyHistory.slice(-50);
   saveGameData(d);
   toast(civWin?'🎉 平民胜利！':'🎭 卧底胜利！');
+  // v171：胜利语音 + 鼓掌（音量 1.0，由 _sfxVol 控制）
+  sfxVictory(civWin ? '恭喜平民胜利' : '恭喜卧底胜利');
   openSpyGame();
 }
 
@@ -7896,6 +8005,8 @@ function charadesStart(){
 function charadesNext(fresh){
   if(!_charades) return;
   _charades.stopConfirm=false;
+  // v171：跳过按钮触发时，语音提示"跳过"
+  if(!fresh){ sfxSkip(); }
   if(!fresh){
     _charades.list.splice(_charades.idx,1);
     if(!_charades.list.length){ _charades.list=CHARADES_CATS[_charades.cat].slice(); }
@@ -7917,10 +8028,15 @@ function charadesNext(fresh){
   _charades.timer=setInterval(function(){
     _charades.timeLeft--;
     var t=document.getElementById('charadesTimer'); if(t) t.textContent=_charades.timeLeft;
+    // v171：每 60 秒语音快速提示"剩余 X 秒"（仅 60/30/10/5/3/2/1 触发，避免频繁播报）
+    var tl=_charades.timeLeft;
+    if(tl>0 && (tl===60 || tl===30 || tl===10 || tl===5 || tl===3 || tl===2 || tl===1)){
+      _speak('剩余 '+tl+' 秒');
+    }
     if(_charades.timeLeft<=0){ clearInterval(_charades.timer); _charades.timer=null; charadesEnd(_charades.score); _charades=null; }
   },1000);
 }
-function charadesCorrect(){ if(_charades){ if(_charades.idx>=0&&_charades.list[_charades.idx]) _charades.words.push(_charades.list[_charades.idx]); _charades.score++; } charadesNext(false); }
+function charadesCorrect(){ if(_charades){ if(_charades.idx>=0&&_charades.list[_charades.idx]) _charades.words.push(_charades.list[_charades.idx]); _charades.score++; sfxCorrect(); } charadesNext(false); }
 function charadesStop(){
   if(!_charades) return;
   if(!_charades.stopConfirm){
@@ -8079,10 +8195,13 @@ function _bombSubmit(){
     b.history.push({n:v,hit:true});
     window._bombEndMsg='💥 踩中炸弹！炸弹是 '+b.bomb;
     saveBombResult('💥 踩中炸弹', b.bomb);
-    el.value=''; _bomb=null; bombRender(); toast(window._bombEndMsg); return;
+    el.value=''; _bomb=null; bombRender(); toast(window._bombEndMsg);
+    _sfxExplode();             // v171：踩中炸弹 → 爆炸音
+    return;
   }
   if(v<b.bomb) b.lo=v+1; else b.hi=v-1;
   b.history.push({n:v,hit:false});
+  _sfxBeep(1000);              // v171：未中 → 滴的一声
   if(b.lo>b.hi){
     window._bombEndMsg='🎉 安全过关！炸弹是 '+b.bomb;
     saveBombResult('🎉 安全过关', b.bomb);
