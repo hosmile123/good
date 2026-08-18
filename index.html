@@ -15,6 +15,7 @@
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v169-cachebust: 客户导入模板与当前字段对齐（新增预约日、日期改名联系日期），强制刷新 -->
 <!-- v173-cachebust: 修你比我猜计时(基于时间戳+清除残留定时器解决叠加加速)、游戏入口手势解锁AudioContext确保音效出声 -->
+<!-- v174-cachebust: 彻底修复系统浏览器TTS语音不响(resume+voices异步就绪重试+中文语音优选+iOS保活+首次手势解锁安全网) -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -6992,13 +6993,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 173;                         // v173：你比我猜计时修复(时间戳+清残留timer)+游戏入口解锁AudioContext确保音效出声
+const WB_VERSION = 174;                         // v174：彻底修复系统浏览器TTS语音不响(resume+voices异步就绪重试+中文语音优选+iOS保活+首次手势解锁安全网)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 90;                  // v173 发版：89→90（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 91;                  // v174 发版：90→91（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7682,44 +7683,105 @@ function _acx(){
   if(_ac && _ac.state === 'suspended'){ _ac.resume(); }
   return _ac;
 }
-// 语音引擎初始化：提前缓存 voices，并在用户手势中解锁 TTS（移动端/微信内嵌浏览器必须先交互一次才能播报）
-var _sfxVoices = null;
+// 语音引擎初始化：提前缓存 voices，并在用户手势中解锁 TTS
+// 跨浏览器差异很大，统一处理：
+//  - 桌面 Chrome：voices 异步加载，首次 getVoices 常为空；空闲后会被 pause，每次 speak 前需 resume
+//  - Safari / iOS：必须先有"用户手势"触发过 speak 才出声，且空闲后会被 pause
+//  - 微信/Android 内嵌浏览器：同样需要手势解锁
+// 因此这里：异步加载 voices + 手势解锁(真正 utterance) + 每次 speak 前 resume + 优选中文语音 + iOS 后台保活
+var _sfxVoices = [];
+var _sfxVoiceReady = false;
 function _loadVoices(){
   if(!('speechSynthesis' in window)) return;
-  try { _sfxVoices = window.speechSynthesis.getVoices(); } catch(e){ _sfxVoices = null; }
+  try {
+    var vs = window.speechSynthesis.getVoices();
+    if(vs && vs.length){ _sfxVoices = vs; _sfxVoiceReady = true; }
+  } catch(e){}
 }
+// 选择最合适的语音：优先 zh-CN，其次任意中文/粤语/繁体，最后返回 null（用浏览器默认）
+function _pickVoice(){
+  if(!_sfxVoices || !_sfxVoices.length) return null;
+  var zhCN = null, zh = null;
+  for(var i=0;i<_sfxVoices.length;i++){
+    var v = _sfxVoices[i];
+    var lang = v.lang || '';
+    if(/^zh[-_]?CN/i.test(lang)){ zhCN = v; }
+    else if(/zh|Chinese|中文|Yue|Hans|Hant/i.test(lang + ' ' + (v.name||''))){ zh = v; }
+  }
+  return zhCN || zh || null;
+}
+var _speechUnlocked = false;
+// 在用户手势中调用：用一段极低音量的真实 utterance 激活 TTS 流水线，并启动保活，防止后续定时播报失效
 function unlockSpeech(){
   if(_sfxMuted || !('speechSynthesis' in window)) return;
-  try{
-    window.speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance('');
-    u.volume = 0;
-    window.speechSynthesis.speak(u);
-  }catch(e){}
+  var ss = window.speechSynthesis;
+  try { ss.resume(); } catch(e){}
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0; u.rate = 5; u.lang = 'zh-CN';
+    ss.speak(u);
+    _speechUnlocked = true;
+  } catch(e){}
+  _ttsKeepAliveStart();
+}
+// 后台保活：解锁后定期 resume，避免 Safari/iOS 空闲暂停；iOS 额外发"静音占位"保持会话，确保定时器里的语音也能播
+var _ttsAliveTimer = null;
+function _ttsKeepAliveStart(){
+  if(_ttsAliveTimer || !('speechSynthesis' in window)) return;
+  _ttsAliveTimer = setInterval(function(){
+    if(_sfxMuted || !_speechUnlocked) return;
+    try {
+      var ss = window.speechSynthesis;
+      ss.resume();
+      if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !ss.speaking){
+        var u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0; u.rate = 5; u.lang = 'zh-CN';
+        ss.speak(u);
+      }
+    } catch(e){}
+  }, 2500);
 }
 if('speechSynthesis' in window){
   _loadVoices();
   try { window.speechSynthesis.onvoiceschanged = _loadVoices; } catch(e){}
+  // voices 常首次为空，延迟再取一次兜底
+  setTimeout(_loadVoices, 300);
+  setTimeout(_loadVoices, 1200);
 }
-// 语音播报：使用浏览器内置 TTS，音量=_sfxVol；自动优选中文语音
+// 安全网：任意首次用户交互也解锁 TTS，防止漏掉游戏入口的解锁时机
+(function(){
+  if(!('speechSynthesis' in window)) return;
+  var done = false;
+  function onFirst(){ if(done) return; done = true; unlockSpeech(); }
+  try {
+    window.addEventListener('pointerdown', onFirst, { once:true });
+    window.addEventListener('keydown', onFirst, { once:true });
+  } catch(e){}
+})();
+// 语音播报：使用浏览器内置 TTS，音量=_sfxVol；自动优选中文语音；voices 未就绪时等加载后再播一次
 function _speak(text, opts){
-  if(_sfxMuted || !('speechSynthesis' in window)) return;
-  try{
-    var u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-CN';
-    u.rate = (opts && opts.rate) || 1.05;
-    u.pitch = (opts && opts.pitch) || 1.0;
-    u.volume = _sfxVol;
-    if(_sfxVoices && _sfxVoices.length){
-      var zh = null;
-      for(var i=0;i<_sfxVoices.length;i++){
-        var v=_sfxVoices[i];
-        if(/zh|Chinese|中文|Yue|Hans|Hant/i.test(v.lang||v.name||'')){ zh=v; break; }
-      }
-      if(zh) u.voice = zh;
-    }
-    window.speechSynthesis.speak(u);
-  }catch(e){}
+  if(_sfxMuted || !('speechSynthesis' in window) || !text) return;
+  var ss = window.speechSynthesis;
+  try { ss.resume(); } catch(e){}
+  if(!_sfxVoiceReady){ _loadVoices(); }
+  // voices 尚未就绪：注册一次性 voiceschanged，就绪后再播（避免首条静默失败）
+  if(!_sfxVoiceReady){
+    try {
+      window.speechSynthesis.addEventListener('voiceschanged', function once(){
+        try { window.speechSynthesis.removeEventListener('voiceschanged', once); } catch(e){}
+        _speak(text, opts);
+      }, { once:true });
+      return;
+    } catch(e){ /* 不支持 addEventListener 则直接播 */ }
+  }
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = (opts && opts.rate) || 1.05;
+  u.pitch = (opts && opts.pitch) || 1.0;
+  u.volume = _sfxVol;
+  var v = _pickVoice();
+  if(v) u.voice = v;
+  ss.speak(u);
 }
 // 合成音效：低频 noise + 振幅包络模拟爆炸声
 function _sfxExplode(){
