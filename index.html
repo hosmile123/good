@@ -14,6 +14,7 @@
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v169-cachebust: 客户导入模板与当前字段对齐（新增预约日、日期改名联系日期），强制刷新 -->
+<!-- v170-cachebust: 客户中心 1)统计卡顺序调整(无人挪到加微后) 2)客户卡片加成交金额 3)保函 tab 改名 TOB 4)词库默认展开+默认选中待复习 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1936,7 +1937,7 @@ function toggleSbCollapse(){
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('cl',this,'cl-list')">客户</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-policy')">保单</button>
-    <button class="subtab" onclick="switchSub('cl',this,'cl-guarantee')">保函</button>
+    <button class="subtab" onclick="switchSub('cl',this,'cl-guarantee')">TOB</button>
     <button class="subtab" onclick="switchSub('cl',this,'cl-visit')">拜访</button>
   </div>
 
@@ -1947,8 +1948,8 @@ function toggleSbCollapse(){
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'成交')"><div class="cs-num" style="color:var(--success)" id="csDeal">0</div><div class="cs-label">成交</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'已报价')"><div class="cs-num" style="color:var(--primary)" id="csQuote">0</div><div class="cs-label">已报价</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'加微')"><div class="cs-num" style="color:#722ED1" id="csWx">0</div><div class="cs-label">加微</div></div>
-      <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('today')"><div class="cs-num" style="color:#EB2F96" id="csTodayAppt">0</div><div class="cs-label">今天预约客户</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetTag(null,'无人')"><div class="cs-num" style="color:#8C8C8C" id="csNoAns">0</div><div class="cs-label">无人</div></div>
+      <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('today')"><div class="cs-num" style="color:#EB2F96" id="csTodayAppt">0</div><div class="cs-label">今天预约客户</div></div>
       <div class="cs-item" style="cursor:pointer" onclick="clientSetAppt('week')"><div class="cs-num" style="color:#FA8C16" id="csWeekAppt">0</div><div class="cs-label">本周预约联系客户</div></div>
       <div class="cs-item" style="cursor:pointer; background: linear-gradient(135deg, #FFF7E6, #FFE7BA)" onclick="document.getElementById('clientExpireFrom').value=_today(); var d=new Date();d.setDate(d.getDate()+30); document.getElementById('clientExpireTo').value=d.toISOString().slice(0,10); renderClients()"><div class="cs-num" style="color:#FA8C16" id="csExpiring">0</div><div class="cs-label">30天内到期</div></div>
     </div>
@@ -1969,10 +1970,10 @@ function toggleSbCollapse(){
     <div class="card" style="padding:0" id="policyList"></div>
   </div>
 
-  <!-- 保函（保函成交客户派生） -->
+  <!-- TOB（保函成交客户派生） -->
   <div class="subtab-content" id="cl-guarantee">
     <div class="guarantee-types" id="gtTypes"></div>
-    <div class="section-label">保函清单（保函成交客户）</div>
+    <div class="section-label">TOB 客户清单（含保函/工程类成交客户）</div>
     <div class="card" style="padding:0" id="guaranteeList"></div>
     <div class="card" style="margin-top:12px">
       <div class="card-title">📊 保函统计</div>
@@ -2758,13 +2759,13 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:#fa8c16" id="engDue">0</div><div style="font-size:11px;color:var(--text-light)">今日待复习</div></div>
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:var(--primary)" id="engWaiting">0</div><div style="font-size:11px;color:var(--text-light)">复习中</div></div>
     </div>
-    <details class="eng-library" id="engLibrary" ontoggle="renderEngLibrary()">
+    <details class="eng-library" id="engLibrary" ontoggle="renderEngLibrary()" open>
       <summary>我的词库<small>点开查看学过的词 · 重点 / 掌握 / 复习 / 不熟练</small></summary>
       <div class="eng-lib-tabs">
-        <button class="eng-lib-tab active" data-tab="starred" onclick="engLibTab('starred',this)">⭐ 重点集<span class="cnt">0</span></button>
+        <button class="eng-lib-tab" data-tab="starred" onclick="engLibTab('starred',this)">⭐ 重点集<span class="cnt">0</span></button>
         <button class="eng-lib-tab" data-tab="mastered" onclick="engLibTab('mastered',this)">📗 已掌握<span class="cnt">0</span></button>
         <button class="eng-lib-tab" data-tab="reviewing" onclick="engLibTab('reviewing',this)">🔁 复习中<span class="cnt">0</span></button>
-        <button class="eng-lib-tab" data-tab="due" onclick="engLibTab('due',this)">⏰ 待复习<span class="cnt">0</span></button>
+        <button class="eng-lib-tab active" data-tab="due" onclick="engLibTab('due',this)">⏰ 待复习<span class="cnt">0</span></button>
         <button class="eng-lib-tab" data-tab="weak" onclick="engLibTab('weak',this)">🆕 不熟练<span class="cnt">0</span></button>
       </div>
       <div class="eng-lib-search">
@@ -4523,6 +4524,8 @@ function renderClients(){
       if(c.title)   infoBits.push('<span class="cm-field">职位 <b>'+esc(c.title)+'</b></span>');
     }
     if(c.phone) infoBits.push('<span class="cm-field">电话 <b>'+esc(c.phone)+'</b></span>');
+    var _amt = +c.amount||0;
+    if(_amt>0) infoBits.push('<span class="cm-field" style="color:var(--success)">成交 <b>'+esc(fmtMoney(_amt))+'</b></span>');
     var row2 = infoBits.length ? '<div class="client-row2">' + infoBits.join('') + '</div>' : '';
     // Row3：四合一 chip 行
     var chips = [];
@@ -6174,7 +6177,7 @@ function selectEngDeck(name, btn, force){
 }
 
 // ===== 我的词库（v141）：按分类查看学过的单词 =====
-let engLibTabName = 'starred';
+let engLibTabName = 'due';
 const ENG_DECK_LABEL = {
   daily:'日常高频词', biz:'雅思', travel:'旅行英语', extra:'综合拓展',
   food:'食物饮食', school:'校园学习', health:'健康医疗', emotion:'情感表达',
@@ -6988,13 +6991,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 169;                         // v169：客户导入模板与当前字段对齐（新增预约日 apptDate、日期改名联系日期），导出/导入表头同步更新
+const WB_VERSION = 170;                         // v170：客户中心四改 + 词库默认展开到待复习分类
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 86;                  // v169 发版：85→86（不含 4，合法递增）
+const WB_DISPLAY_VERSION = 87;                  // v170 发版：86→87（不含 4，合法递增）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
