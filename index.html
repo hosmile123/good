@@ -16,7 +16,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
-<!-- v179-cachebust: 修复人员筛选PC端下拉不显示(CSS移除了max-width:768px限制，filter-tab兜底隐藏)；旧版select仅窄屏显示导致PC端空白 -->
+<!-- v180-cachebust: 找回码管理底部「已注册账号」列表兜底改用本机wb_accounts(localStorage)（云端list为空时不再空白）；refreshResetCodes验证码列表为空时也保留到底，渲染账号列表不早return；后端GET /api/admin/accounts不再写数据回盘 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -7039,13 +7039,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 179;                         // v179：修复人员筛选PC端下拉不显示(CSS移除max-width:768px限制+filter-tab兜底隐藏)
+const WB_VERSION = 180;                         // v180：找回码管理底部「已注册账号」列表兜底改用本机wb_accounts(避免云端list=[]时空白)；refreshResetCodes不再因验证码列表空就return
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 96;                  // v179 发版：95→96
+const WB_DISPLAY_VERSION = 97;                  // v180 发版：96→97
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10721,66 +10721,95 @@ async function refreshResetCodes(){
     var list = (data && data.list) || [];
     if(list.length === 0){
       box.innerHTML = '<div style="font-size:13px;color:var(--text-light)">暂无待处理的验证码。</div>';
-      return;
+    } else {
+      var html = '';
+      list.forEach(function(r){
+        var expired = r.expired ? '（已过期）' : '';
+        var color = r.expired ? '#bbb' : '#1677ff';
+        var left = r.expired ? 0 : Math.max(0, Math.ceil((r.expires - Date.now())/1000));
+        var badge = r.expired
+          ? '<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#f5f5f5;color:#bbb">已过期</span>'
+          : '<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#e8f3ff;color:#1677ff">有效</span>';
+        html += '<div style="border:1px solid var(--border);border-left:4px solid ' + color + ';border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+              + '<div style="display:flex;justify-content:space-between;align-items:center">'
+              + '<div style="font-size:13px;font-weight:600">' + escapeHtml(r.email) + '</div>'
+              + '<div style="display:flex;gap:6px;align-items:center">'
+              + badge
+              + '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + escapeHtml(r.email) + '\')" title="直接为该用户设置新密码（无需验证码）">🚀 应用</button>'
+              + '<button class="badge-btn" style="font-size:11px" onclick="clearResetCode(\'' + escapeHtml(r.email) + '\')">清除</button>'
+              + '</div>'
+              + '</div>'
+              + '<div style="font-size:22px;font-weight:700;letter-spacing:4px;color:' + color + ';margin:6px 0">' + r.code + ' <span style="font-size:11px;font-weight:400;letter-spacing:0;color:var(--text-light)">' + expired + '</span></div>'
+              + '<div style="font-size:11px;color:var(--text-light)">用途：' + (r.purpose==='reset'?'找回密码':'验证码') + ' · 剩余 ' + left + ' 秒 · 申请于 ' + new Date(r.requestedAt).toLocaleString('zh-CN') + '</div>'
+              + '</div>';
+      });
+      box.innerHTML = html;
     }
-    var html = '';
-    list.forEach(function(r){
-      var expired = r.expired ? '（已过期）' : '';
-      var color = r.expired ? '#bbb' : '#1677ff';
-      var left = r.expired ? 0 : Math.max(0, Math.ceil((r.expires - Date.now())/1000));
-      var badge = r.expired
-        ? '<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#f5f5f5;color:#bbb">已过期</span>'
-        : '<span style="font-size:10px;padding:1px 7px;border-radius:8px;background:#e8f3ff;color:#1677ff">有效</span>';
-      html += '<div style="border:1px solid var(--border);border-left:4px solid ' + color + ';border-radius:10px;padding:10px 12px;margin-bottom:8px">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center">'
-            + '<div style="font-size:13px;font-weight:600">' + escapeHtml(r.email) + '</div>'
-            + '<div style="display:flex;gap:6px;align-items:center">'
-            + badge
-            + '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + escapeHtml(r.email) + '\')" title="直接为该用户设置新密码（无需验证码）">🚀 应用</button>'
-            + '<button class="badge-btn" style="font-size:11px" onclick="clearResetCode(\'' + escapeHtml(r.email) + '\')">清除</button>'
-            + '</div>'
-            + '</div>'
-            + '<div style="font-size:22px;font-weight:700;letter-spacing:4px;color:' + color + ';margin:6px 0">' + r.code + ' <span style="font-size:11px;font-weight:400;letter-spacing:0;color:var(--text-light)">' + expired + '</span></div>'
-            + '<div style="font-size:11px;color:var(--text-light)">用途：' + (r.purpose==='reset'?'找回密码':'验证码') + ' · 剩余 ' + left + ' 秒 · 申请于 ' + new Date(r.requestedAt).toLocaleString('zh-CN') + '</div>'
-            + '</div>';
-    });
-    box.innerHTML = html;
-    // 底部加载所有已注册账号
+    // 底部加载所有已注册账号（无论验证码列表是否为空都要显示）
+    var accBox = document.getElementById('accList');
+    var accCount = document.getElementById('accCount');
+    var accs = [];
+    var accSource = '';
     try {
       const accData = await api('/api/admin/accounts', 'GET');
-      var accs = (accData && accData.list) || [];
-      var accBox = document.getElementById('accList');
-      var accCount = document.getElementById('accCount');
-      if(accCount) accCount.textContent = accs.length;
-      if(!accs.length){
-        if(accBox) accBox.innerHTML = '<div style="font-size:13px;color:var(--text-light)">暂无注册账号。</div>';
-      } else {
-        if(accBox) accBox.innerHTML = accs.map(function(a){
-          var d = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '未知';
-          var part = a.partition || { work: true, life: true, fun: true };
-          _accParts[a.email] = { work: !!part.work, life: !!part.life, fun: !!part.fun };
-          var em = escapeHtml(a.email);
-          var raw = a.email;
-          // v178：删除按钮（管理员账号不可删）+ 重置密码按钮（任何一个账号都能用）
-          var _isPlainAdminEmail = String(raw).toLowerCase() === String(WB_ADMIN_EMAIL || 'seeyoulook@qq.com').toLowerCase();
-          var delBtn = _isPlainAdminEmail ? '' :
-            '<button class="badge-btn" style="font-size:11px;background:#FFF1F0;color:#FF4D4F;border-color:#FFA39E" onclick="deleteAccount(\'' + raw + '\')">删除</button>';
-          var pwBtn = '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + raw + '\')">🔧 重置密码</button>';
-          var meHint = _isPlainAdminEmail ? '<span style="font-size:11px;color:#1677ff;background:#E8F3FF;padding:1px 6px;border-radius:6px;margin-left:6px">我（管理员）</span>' : '';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;gap:8px;flex-wrap:wrap">' +
-            '<div style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + em + meHint + '<div style="font-size:11px;color:var(--text-light);font-weight:400">注册于 ' + d + '</div></div>' +
-            '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;flex-wrap:wrap">' +
-              '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.work?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'work\',this.checked)">工作</label>' +
-              '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.life?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'life\',this.checked)">生活</label>' +
-              '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.fun?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'fun\',this.checked)">娱乐</label>' +
-              pwBtn + delBtn +
-            '</div>' +
-          '</div>';
-        }).join('');
-      }
+      accs = (accData && accData.list) || [];
+      accSource = 'cloud';
+      console.log('[resetCodes] 云端 /api/admin/accounts 返回', accs.length, '个账号');
     } catch(e){
-      var accBox2 = document.getElementById('accList');
-      if(accBox2) accBox2.innerHTML = '<div style="font-size:12px;color:#FF4D4F">账号列表加载失败：' + (e.message || '未知错误') + '</div>';
+      console.warn('[resetCodes] 云端列表失败', e);
+    }
+    // v180：云端为空或失败时，fallback 用本机的 wb_accounts（localStorage）补足
+    if(!accs.length){
+      try {
+        var localMap = (typeof wbAccounts === 'function') ? wbAccounts() : {};
+        var localArr = Object.keys(localMap || {}).map(function(email){
+          var a = localMap[email] || {};
+          return {
+            email: email,
+            createdAt: a.createdAt || 0,
+            partition: a.partition || { work: true, life: true, fun: true }
+          };
+        });
+        if(localArr.length){
+          accs = localArr;
+          accSource = 'local-fallback';
+          console.log('[resetCodes] fallback 改用 localStorage，显示', accs.length, '个账号');
+        }
+      } catch(e){
+        console.warn('[resetCodes] localStorage fallback 失败', e);
+      }
+    }
+    if(accCount) accCount.textContent = accs.length;
+    if(!accs.length){
+      if(accBox) accBox.innerHTML = '<div style="font-size:13px;color:var(--text-light)">暂无注册账号。</div>';
+    } else {
+      var accHtmlArr = [];
+      if(accSource === 'local-fallback'){
+        accHtmlArr.push('<div style="font-size:11px;color:#FA8C16;background:#FFF7E6;border:1px dashed #FFD591;border-radius:8px;padding:6px 10px;margin-bottom:8px">⚠️ 云端账号列表为空，已用本机 localStorage 账号列表兜底显示（仅作查看，本机的密码/分区在此处修改不会上传云端）。</div>');
+      }
+      var accHtml = accs.map(function(a){
+        var d = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '未知';
+        var part = a.partition || { work: true, life: true, fun: true };
+        _accParts[a.email] = { work: !!part.work, life: !!part.life, fun: !!part.fun };
+        var em = escapeHtml(a.email);
+        var raw = a.email;
+        var _isPlainAdminEmail = String(raw).toLowerCase() === String(WB_ADMIN_EMAIL || 'seeyoulook@qq.com').toLowerCase();
+        var delBtn = _isPlainAdminEmail ? '' :
+          '<button class="badge-btn" style="font-size:11px;background:#FFF1F0;color:#FF4D4F;border-color:#FFA39E" onclick="deleteAccount(\'' + raw + '\')">删除</button>';
+        var pwBtn = '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + raw + '\')">🔧 重置密码</button>';
+        var meHint = _isPlainAdminEmail ? '<span style="font-size:11px;color:#1677ff;background:#E8F3FF;padding:1px 6px;border-radius:6px;margin-left:6px">我（管理员）</span>' : '';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;gap:8px;flex-wrap:wrap">' +
+          '<div style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + em + meHint + '<div style="font-size:11px;color:var(--text-light);font-weight:400">注册于 ' + d + '</div></div>' +
+          '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;flex-wrap:wrap">' +
+            '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.work?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'work\',this.checked)">工作</label>' +
+            '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.life?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'life\',this.checked)">生活</label>' +
+            '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.fun?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'fun\',this.checked)">娱乐</label>' +
+            pwBtn + delBtn +
+          '</div>' +
+        '</div>';
+      }).join('');
+      accHtmlArr.push(accHtml);
+      if(accBox) accBox.innerHTML = accHtmlArr.join('');
     }
   } catch(e){
     box.innerHTML = '<div style="font-size:13px;color:#FF4D4F">' + (e.message || '加载失败') + '</div>';
