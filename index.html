@@ -16,7 +16,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
-<!-- v180-cachebust: 找回码管理底部「已注册账号」列表兜底改用本机wb_accounts(localStorage)（云端list为空时不再空白）；refreshResetCodes验证码列表为空时也保留到底，渲染账号列表不早return；后端GET /api/admin/accounts不再写数据回盘 -->
+<!-- v181-cachebust: 分区bug修复——applyAccountPartition兜底移除else分支(不再无条件显示覆盖正确隐藏)；loadAccountPartition移除全false全开兜底+成功后缓存到localStorage(失败时优先读缓存)；setAccPartition改为partial update(只发被修改字段)，后端POST只更新提供字段不再误覆盖其他分区 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4065,11 +4065,12 @@ function applyAccountPartition(){
   }
   // 数据备份入口（与分区无关，按管理开关显示）
   applyBackupEnabled();
-  // 兜底：再次强制把 fun 入口按 _accountPartition.fun 隐藏（防止 PAGE_PARTITION 漏配）
+  // 兜底：fun 明确未勾选时强制隐藏（防止 PAGE_PARTITION 漏配、DOM 重建覆盖）。
+  // 关键：不写 else 分支无条件显示——fun 的显示已由上方 pageVisible 统一处理，
+  // 这里仅在确定为 false 时兜底隐藏，避免“无条件显示”覆盖了正确隐藏，
+  // 否则会出现「未勾选娱乐的账号依然能看到娱乐」的问题。
   if(_accountPartition.fun === false){
     document.querySelectorAll('[data-page="fun"], [data-qpage="fun"]').forEach(function(el){ el.style.display = 'none'; });
-  } else {
-    document.querySelectorAll('[data-page="fun"], [data-qpage="fun"]').forEach(function(el){ el.style.display = ''; });
   }
   console.log('[partition] 已应用账号分区过滤，当前可见：work=' + _accountPartition.work + ' life=' + _accountPartition.life + ' fun=' + _accountPartition.fun);
 }
@@ -4077,6 +4078,7 @@ function applyAccountPartition(){
 async function loadAccountPartition(){
   // 管理员永远全开，避免误隐藏管理面板
   if(!API_TOKEN || wbIsAdmin()){ _accountPartition = { work: true, life: true, fun: true }; return; }
+  var cacheKey = 'wb_partition_' + (WB_SESSION || '');
   try {
     var r = await api('/api/account/partition', 'GET');
     if(r && r.ok && r.partition && typeof r.partition === 'object'){
@@ -4086,23 +4088,41 @@ async function loadAccountPartition(){
         life: r.partition.life === true,
         fun:  r.partition.fun  === true
       };
-      // 若三个分区都未勾选，保留全开（兜底：避免误隐藏全部）
-      if(!_accountPartition.work && !_accountPartition.life && !_accountPartition.fun){
-        _accountPartition = { work: true, life: true, fun: true };
-      }
+      // 缓存到本地：后端不可用时可兜底，不再“一律全开”，避免未勾选的分区被误显示
+      try { localStorage.setItem(cacheKey, JSON.stringify(_accountPartition)); } catch(e){}
     } else {
-      _accountPartition = { work: true, life: true, fun: true };
+      // 后端返回结构异常：优先读本地缓存（保留上次的隐藏设置），无缓存才全开兜底
+      _accountPartition = _readPartitionCache(cacheKey);
     }
   } catch(e){
-    _accountPartition = { work: true, life: true, fun: true };
+    // 网络/服务异常：优先读本地缓存，无缓存才全开兜底
+    _accountPartition = _readPartitionCache(cacheKey);
+    console.warn('[partition] 拉取分区失败，使用本地缓存/兜底：', e && e.message, _accountPartition);
   }
   console.log('[partition] 当前账号可见分区 =', _accountPartition);
+}
+// 读取本地分区缓存；无缓存时返回全开兜底（仅用于后端完全不可达的极端情况）
+function _readPartitionCache(cacheKey){
+  try {
+    var raw = localStorage.getItem(cacheKey);
+    if(raw){
+      var c = JSON.parse(raw);
+      if(c && typeof c === 'object' && ('work' in c) && ('life' in c) && ('fun' in c)){
+        return { work: !!c.work, life: !!c.life, fun: !!c.fun };
+      }
+    }
+  } catch(e){}
+  return { work: true, life: true, fun: true };
 }
 // 管理端：切换某账号的某分区
 async function setAccPartition(email, part, val){
   if(!_accParts[email]) _accParts[email] = { work: true, life: true, fun: true };
   _accParts[email][part] = val;
   try {
+    // 发送全部三个分区当前值（_accParts 在 refreshResetCodes 渲染时已完整填充），
+    // 后端无论新旧版本都能据此重建 partition；后端 partial 版也兼容（提供的字段都会更新）。
+    // 注：这里发送全量是刻意的——若只发单个字段而云端后端仍是旧版（非 partial），
+    // 旧后端会把缺失的 work/life 当成 undefined 误写为 false，反而破坏其他分区。
     await api('/api/admin/accounts/partition', 'POST', {
       email: email,
       work: _accParts[email].work,
@@ -7039,13 +7059,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 180;                         // v180：找回码管理底部「已注册账号」列表兜底改用本机wb_accounts(避免云端list=[]时空白)；refreshResetCodes不再因验证码列表空就return
+const WB_VERSION = 181;                         // v181：分区bug修复——娱乐勾选刷新丢失/未勾选仍可见；applyAccountPartition兜底移除else分支避免无条件显示；loadAccountPartition移除全false全开兜底+本地缓存；setAccPartition改为partial update(后端只更新提供字段，不再误覆盖其他分区)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 97;                  // v180 发版：96→97
+const WB_DISPLAY_VERSION = 98;                  // v181 发版：97→98（跳过任何含"4"的号）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
