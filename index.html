@@ -13,10 +13,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
-<!-- v169-cachebust: 客户导入模板与当前字段对齐（新增预约日、日期改名联系日期），强制刷新 -->
-<!-- v173-cachebust: 修你比我猜计时(基于时间戳+清除残留定时器解决叠加加速)、游戏入口手势解锁AudioContext确保音效出声 -->
-<!-- v174-cachebust: 彻底修复系统浏览器TTS语音不响(resume+voices异步就绪重试+中文语音优选+iOS保活+首次手势解锁安全网) -->
-<!-- v175-cachebust: 修复你比我猜开始无反应(_charades未var声明)+猜对了不再追加跳过语音+倒计时仅60/30/10秒播报 -->
+<!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
+<!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4546,13 +4544,16 @@ function renderClients(){
     var stBadge = st ? '<span class="client-status '+st.cls+'"><span>'+(st.icon||'')+'</span><span>'+esc(st.label)+'</span></span>' : '';
     // 归属徽章（管理员查看全部时显示客户属于哪位人员）
     var ownerBadge = (wbIsAdmin() && c.ownerUid && c.ownerUid!==WB_SESSION) ? '<span class="client-owner-badge" title="归属人员">@'+esc(accountNick(c.ownerUid))+'</span>' : '';
-    // Row1：姓名 + 类型 + 跟进等级/状态徽章 + 编辑/更多
+    // 联系日期 chip（Row1 第一排，跟随姓名一起看）
+    var dealChip = c.dealDate ? '<span class="client-chip chip-contact" style="font-size:11px;padding:2px 7px">📅 联系 '+esc(fmtDateShort(c.dealDate))+'</span>' : '';
+    // Row1：姓名 + 类型 + 跟进等级/状态徽章 + 联系日期 + 编辑/更多
     var row1 =
       '<div class="client-row1">'
       + '<div class="client-name-block">'
       +   '<span class="client-name">'+esc(c.name||'')+'</span>'
       +   (c.type? '<span class="client-type-chip">'+esc(c.type)+'</span>':'')
       +   l1Badge + l2Badge
+      +   dealChip
       + '</div>'
       + '<div class="client-row1-right">'
       +   ownerBadge
@@ -4574,12 +4575,8 @@ function renderClients(){
     var _amt = +c.amount||0;
     if(_amt>0) infoBits.push('<span class="cm-field" style="color:var(--success)">成交 <b>'+esc(fmtMoney(_amt))+'</b></span>');
     var row2 = infoBits.length ? '<div class="client-row2">' + infoBits.join('') + '</div>' : '';
-    // Row3：四合一 chip 行
+    // Row3：四合一 chip 行（联系日期已在第一排，本行只放到期+行动+备注）
     var chips = [];
-    // 联系 chip（始终蓝）
-    if(c.apptDate){
-      chips.push('<span class="client-chip chip-contact">📅 联系 '+esc(fmtDateShort(c.apptDate))+'</span>');
-    }
     // 到期 chip（按紧急度变色）
     if(c.expireDate){
       var expLevel = dateUrgencyLevel(c.expireDate, todayStr, 'expire');
@@ -4724,40 +4721,34 @@ function clientSetType(btn, type){
   document.querySelectorAll('#clientTypeFilter .filter-tab').forEach(function(t){t.classList.remove('active');}); btn.classList.add('active');
   _clState.type = type; _clState.appt = null; renderClients();
 }
-// 人员筛选（管理员按账号昵称筛选；员工仅“全部/我”）
+// 人员筛选（管理员按账号昵称筛选；员工仅"全部/我"）—— 统一用下拉，不再用按钮
 function renderPersonFilter(){
   var box = document.getElementById('clientPersonFilter'); if(!box) return;
-  // chips (PC 端)
-  var html = '<button class="filter-tab'+( _clState.person==='all'?' active':'')+'" onclick="clientSetPerson(this,\'all\')">👥 人员·全部</button>';
-  // options (移动端 select)
   var opts = '<option value="all">👥 人员·全部</option>';
   if(wbIsAdmin()){
     wbAllAccounts().forEach(function(a){
-      if(a.role==='admin') return; // 管理员自己不列为“人员”
-      var on = (_clState.person===a.email)?' active':'';
-      var label = esc(a.nick||a.email);
-      html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+a.email+'\')">'+label+'</button>';
+      if(a.role==='admin') return; // 管理员自己不列为"人员"
       var sel = (_clState.person===a.email)?' selected':'';
-      opts += '<option value="'+a.email+'"'+sel+'>'+label+'</option>';
+      var label = esc(a.nick||a.email);
+      opts += '<option value="'+a.email+'"'+sel+'>👤 '+label+'</option>';
     });
   } else {
     var meUid = WB_SESSION||'guest';
-    var on = (_clState.person===meUid)?' active':'';
     var sel = (_clState.person===meUid)?' selected':'';
-    html += '<button class="filter-tab'+on+'" onclick="clientSetPerson(this,\''+meUid+'\')">我</button>';
-    opts += '<option value="'+meUid+'"'+sel+'>我</option>';
+    opts += '<option value="me" data-uid="'+meUid+'"'+sel+'>👤 我</option>';
   }
-  html += '<select class="filter-select" onchange="clientSetPerson(this,this.value)" aria-label="人员筛选">'+opts+'</select>';
-  box.innerHTML = html;
+  box.innerHTML =
+    '<span class="tf-label" style="font-size:11px">👥 人员</span>'
+    +'<select class="filter-select" onchange="clientSetPerson(this,this.value)" aria-label="人员筛选" style="min-width:140px">'+opts+'</select>';
 }
 function clientSetPerson(src, uid){
-  var rowEl = (src && src.parentNode) ? src.parentNode : document.getElementById('clientPersonFilter');
-  if(rowEl) rowEl.querySelectorAll('.filter-tab').forEach(function(t){t.classList.remove('active');});
-  if(src && src.tagName==='SELECT'){ src.value = uid; } else if(src && src.classList){ src.classList.add('active'); }
-  if(rowEl){
-    var sel = rowEl.querySelector('.filter-select');
-    if(sel && src!==sel) sel.value = uid;
+  // 非管理员选了「我」时，把 value 解析为当前账号 uid
+  if(uid==='me'){
+    var opt = src && src.selectedOptions && src.selectedOptions[0];
+    uid = (opt && opt.getAttribute('data-uid')) || (WB_SESSION||'guest');
   }
+  var rowEl = (src && src.parentNode) ? src.parentNode : document.getElementById('clientPersonFilter');
+  if(src && src.tagName==='SELECT'){ src.value = uid==='all' ? 'all' : (uid===(WB_SESSION||'guest') ? 'me' : uid); }
   _clState.person = uid; renderClients();
 }
 function clientSetAppt(scope){
@@ -7038,13 +7029,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 176;                         // v176：数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开)
+const WB_VERSION = 177;                         // v177：客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 93;                  // v176 发版：92→93
+const WB_DISPLAY_VERSION = 94;                  // v177 发版：93→94
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
