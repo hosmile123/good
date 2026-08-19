@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- v177-cachebust: 三镜像(GitHub Pages + Vercel + CloudStudio) 智能测速跳转 -->
 <title>工作台 · 智能入口</title>
 <style>
   *{box-sizing:border-box}
@@ -35,10 +36,11 @@
   </div>
 <script>
 (function(){
-  // 两个稳定镜像（CloudStudio 链接一次性、每次部署变，不纳入路由）
+  // 三镜像：GitHub Pages（稳定主）+ Vercel（稳定备）+ CloudStudio（本次部署临时链接，每次变）
   var MIRRORS=[
     {name:"GitHub Pages", url:"https://hosmile123.github.io/workbench/"},
-    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"}
+    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"},
+    {name:"CloudStudio",  url:"https://8b24ac371b6d4163acc7d52abf548d8f.sh1.agentos-app.net/"}
   ];
   var TIMEOUT=3000;   // 单镜像探测超时
   var SAFETY=5000;    // 全局安全兜底：超过此时间必定显示手动链接
@@ -100,7 +102,7 @@
   Promise.all(MIRRORS.map(ping)).then(function(res){
     if(resolved) return;
     var good=res.filter(function(r){return r.ok;});
-    if(!good.length){showFallback("两个镜像暂不可达");return;}
+    if(!good.length){showFallback("三个镜像暂不可达");return;}
     good.sort(function(a,b){return a.ms-b.ms;});
     var best=good[0];
     msg.textContent="已选 "+best.m.name+"（"+Math.round(best.ms)+"ms）";
