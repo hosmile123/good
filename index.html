@@ -16,6 +16,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
+<!-- v179-cachebust: 修复人员筛选PC端下拉不显示(CSS移除了max-width:768px限制，filter-tab兜底隐藏)；旧版select仅窄屏显示导致PC端空白 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -370,11 +371,9 @@ body.sb-collapsed .sidebar-item:hover::after {
 /* 客户中心筛选行：保留 <select> 节点供 JS 读写状态，默认隐藏以防误显 */
 .filter-select { display: none; width: 100%; max-width: 100%; padding: 8px 12px; border-radius: 18px; border: 1px solid var(--border); background: #fff; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; box-sizing: border-box; }
 .filter-select:focus { border-color: var(--primary); }
-/* 仅带 mobile-select 的行（人员筛选）在窄屏切换为下拉单选，节省空间；其余行仍用胶囊按钮 */
-@media (max-width: 768px) {
-  .filter-row.mobile-select .filter-tab { display: none; }
-  .filter-row.mobile-select .filter-select { display: block; width: calc(100% / 3); max-width: 180px; margin-right: auto; }
-}
+/* 仅带 mobile-select 的行（人员筛选）：永远显示下拉（已统一改下拉，不再随屏幕切换样式） */
+.filter-row.mobile-select .filter-select { display: block; width: 100%; max-width: 220px; margin-right: auto; }
+.filter-row.mobile-select .filter-tab { display: none; }
 
 /* 早睡早起合并卡片：手机端 1 列，桌面端 2 列（已在 inline 实现） */
 @media (max-width: 768px) {
@@ -1937,7 +1936,7 @@ function toggleSbCollapse(){
   </div>
 
   <!-- 人员筛选（管理员可见全部人员；员工仅见自己） -->
-  <div class="filter-row mobile-select" id="clientPersonFilter" style="margin-top:8px"></div>
+  <div class="filter-row mobile-select" id="clientPersonFilter" style="margin-top:8px;display:flex;align-items:center;gap:8px"></div>
 
   <!-- 日期筛选 -->
   <div class="date-filter-row" id="clientDateFilter" style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -7040,13 +7039,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 178;                         // v178：修复娱乐勾选刷新丢失(后端GET列表兜底partition.fun+迁移老数据)+新增删除账号接口+管理员直接改密码(无需验证码)
+const WB_VERSION = 179;                         // v179：修复人员筛选PC端下拉不显示(CSS移除max-width:768px限制+filter-tab兜底隐藏)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 95;                  // v178 发版：94→95
+const WB_DISPLAY_VERSION = 96;                  // v179 发版：95→96
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
