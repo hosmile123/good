@@ -15,6 +15,7 @@
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
+<!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1443,6 +1444,16 @@ function toggleSbCollapse(){
     </div>
     <div style="font-size:12px;color:var(--text-light);line-height:1.6;margin-bottom:12px">
       用户申请找回密码后，验证码会保存在此处，并同时推送至管理员邮箱。请将对应邮箱的验证码告知本人，由其自行完成密码重置。验证码 10 分钟内有效。
+    </div>
+    <!-- v178：管理员自己快速改密码入口（在已登录状态下也能重置自己的密码，无需退出登录走忘记密码流程） -->
+    <div class="admin-only" id="rcAdminPwArea" style="display:none;background:linear-gradient(135deg,#E6F4FF,#BAE0FF);border:1px solid #91CAFF;border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0;font-size:12px;color:var(--text-primary);line-height:1.5">
+          <div style="font-weight:600;font-size:13px">🔐 我（管理员）改密码</div>
+          <div style="color:var(--text-light);margin-top:2px">直接在当前页改自己的密码，无需退出登录走「忘记密码」。</div>
+        </div>
+        <button class="badge-btn" style="background:#1677ff;color:#fff;border-color:#1677ff" onclick="adminResetPwPrompt(wbAdminEmail())">改密码</button>
+      </div>
     </div>
     <div id="rcList" style="max-height:300px;overflow:auto;margin-bottom:12px">
       <div style="font-size:13px;color:var(--text-light)">加载中…</div>
@@ -7029,13 +7040,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 177;                         // v177：客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转
+const WB_VERSION = 178;                         // v178：修复娱乐勾选刷新丢失(后端GET列表兜底partition.fun+迁移老数据)+新增删除账号接口+管理员直接改密码(无需验证码)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 94;                  // v177 发版：93→94
+const WB_DISPLAY_VERSION = 95;                  // v178 发版：94→95
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10632,7 +10643,7 @@ async function wbLoadBackupEnabled(){
 // 根据登录身份显示/隐藏管理员菜单项
 function wbApplyAdminUI(){
   var show = wbIsAdmin() ? '' : 'none';
-  ['qaInviteItem','qaResetItem','qaAdminItem','rcBackupToggle','syncBackupToggle'].forEach(function(id){
+  ['qaInviteItem','qaResetItem','qaAdminItem','rcBackupToggle','syncBackupToggle','rcAdminPwArea'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.style.display = show;
   });
@@ -10645,6 +10656,52 @@ function wbApplyAdminUI(){
 }
 
 // ===== 管理员：找回密码验证码 =====
+// v178：拿到当前管理员自己的邮箱（用作改自己的密码入口的默认填入）
+function wbAdminEmail(){
+  if(typeof WB_ADMIN_EMAIL === 'string' && WB_ADMIN_EMAIL) return WB_ADMIN_EMAIL;
+  try { if(WB_SESSION) return WB_SESSION; } catch(e){}
+  return 'seeyoulook@qq.com';
+}
+// v178：管理员直接给某个账号重置密码（输入新密码弹窗）
+async function adminResetPwPrompt(email){
+  if(!wbIsAdmin()){ toast('仅管理员可操作'); return; }
+  email = String(email || '').trim();
+  if(!email){ toast('缺少邮箱'); return; }
+  // 用浏览器原生 prompt 弹窗输入新密码——简单直接、不干扰当前 modal
+  const newPw = window.prompt('为「' + email + '」设置新密码（至少4位）', '');
+  if(newPw === null) return; // 用户取消
+  if(!newPw || String(newPw).length < 4){ toast('新密码至少4位'); return; }
+  if(!window.confirm('确认将「' + email + '」的密码重置为新值？\n该账号下次登录需使用新密码。')) return;
+  try {
+    const r = await api('/api/auth/admin-reset-pw', 'POST', { email: email, newPassword: newPw });
+    toast((r && r.message) ? r.message : '已重置密码');
+    if(String(email).toLowerCase() === wbAdminEmail().toLowerCase()){
+      toast('自己的密码已更新，建议重新登录');
+    }
+  } catch(e){
+    toast('重置失败：' + (e.message || '未知错误'));
+  }
+}
+
+// v178：管理员删除某个账号（带二次确认）
+async function deleteAccount(email){
+  if(!wbIsAdmin()){ toast('仅管理员可操作'); return; }
+  email = String(email || '').trim();
+  if(!email){ toast('缺少邮箱'); return; }
+  if(email.toLowerCase() === wbAdminEmail().toLowerCase()){
+    toast('管理员账号不可删除'); return;
+  }
+  if(!window.confirm('确认删除账号「' + email + '」？\n此操作不可恢复，该账号的所有数据均将丢失。')) return;
+  if(!window.confirm('再次确认：删除「' + email + '」将清除其账号、找回密码申请、设备会话。\n确定要执行吗？')) return;
+  try {
+    await api('/api/admin/accounts/delete', 'POST', { email: email });
+    toast('✅ 已删除「' + email + '」');
+    await refreshResetCodes(); // 刷新列表
+  } catch(e){
+    toast('删除失败：' + (e.message || '未知错误'));
+  }
+}
+
 async function openResetCodesAdmin(){
   if(!wbIsAdmin()){ toast('仅管理员可操作'); return; }
   var menu = document.getElementById('abMenu'); if(menu) menu.style.display = 'none';
@@ -10680,6 +10737,7 @@ async function refreshResetCodes(){
             + '<div style="font-size:13px;font-weight:600">' + escapeHtml(r.email) + '</div>'
             + '<div style="display:flex;gap:6px;align-items:center">'
             + badge
+            + '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + escapeHtml(r.email) + '\')" title="直接为该用户设置新密码（无需验证码）">🚀 应用</button>'
             + '<button class="badge-btn" style="font-size:11px" onclick="clearResetCode(\'' + escapeHtml(r.email) + '\')">清除</button>'
             + '</div>'
             + '</div>'
@@ -10704,12 +10762,19 @@ async function refreshResetCodes(){
           _accParts[a.email] = { work: !!part.work, life: !!part.life, fun: !!part.fun };
           var em = escapeHtml(a.email);
           var raw = a.email;
+          // v178：删除按钮（管理员账号不可删）+ 重置密码按钮（任何一个账号都能用）
+          var _isPlainAdminEmail = String(raw).toLowerCase() === String(WB_ADMIN_EMAIL || 'seeyoulook@qq.com').toLowerCase();
+          var delBtn = _isPlainAdminEmail ? '' :
+            '<button class="badge-btn" style="font-size:11px;background:#FFF1F0;color:#FF4D4F;border-color:#FFA39E" onclick="deleteAccount(\'' + raw + '\')">删除</button>';
+          var pwBtn = '<button class="badge-btn" style="font-size:11px;background:#FFF7E6;color:#FA8C16;border-color:#FFD591" onclick="adminResetPwPrompt(\'' + raw + '\')">🔧 重置密码</button>';
+          var meHint = _isPlainAdminEmail ? '<span style="font-size:11px;color:#1677ff;background:#E8F3FF;padding:1px 6px;border-radius:6px;margin-left:6px">我（管理员）</span>' : '';
           return '<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:6px;gap:8px;flex-wrap:wrap">' +
-            '<div style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + em + '<div style="font-size:11px;color:var(--text-light);font-weight:400">注册于 ' + d + '</div></div>' +
+            '<div style="font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">' + em + meHint + '<div style="font-size:11px;color:var(--text-light);font-weight:400">注册于 ' + d + '</div></div>' +
             '<div style="display:flex;gap:12px;align-items:center;flex-shrink:0;flex-wrap:wrap">' +
               '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.work?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'work\',this.checked)">工作</label>' +
               '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.life?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'life\',this.checked)">生活</label>' +
               '<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" ' + (part.fun?'checked':'') + ' onchange="setAccPartition(\'' + raw + '\',\'fun\',this.checked)">娱乐</label>' +
+              pwBtn + delBtn +
             '</div>' +
           '</div>';
         }).join('');
