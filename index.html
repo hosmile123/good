@@ -1182,6 +1182,14 @@ body.sb-collapsed .sidebar-item:hover::after {
   <div class="modal-card sync-card">
     <div class="modal-title">💾 数据备份与同步</div>
     <div class="sync-tip">同一份数据，电脑和手机都能用：用「同步链接」在另一台设备打开即可自动载入；或用「备份文件」存档 / 换设备恢复。</div>
+    <!-- 数据备份功能开关（仅管理员可见）：可在弹窗内直接关闭，开启状态由管理账号在「找回码 → 账号管理」控制 -->
+    <div class="admin-only" id="syncBackupToggle" style="display:none;background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:1px solid #FFCC80;border-radius:10px;padding:10px 14px;margin:8px 0 14px;align-items:center;justify-content:space-between;gap:10px">
+      <div style="flex:1;min-width:0;font-size:12px;color:var(--text-primary);line-height:1.5">💡 此入口由管理员控制。关闭后，所有用户的首页「数据备份」入口将立即隐藏。</div>
+      <label style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:#fff;padding:5px 12px;border-radius:20px;border:1px solid #ddd">
+        <input type="checkbox" id="syncBackupCheckbox" onchange="wbSetBackupEnabled(this.checked)" style="cursor:pointer">
+        <span style="font-size:12px;font-weight:600" id="syncBackupLabel">关闭</span>
+      </label>
+    </div>
 
     <div class="sync-section">
       <div class="sync-label">📤 导出备份文件（存档）</div>
@@ -1442,6 +1450,19 @@ function toggleSbCollapse(){
       <div style="font-size:13px;color:var(--text-light)">加载中…</div>
     </div>
     <div style="border-top:1px dashed var(--border);margin:14px 0 10px"></div>
+    <!-- 数据备份功能开关（仅管理员可见）：默认关闭，因数据已实时云同步；开启后所有用户的首页「数据备份」入口才出现 -->
+    <div class="admin-only" id="rcBackupToggle" style="display:none;background:linear-gradient(135deg,#FFF3E0,#FFE0B2);border:1px solid #FFCC80;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:6px">💾 数据备份功能</div>
+          <div style="font-size:11px;color:var(--text-light);margin-top:4px;line-height:1.5">开启后，所有用户的首页会出现「数据备份」入口（导出/导入/同步码）。默认关闭，因数据已实时云同步。</div>
+        </div>
+        <label style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:#fff;padding:6px 12px;border-radius:20px;border:1px solid #ddd">
+          <input type="checkbox" id="rcBackupCheckbox" onchange="wbSetBackupEnabled(this.checked)" style="cursor:pointer">
+          <span style="font-size:12px;font-weight:600" id="rcBackupLabel">关闭</span>
+        </label>
+      </div>
+    </div>
     <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text-primary)">👥 已注册账号（共 <span id="accCount">0</span> 个）</div>
     <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;line-height:1.5">勾选「工作 / 生活 / 娱乐」决定该账号可见的功能模块。未勾选的分区，对应功能对该账号隐藏（侧边栏、首页快捷入口同步过滤）。</div>
     <div id="accList" style="max-height:220px;overflow:auto;margin-bottom:12px"></div>
@@ -1502,7 +1523,7 @@ function toggleSbCollapse(){
     <div class="quick-item" data-qpage="routine" onclick="switchPage('routine')"><div class="qi-emoji">🌙</div><span>作息</span></div>
     <div class="quick-item" data-qpage="fitness" onclick="switchPage('fitness')"><div class="qi-emoji">🏃</div><span>运动旅行</span></div>
     <div class="quick-item" data-qpage="money" onclick="switchPage('money')"><div class="qi-emoji">💰</div><span>记账</span></div>
-    <div class="quick-item" onclick="openSyncPanel()"><div class="qi-emoji">💾</div><span>数据备份</span></div>
+    <div class="quick-item" id="quickBackup" data-qpage="backup" style="display:none" onclick="openSyncPanel()"><div class="qi-emoji">💾</div><span>数据备份</span></div>
     <div class="quick-item" onclick="showLogoutMenu()"><div class="qi-emoji">🚪</div><span>退出</span></div>
     <div class="quick-item" id="lpQuickEntry" style="display:none" onclick="openLifePass()"><div class="qi-emoji">🔐</div><span>生活密码</span></div>
     <div class="quick-item admin-only" id="qaInviteItem" style="display:none" onclick="openInviteAdmin()"><div class="qi-emoji">🔑</div><span>邀请码</span></div>
@@ -4034,17 +4055,40 @@ function applyAccountPartition(){
     // 重建后立即填充真实数据（renderHome 检测到新 DOM 存在就会填充）
     renderHome();
   }
+  // 数据备份入口（与分区无关，按管理开关显示）
+  applyBackupEnabled();
+  // 兜底：再次强制把 fun 入口按 _accountPartition.fun 隐藏（防止 PAGE_PARTITION 漏配）
+  if(_accountPartition.fun === false){
+    document.querySelectorAll('[data-page="fun"], [data-qpage="fun"]').forEach(function(el){ el.style.display = 'none'; });
+  } else {
+    document.querySelectorAll('[data-page="fun"], [data-qpage="fun"]').forEach(function(el){ el.style.display = ''; });
+  }
+  console.log('[partition] 已应用账号分区过滤，当前可见：work=' + _accountPartition.work + ' life=' + _accountPartition.life + ' fun=' + _accountPartition.fun);
 }
 // 登录后拉取当前账号分区（后端不可用时不收窄，避免误隐藏）
 async function loadAccountPartition(){
-  if(!API_TOKEN){ _accountPartition = { work: true, life: true, fun: true }; return; }
+  // 管理员永远全开，避免误隐藏管理面板
+  if(!API_TOKEN || wbIsAdmin()){ _accountPartition = { work: true, life: true, fun: true }; return; }
   try {
     var r = await api('/api/account/partition', 'GET');
-    if(r && r.ok && r.partition) _accountPartition = Object.assign({work:true,life:true,fun:true}, r.partition);
-    else _accountPartition = { work: true, life: true, fun: true };
+    if(r && r.ok && r.partition && typeof r.partition === 'object'){
+      // 严格按后端返回的字段决定可见性：未返回或非 true 一律视为 false（避免默认值覆盖已关闭的分区）
+      _accountPartition = {
+        work: r.partition.work === true,
+        life: r.partition.life === true,
+        fun:  r.partition.fun  === true
+      };
+      // 若三个分区都未勾选，保留全开（兜底：避免误隐藏全部）
+      if(!_accountPartition.work && !_accountPartition.life && !_accountPartition.fun){
+        _accountPartition = { work: true, life: true, fun: true };
+      }
+    } else {
+      _accountPartition = { work: true, life: true, fun: true };
+    }
   } catch(e){
     _accountPartition = { work: true, life: true, fun: true };
   }
+  console.log('[partition] 当前账号可见分区 =', _accountPartition);
 }
 // 管理端：切换某账号的某分区
 async function setAccPartition(email, part, val){
@@ -6994,13 +7038,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 175;                         // v175：修复你比我猜开始无反应(_charades未var声明致ReferenceError)+猜对了不再追加跳过语音+倒计时去掉5/3/2/1秒播报
+const WB_VERSION = 176;                         // v176：数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 92;                  // v175 发版：91→92
+const WB_DISPLAY_VERSION = 93;                  // v176 发版：92→93
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10472,6 +10516,8 @@ async function wbLoginOK(user, fromCloud){
   _lifeUnlocked = false; // 每次登录重置解锁态
   await loadLifePassConfig();
   renderLifePassQuickEntry(); // 手机端显示生活密码快捷入口，电脑端隐藏
+  applyBackupEnabled(); // 立即按本地开关状态应用数据备份入口显隐
+  wbLoadBackupEnabled().then(applyBackupEnabled); // 后台从云端拉取最新开关
   await loadAccountPartition();
   applyAccountPartition();
 }
@@ -10531,13 +10577,80 @@ function wbLocalInviteCode(){
   return (localStorage.getItem('wb_invite_code') || '2008').trim();
 }
 
+// ============== 数据备份功能开关（管理账号控制，默认关闭） ==============
+// 因数据已实时云同步（云端 API 启用后），数据备份/导入/同步码为冗余能力，默认隐藏。
+// 管理账号可在「找回码 → 账号管理」或「数据备份」弹窗顶部打开开关，开启后所有用户的首页「数据备份」入口会出现。
+function wbGetBackupEnabled(){
+  try { return localStorage.getItem('wb_backup_enabled') === '1'; } catch(e){ return false; }
+}
+function wbSetBackupEnabled(v){
+  if(!wbIsAdmin()){ toast('仅管理员可切换数据备份功能'); _syncBackupUI(); return; }
+  var on = !!v;
+  try { localStorage.setItem('wb_backup_enabled', on ? '1' : '0'); } catch(e){}
+  // 同步到云端（如果登录了）
+  if(API_TOKEN){
+    api('/api/admin/backup-enabled', 'POST', { enabled: on }).catch(function(e){
+      console.warn('同步备份开关到云端失败：', e);
+    });
+  }
+  applyBackupEnabled();
+  toast(on ? '✅ 已开启「数据备份」功能' : '已关闭「数据备份」功能');
+  _syncBackupUI();
+  // 重新拉取一次账号管理列表（开关状态可能影响一些 UI）
+  var rcModal = document.getElementById('resetCodesModal');
+  if(rcModal && rcModal.style.display === 'flex'){
+    refreshResetCodes();
+  }
+}
+// 同步两个开关的 UI 状态（避免开关显示与真实状态不一致）
+function _syncBackupUI(){
+  var on = wbGetBackupEnabled();
+  var cb1 = document.getElementById('rcBackupCheckbox');
+  var lb1 = document.getElementById('rcBackupLabel');
+  if(cb1) cb1.checked = on;
+  if(lb1) lb1.textContent = on ? '开启' : '关闭';
+  var cb2 = document.getElementById('syncBackupCheckbox');
+  var lb2 = document.getElementById('syncBackupLabel');
+  if(cb2) cb2.checked = on;
+  if(lb2) lb2.textContent = on ? '开启' : '关闭';
+}
+// 根据开关状态显示/隐藏首页「数据备份」入口
+function applyBackupEnabled(){
+  var on = wbGetBackupEnabled();
+  var el = document.getElementById('quickBackup');
+  if(el) el.style.display = on ? '' : 'none';
+  // 非 admin 时，sync 弹窗内的提示条应隐藏
+  var tgl = document.getElementById('syncBackupToggle');
+  if(tgl){
+    if(wbIsAdmin()) tgl.style.display = on ? 'flex' : 'flex';
+    else tgl.style.display = 'none';
+  }
+}
+// 进入页面时尝试从云端拉取开关状态（如果 API_TOKEN 有）
+async function wbLoadBackupEnabled(){
+  if(!API_TOKEN) return;
+  try {
+    var r = await api('/api/admin/backup-enabled', 'GET');
+    if(r && r.ok && typeof r.enabled === 'boolean'){
+      try { localStorage.setItem('wb_backup_enabled', r.enabled ? '1' : '0'); } catch(e){}
+      applyBackupEnabled();
+    }
+  } catch(e){ /* 离线模式忽略 */ }
+}
+
 // 根据登录身份显示/隐藏管理员菜单项
 function wbApplyAdminUI(){
   var show = wbIsAdmin() ? '' : 'none';
-  ['qaInviteItem','qaResetItem','qaAdminItem'].forEach(function(id){
+  ['qaInviteItem','qaResetItem','qaAdminItem','rcBackupToggle','syncBackupToggle'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.style.display = show;
   });
+  // admin 才能切换数据备份开关
+  var adminOnly = wbIsAdmin();
+  var cb1 = document.getElementById('rcBackupCheckbox');
+  if(cb1) cb1.disabled = !adminOnly;
+  var cb2 = document.getElementById('syncBackupCheckbox');
+  if(cb2) cb2.disabled = !adminOnly;
 }
 
 // ===== 管理员：找回密码验证码 =====
@@ -10545,6 +10658,7 @@ async function openResetCodesAdmin(){
   if(!wbIsAdmin()){ toast('仅管理员可操作'); return; }
   var menu = document.getElementById('abMenu'); if(menu) menu.style.display = 'none';
   document.getElementById('resetCodesModal').style.display = 'flex';
+  _syncBackupUI(); // 同步数据备份开关状态
   await refreshResetCodes();
 }
 function closeResetCodesAdmin(){
@@ -11423,6 +11537,7 @@ function toast(msg){
 }
 function openSyncPanel(){
   const m=document.getElementById('syncModal'); if(m) m.style.display='flex';
+  _syncBackupUI(); // 同步开关状态
   const inp = document.getElementById('apiBaseInput');
   const stat = document.getElementById('apiBaseStatus');
   if(inp){
@@ -11554,6 +11669,8 @@ function boot(){
     _lifeUnlocked = false; // 每次登录重置解锁态
     loadLifePassConfig(); // 后台加载生活密码配置（电脑端拦截依赖）
     renderLifePassQuickEntry(); // 手机端显示生活密码快捷入口，电脑端隐藏
+    applyBackupEnabled(); // 立即按本地开关状态应用数据备份入口显隐
+    wbLoadBackupEnabled().then(applyBackupEnabled); // 后台从云端拉取最新开关
     loadAccountPartition().then(applyAccountPartition); // 后台拉取账号分区并按分区隐藏功能
     // 后台静默同步云端数据（不阻塞 UI）
     if(API_TOKEN){
