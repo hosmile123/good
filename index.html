@@ -16,7 +16,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
-<!-- v181-cachebust: 分区bug修复——applyAccountPartition兜底移除else分支(不再无条件显示覆盖正确隐藏)；loadAccountPartition移除全false全开兜底+成功后缓存到localStorage(失败时优先读缓存)；setAccPartition改为partial update(只发被修改字段)，后端POST只更新提供字段不再误覆盖其他分区 -->
+<!-- v182-cachebust: 修复备份隐藏后仍可见(applyAccountPartition跳过非分区data-qpage如backup不重置display)+手机版游戏无声(sfxCorrect/sfxSkip/sfxVictory加Web Audio蜂鸣兜底)+你比我猜手机版开始无反应(type=button+touch-action:manipulation+select blur+try-catch容错+inset降级写法) -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3266,8 +3266,9 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       .gc-desc{font-size:12px;color:#888}
 
       /* 游戏通用弹窗 */
-      .game-modal{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
-      .game-modal-inner{background:#fff;border-radius:20px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;padding:20px;box-sizing:border-box}
+      .game-modal{position:fixed;top:0;right:0;bottom:0;left:0;z-index:10000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+      .game-modal-inner{background:#fff;border-radius:20px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;box-sizing:border-box}
+      .game-modal-inner button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       .gm-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
       .gm-title{font-size:18px;font-weight:700}
       .gm-close{width:30px;height:30px;border-radius:50%;border:none;background:#f5f5f5;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -4033,10 +4034,13 @@ function applyAccountPartition(){
     else if(pg) el.style.display = '';
   });
   // 首页快捷入口：未勾选分区的项隐藏
+  // 注意：仅处理 PAGE_PARTITION 中已注册的页面；未注册的（如 backup）由各自开关控制，不在此处重置 display，
+  // 否则会把 applyBackupEnabled() 设的 display:none 覆盖为 display:''，导致"关闭备份后仍可见"。
   document.querySelectorAll('[data-qpage]').forEach(function(el){
     var pg = el.getAttribute('data-qpage');
-    if(pg && !pageVisible(pg)) el.style.display = 'none';
-    else if(pg) el.style.display = '';
+    if(!pg || !PAGE_PARTITION[pg]) return; // 非分区页跳过，不重置 display
+    if(!pageVisible(pg)) el.style.display = 'none';
+    else el.style.display = '';
   });
   // 动态重建底部导航栏（首页始终第一、更多始终最后）
   var inner = document.querySelector('#mobileNav .m-nav-inner');
@@ -7059,13 +7063,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 181;                         // v181：分区bug修复——娱乐勾选刷新丢失/未勾选仍可见；applyAccountPartition兜底移除else分支避免无条件显示；loadAccountPartition移除全false全开兜底+本地缓存；setAccPartition改为partial update(后端只更新提供字段，不再误覆盖其他分区)
+const WB_VERSION = 182;                         // v182：修复备份隐藏后仍可见+手机版游戏无声+你比我猜手机版开始无反应
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 98;                  // v181 发版：97→98（跳过任何含"4"的号）
+const WB_DISPLAY_VERSION = 99;                  // v182 发版：98→99（跳过任何含"4"的号）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7882,12 +7886,12 @@ function _sfxBeep(freq){
   osc.connect(g); g.connect(ac.destination);
   osc.start(); osc.stop(ac.currentTime+dur+0.02);
 }
-// 复合音效：胜利（仅语音，已取消鼓掌）
-function sfxVictory(text){ _speak(text); }
-// 复合音效：猜对（仅语音「猜对了」，已取消鼓掌与滴声）
-function sfxCorrect(){ _speak('猜对了'); }
-// 复合音效：跳过（仅语音）
-function sfxSkip(){ _speak('跳过'); }
+// 复合音效：胜利（语音 + 双音蜂鸣）
+function sfxVictory(text){ _speak(text); _sfxBeep(660); setTimeout(function(){ _sfxBeep(990); }, 150); }
+// 复合音效：猜对（语音 + 高音蜂鸣）——蜂鸣兜底确保手机版（TTS 不可用时）仍有声
+function sfxCorrect(){ _speak('猜对了'); _sfxBeep(880); }
+// 复合音效：跳过（语音 + 低音蜂鸣）
+function sfxSkip(){ _speak('跳过'); _sfxBeep(440); }
 function exportGameBackup(){
   var d=getGameData();
   var b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
@@ -8117,19 +8121,25 @@ function openCharadesGame(){
       '<button type="button" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid #FF6B00;background:#fff;color:#FF6B00;font-size:15px;font-weight:700;cursor:pointer" onclick="charadesSetTime(180,this)">180秒</button>'+
       '<button type="button" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid #FF6B00;background:#fff;color:#FF6B00;font-size:15px;font-weight:700;cursor:pointer" onclick="charadesSetTime(300,this)">300秒</button>'+
     '</div>'+
-    '<button class="btn-primary" style="width:100%;background:#FF6B00" onclick="charadesStart()">🚀 开始</button>'+
+    '<button type="button" class="btn-primary" style="width:100%;background:#FF6B00;touch-action:manipulation" onclick="charadesStart()">🚀 开始</button>'+
     '<div id="charadesArea"></div>');
 }
 function charadesStart(){
+  try {
   // v172-fix：开始新一轮前先清掉残留定时器，避免多次点击「开始」导致多个 interval 叠加、计时加速
   if(_charades && _charades.timer){ clearInterval(_charades.timer); _charades.timer=null; }
   unlockSpeech(); _acx();   // 在「开始」手势里再次解锁 TTS + 音频上下文，确保后续有声
-  var cat=document.getElementById('charadesCat').value;
+  var catSel=document.getElementById('charadesCat');
+  if(!catSel){ toast('页面错误，请重试'); return; }
+  // iOS/微信：select 选择后可能保持焦点吞掉后续 click，先 blur 释放
+  try{ catSel.blur(); }catch(e){}
+  var cat=catSel.value;
   var sec=_charadesSec||120;
   var list=CHARADES_CATS[cat]||[];
   if(!list.length){ toast('该分类暂无词'); return; }
   _charades={cat:cat,list:list.slice(),idx:-1,score:0,timeLeft:sec,timer:null,stopConfirm:false,words:[]};
   charadesNext(true);
+  } catch(e){ console.error('[charadesStart] error:', e); toast('启动失败: '+(e.message||e)); }
 }
 function charadesNext(fresh, isSkip){
   if(!_charades) return;
@@ -8162,6 +8172,7 @@ function charadesNext(fresh, isSkip){
     var tl=_charades.timeLeft;
     if(tl>0 && (tl===60 || tl===30 || tl===10)){
       _speak('剩余 '+tl+' 秒');
+      _sfxBeep(tl===10 ? 660 : 440); // 蜂鸣兜底：手机版 TTS 不可用时仍有提示音
     }
     if(_charades.timeLeft<=0){ clearInterval(_charades.timer); _charades.timer=null; charadesEnd(_charades.score); _charades=null; }
   },1000);
