@@ -16,7 +16,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
-<!-- v182-cachebust: 修复备份隐藏后仍可见(applyAccountPartition跳过非分区data-qpage如backup不重置display)+手机版游戏无声(sfxCorrect/sfxSkip/sfxVictory加Web Audio蜂鸣兜底)+你比我猜手机版开始无反应(type=button+touch-action:manipulation+select blur+try-catch容错+inset降级写法) -->
+<!-- v183-cachebust: 多后端并行高可用——api() 读操作串行故障转移(SCF失败自动切Supabase备用)+写操作主后端await+备用fire-and-forget双写；两后端共用同一JWT(同签名密钥)前端只存一个token；备用端启用方式：localStorage wb_api_base_supa 或部署时硬编码 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -7063,13 +7063,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 182;                         // v182：修复备份隐藏后仍可见+手机版游戏无声+你比我猜手机版开始无反应
+const WB_VERSION = 183;                         // v183：多后端并行高可用——api()读故障转移+写双写(SCF主/Supabase备)，共用JWT
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 99;                  // v182 发版：98→99（跳过任何含"4"的号）
+const WB_DISPLAY_VERSION = 100;                 // v183 发版：99→100（跳过任何含"4"的号）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -7099,32 +7099,72 @@ const API_BASE = (function(){
   if(location.hostname==='localhost'||location.hostname==='127.0.0.1') return 'http://localhost:3000';
   return 'https://1258476798-0i14j3xnr3.ap-guangzhou.tencentscf.com';
 })();
+// v183：多后端并行（高可用）——主 = 腾讯云 SCF；备 = Supabase Edge Function。
+// 两后端共用同一 JWT 签名密钥，前端只存一个 wb_token，两端都能验证。
+// 备用后端启用方式：凭证就绪后在 localStorage 写入 wb_api_base_supa（部署时也可直接硬编码到下方列表）。
+const API_BACKENDS = (function(){
+  var list = [{ id:'scf', url: API_BASE }];
+  try {
+    var supa = localStorage.getItem('wb_api_base_supa');
+    if(supa && supa.length > 8) list.push({ id:'supa', url: String(supa).replace(/\/+$/,'') });
+  } catch(e){}
+  return list;
+})();
 let API_TOKEN = localStorage.getItem('wb_token') || '';
+
+// 单次请求（带 SERVER_OFFLINE 语义化：非 JSON 响应/网络错误/JSON 解析失败 → 视为后端不可用）
+function _apiFetch(base, path, opts){
+  return fetch(base + path, opts).then(function(res){
+    const ct = res.headers.get('content-type') || '';
+    if(!ct.includes('application/json')) throw new Error('SERVER_OFFLINE'); // HTML（静态托管无后端）
+    return res.json().then(function(data){
+      if(!res.ok) throw new Error(data.error || '请求失败');
+      return data;
+    });
+  }).catch(function(e){
+    if(e.message === 'SERVER_OFFLINE') throw e;
+    if(e.message === 'Failed to fetch' || (e.message && e.message.includes('NetworkError'))){
+      throw new Error('SERVER_OFFLINE');
+    }
+    if((e.message && e.message.includes('is not valid JSON')) || e instanceof SyntaxError){
+      throw new Error('SERVER_OFFLINE');
+    }
+    throw e;
+  });
+}
 
 async function api(path, method, body){
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if(API_TOKEN) opts.headers['Authorization'] = 'Bearer ' + API_TOKEN;
   if(body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(API_BASE + path, opts);
-    const ct = res.headers.get('content-type') || '';
-    if(!ct.includes('application/json')){
-      // 返回的是 HTML（静态托管无后端），标记为服务不可用
-      throw new Error('SERVER_OFFLINE');
+  const isWrite = (method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH');
+  if(isWrite && API_BACKENDS.length > 1){
+    // 写操作：先并行发起备用后端双写（fire-and-forget，不阻塞主路径，失败静默、下次写自愈）
+    for(var j=1;j<API_BACKENDS.length;j++){
+      (function(bk){
+        _apiFetch(bk.url, path, opts).catch(function(e){
+          console.warn('[api:backup] ' + bk.id + ' 双写失败（不影响主后端）:', e && e.message);
+        });
+      })(API_BACKENDS[j]);
     }
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error || '请求失败');
-    return data;
-  } catch(e) {
-    if(e.message === 'SERVER_OFFLINE') throw e;
-    if(e.message === 'Failed to fetch' || e.message.includes('NetworkError')){
-      throw new Error('SERVER_OFFLINE');
+    // 主后端 await（结果优先）
+    try {
+      return await _apiFetch(API_BACKENDS[0].url, path, opts);
+    } catch(e) {
+      // 主失败 → 用备用结果兜底（故障转移）
+      for(var k=1;k<API_BACKENDS.length;k++){
+        try { return await _apiFetch(API_BACKENDS[k].url, path, opts); } catch(e2){}
+      }
+      throw e;
     }
-    if(e.message.includes('is not valid JSON') || e instanceof SyntaxError){
-      throw new Error('SERVER_OFFLINE');
-    }
-    throw e;
   }
+  // 读操作或单后端：串行故障转移（先主后备）
+  var lastErr = null;
+  for(var i=0;i<API_BACKENDS.length;i++){
+    try { return await _apiFetch(API_BACKENDS[i].url, path, opts); }
+    catch(e){ lastErr = e; }
+  }
+  throw lastErr;
 }
 
 function wbShowOverlay(show){
