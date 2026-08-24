@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<!-- v177-cachebust: 三镜像(GitHub Pages + Vercel + CloudStudio) 智能测速跳转 -->
+<!-- v186-cachebust: 三镜像(GitHub Pages(good) + Vercel + CloudStudio) 智能测速跳转 -->
 <title>工作台 · 智能入口</title>
 <style>
   *{box-sizing:border-box}
@@ -38,9 +38,9 @@
 (function(){
   // 三镜像：GitHub Pages（稳定主）+ Vercel（稳定备）+ CloudStudio（本次部署临时链接，每次变）
   var MIRRORS=[
-    {name:"GitHub Pages", url:"https://hosmile123.github.io/workbench/"},
+    {name:"GitHub Pages", url:"https://hosmile123.github.io/good/"},
     {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"},
-    {name:"CloudStudio",  url:"https://8b24ac371b6d4163acc7d52abf548d8f.sh1.agentos-app.net/"}
+    {name:"CloudStudio",  url:"https://59b014f3b9374d90a05ac7066600384e.app.workbuddy.link/"}
   ];
   var TIMEOUT=3000;   // 单镜像探测超时
   var SAFETY=5000;    // 全局安全兜底：超过此时间必定显示手动链接
