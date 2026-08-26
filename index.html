@@ -18,6 +18,7 @@
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
+<!-- v194-cachebust: TOB 客户新增「中标项目/来源链接」字段(标题/甲方/金额/阶段/日期/公告链接/来源/需求多选chip)，表单与卡片均显示，非TOB自动隐藏 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -716,6 +717,27 @@ body.sb-collapsed .sidebar-item:hover::after {
 .client-chip.chip-note { background: #f8fafc; color: var(--text-secondary); border: 1px solid #e2e8f0; font-weight: 400; }
 .client-row4 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .client-row4 .client-note { font-size: 12px; color: var(--text-secondary); background: #f8fafc; padding: 4px 10px; border-radius: 10px; }
+/* v194：TOB 中标项目/来源链接卡片（浅蓝背景） */
+.client-bid-card {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #F0F7FF;
+  border: 1px solid #BAE0FF;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.client-bid-card .cbc-title { font-weight: 700; color: var(--text-primary); margin-bottom: 6px; line-height: 1.4; font-size: 13px; }
+.client-bid-card .cbc-meta { color: var(--text-secondary); margin-bottom: 6px; line-height: 1.7; }
+.client-bid-card .cbc-meta b { color: var(--text-primary); font-weight: 700; }
+.client-bid-card .cbc-foot { color: var(--text-light); line-height: 1.7; }
+.client-bid-card .cbc-foot a { color: #1668DC; text-decoration: none; font-weight: 600; }
+.client-bid-card .cbc-foot a:hover { text-decoration: underline; }
+.client-bid-card .cbc-tag { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 11px; margin-right: 4px; background: #E6F7FF; color: #1668DC; border: 1px solid #91D5FF; }
+.client-bid-card .cbc-tag.t-baohan   { background: #FFF7E6; color: #D46B08; border-color: #FFD591; }
+.client-bid-card .cbc-tag.t-jgzx    { background: #F9F0FF; color: #722ED1; border-color: #D3ADF7; }
+.client-bid-card .cbc-tag.t-ywx     { background: #FFF0F6; color: #EB2F96; border-color: #FFADD2; }
 /* 状态徽章（考虑/成交/已报价/加微 等） — 紧凑版用于 row1 */
 .client-tag-mini { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .client-tag-mini.t-deal      { background: #f6ffed; color: #389e0d; }
@@ -4387,7 +4409,15 @@ function getClients(){
 }
 function saveClients(list){
   if(!Array.isArray(list)) return;
-  list.forEach(function(c){ if(!c.ownerUid) c.ownerUid = (WB_SESSION||'guest'); });
+  list.forEach(function(c){
+    if(!c.ownerUid) c.ownerUid = (WB_SESSION||'guest');
+    // v194：兼容老客户无 bid 字段
+    if(c.type === 'TOB' && (!c.bid || typeof c.bid !== 'object')){
+      c.bid = { title:'', party:'', amount:'', stage:'', date:'', link:'', source:'', needs:[] };
+    } else if(c.type !== 'TOB'){
+      c.bid = { title:'', party:'', amount:'', stage:'', date:'', link:'', source:'', needs:[] };
+    }
+  });
   // 仅替换本次涉及 owner 的数据，保留其他账号客户的完整性
   var owners = {}; list.forEach(function(c){ owners[c.ownerUid]=true; });
   var others = ALL_CLIENTS.filter(function(c){ return !owners[c.ownerUid||(WB_SESSION||'guest')]; });
@@ -4670,10 +4700,39 @@ function renderClients(){
     // 备注 chip（最末）
     if(c.note){ chips.push('<span class="client-chip chip-note">📝 '+esc(c.note)+'</span>'); }
     var row3 = chips.length ? '<div class="client-row3">' + chips.join('') + '</div>' : '';
+    // v194：TOB 中标项目/来源链接卡片
+    var rowBid = '';
+    if(isTOB && c.bid && (c.bid.title || c.bid.link || c.bid.party)){
+      var _b = c.bid;
+      var _meta = [];
+      if(_b.party)  _meta.push('甲方：<b>'+esc(_b.party)+'</b>');
+      if(_b.amount) _meta.push('金额：<b>'+esc(_b.amount)+'</b>');
+      if(_b.stage)  _meta.push(esc(_b.stage));
+      if(_b.date)   _meta.push(esc(_b.date));
+      var _needHTML = '';
+      if(_b.needs && _b.needs.length){
+        _needHTML = _b.needs.map(function(n){
+          var cls = 'cbc-tag';
+          if(n==='保函')   cls += ' t-baohan';
+          else if(n==='建工险') cls += ' t-jgzx';
+          else if(n==='意外险') cls += ' t-ywx';
+          return '<span class="'+cls+'">'+esc(n)+'</span>';
+        }).join('');
+      }
+      rowBid = '<div class="client-bid-card">'+
+        '<div class="cbc-title">📌 '+esc(_b.title||'（未命名项目）')+'</div>'+
+        (_meta.length ? '<div class="cbc-meta">'+_meta.join(' ｜ ')+'</div>' : '')+
+        '<div class="cbc-foot">'+
+          (_b.link ? '<a href="'+esc(_b.link)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">公告链接 ↗</a>' : '')+
+          (_b.source ? (_b.link?' ｜ ':'')+'来源：'+esc(_b.source) : '')+
+          (_needHTML ? (_b.link||_b.source?' ｜ ':'')+'需求：'+_needHTML : '')+
+        '</div>'+
+      '</div>';
+    }
 
     return '<div class="client-card'+clsUrg+'" data-id="'+c.id+'">'
       + '<div class="client-card-inner">'
-      +   row1 + row2 + row3
+      +   row1 + row2 + row3 + rowBid
       + '</div></div>';
   }).join('');
   bindClientSwipe();
@@ -4860,6 +4919,33 @@ function openClientForm(id){
     '<div class="form-group"><label>成交金额(元)</label><input id="clAmount" type="number" value="'+(+c.amount||0)+'"></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelA">手续费A(元)</label><input id="clFeeA" type="number" value="'+(+c.feeA||0)+'"></div></div>'+
     '<div class="form-row" style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label id="clFeeLabelB">手续费B(元)</label><input id="clFeeB" type="number" value="'+(+c.feeB||0)+'"></div></div>'+
+    // v194：TOB 中标项目/来源链接（仅 TOB 可见）
+    '<div id="clBidWrap" style="display:'+(c.type==='TOB'?'block':'none')+'">'+
+      '<div class="form-group" style="margin:8px 0 6px"><label style="color:#1668DC;font-weight:700">📌 中标项目 / 来源链接<span style="color:#999;font-weight:400">（TOB 专属，选填）</span></label></div>'+
+      '<div class="form-group" style="margin-bottom:8px"><input id="clBidTitle" maxlength="200" placeholder="项目标题，如：广西华电平果巴芳岭10万千瓦风电场风机采购" value="'+esc((c.bid&&c.bid.title)||'')+'"></div>'+
+      '<div class="form-row" style="display:flex;gap:8px">'+
+        '<div class="form-group" style="flex:1;margin-bottom:8px"><label style="font-size:12px">甲方</label><input id="clBidParty" maxlength="100" placeholder="如：中国华电集团有限公司" value="'+esc((c.bid&&c.bid.party)||'')+'"></div>'+
+        '<div class="form-group" style="flex:1;margin-bottom:8px"><label style="font-size:12px">金额</label><input id="clBidAmount" maxlength="40" placeholder="如：4.71亿 / 4710万" value="'+esc((c.bid&&c.bid.amount)||'')+'"></div>'+
+      '</div>'+
+      '<div class="form-row" style="display:flex;gap:8px">'+
+        '<div class="form-group" style="flex:1;margin-bottom:8px"><label style="font-size:12px">阶段</label><select id="clBidStage">'+
+          ['招标公告','资格预审','中标候选人公示','中标公告','合同公告','其他'].map(function(s){
+            return '<option'+(s===(c.bid&&c.bid.stage)?' selected':'')+'>'+s+'</option>';
+          }).join('')+
+        '</select></div>'+
+        '<div class="form-group" style="flex:1;margin-bottom:8px"><label style="font-size:12px">日期</label><input id="clBidDate" type="date" value="'+esc((c.bid&&c.bid.date)||'')+'"></div>'+
+      '</div>'+
+      '<div class="form-group" style="margin-bottom:8px"><label style="font-size:12px">公告链接</label><input id="clBidLink" type="url" placeholder="https://..." value="'+esc((c.bid&&c.bid.link)||'')+'"></div>'+
+      '<div class="form-group" style="margin-bottom:8px"><label style="font-size:12px">来源</label><input id="clBidSource" maxlength="60" placeholder="如：天-华电 / 招标网 / 公司名" value="'+esc((c.bid&&c.bid.source)||'')+'"></div>'+
+      '<div class="form-group" style="margin-bottom:0"><label style="font-size:12px;color:#666">需求（可多选）</label>'+
+        '<div id="clBidNeeds" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
+          ['保函','建工险','意外险','财产险','责任险','车险','货运险','雇主险'].map(function(n){
+            var on = ((c.bid&&c.bid.needs)||[]).indexOf(n)>=0;
+            return '<button type="button" class="clBidNeedBtn" data-val="'+n+'" data-on="'+(on?'1':'0')+'" onclick="clBidNeedToggle(this)" style="padding:4px 10px;border-radius:14px;border:1px solid '+(on?'#1668DC':'#d9d9d9')+';background:'+(on?'#1668DC':'#fff')+';color:'+(on?'#fff':'#555')+';font-size:12px;cursor:pointer;font-weight:'+(on?'600':'400')+'">'+n+'</button>';
+          }).join('')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
     '<div class="form-group"><label>备注</label><textarea id="clNote" rows="2">'+esc(c.note||'')+'</textarea></div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
@@ -5047,6 +5133,28 @@ function clTypeChange(){
   var plbl = document.getElementById('clPhonesLabel');
   if(plbl) plbl.textContent = (t==='TOB') ? '电话号码（TOB 最多 5 个，每个可填联系人/来源）' : '电话号码（最多 3 个，每个可填联系人）';
   // 到期日所有类型均显示（不再仅限财产险）
+  // v194：TOB 中标项目/来源链接区，仅 TOB 显示
+  var bidWrap = document.getElementById('clBidWrap');
+  if(bidWrap) bidWrap.style.display = (t==='TOB') ? 'block' : 'none';
+}
+// v194：中标项目「需求」chip 多选切换
+function clBidNeedToggle(btn){
+  var on = btn.getAttribute('data-on')==='1';
+  if(on){
+    btn.setAttribute('data-on','0');
+    btn.style.background='#fff'; btn.style.color='#555'; btn.style.borderColor='#d9d9d9'; btn.style.fontWeight='400';
+  } else {
+    btn.setAttribute('data-on','1');
+    btn.style.background='#1668DC'; btn.style.color='#fff'; btn.style.borderColor='#1668DC'; btn.style.fontWeight='600';
+  }
+}
+// v194：保存时读取所有选中的「需求」chip，返回数组
+function clBidNeedsRead(){
+  var arr = [];
+  document.querySelectorAll('#clBidNeeds .clBidNeedBtn').forEach(function(b){
+    if(b.getAttribute('data-on')==='1') arr.push(b.getAttribute('data-val'));
+  });
+  return arr;
 }
 function saveClient(id, isEdit){
   var elVal=function(id){ return (document.getElementById(id)||{}).value||''; };
@@ -5094,6 +5202,25 @@ function saveClient(id, isEdit){
     note:(document.getElementById('clNote')||{}).value||'', date:_today(), expireDate:(document.getElementById('clExpireDate')||{}).value||'',
     apptDate:(document.getElementById('clApptDate')||{}).value||'', dealType:(orig&&orig.dealType)?orig.dealType:'财险'
   };
+  // v194：TOB 中标项目/来源链接；非 TOB 一律清空，避免残留数据
+  if(c.type === 'TOB'){
+    var bTitle  = ((document.getElementById('clBidTitle')||{}).value||'').trim();
+    var bParty  = ((document.getElementById('clBidParty')||{}).value||'').trim();
+    var bAmount = ((document.getElementById('clBidAmount')||{}).value||'').trim();
+    var bStage  = ((document.getElementById('clBidStage')||{}).value||'').trim();
+    var bDate   = ((document.getElementById('clBidDate')||{}).value||'').trim();
+    var bLink   = ((document.getElementById('clBidLink')||{}).value||'').trim();
+    var bSrc    = ((document.getElementById('clBidSource')||{}).value||'').trim();
+    var bNeeds  = clBidNeedsRead();
+    // 若全部为空，则保存为空对象（结构稳定），不再保存旧值
+    if(bTitle || bParty || bAmount || bStage || bDate || bLink || bSrc || bNeeds.length){
+      c.bid = { title:bTitle, party:bParty, amount:bAmount, stage:bStage, date:bDate, link:bLink, source:bSrc, needs:bNeeds };
+    } else {
+      c.bid = { title:'', party:'', amount:'', stage:'', date:'', link:'', source:'', needs:[] };
+    }
+  } else {
+    c.bid = { title:'', party:'', amount:'', stage:'', date:'', link:'', source:'', needs:[] };
+  }
   c.ownerUid = orig ? orig.ownerUid : (WB_SESSION||'guest');
   var list=getClients();
   if(isEdit){ var i=list.findIndex(function(x){return x.id===id;}); if(i>=0) list[i]=c; }
@@ -7292,13 +7419,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 193;                         // v193：同步安全修复——基线按账号持久化；拉取改为「本地有未上传改动→先推本地；云端 updatedAt 更新→才覆盖」防数据丢失
+const WB_VERSION = 194;                         // v194：TOB 客户增加「中标项目 / 来源链接」字段（标题/甲方/金额/阶段/日期/公告链接/来源/需求多选 chip）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 111;                 // v193 发版：110→111
+const WB_DISPLAY_VERSION = 112;                 // v194 发版：111→112
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
