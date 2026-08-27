@@ -20,6 +20,7 @@
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
 <!-- v194-cachebust: TOB 客户新增「中标项目/来源链接」字段(标题/甲方/金额/阶段/日期/公告链接/来源/需求多选chip)，表单与卡片均显示，非TOB自动隐藏 -->
 <!-- v195-cachebust: 账号管理列表邮箱完整显示——去掉ellipsis截断(去掉overflow:hidden+text-overflow:ellipsis)，改用word-break:break-all允许长邮箱换行，align-items:flex-start+gap调整，操作按钮区flex-shrink:0不被挤压 -->
+<!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -673,10 +674,10 @@ body.sb-collapsed .sidebar-item:hover::after {
 .client-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
 .client-row1 .client-avatar { width: 38px; height: 38px; font-size: 15px; flex-shrink: 0; }
 .client-row1 .client-name-block { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.client-row1 .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
+.client-row1 .client-name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: normal; word-break: break-word; overflow: visible; max-width: none; }
 /* TOB 客户：公司名突出（更大更宽），姓名退为次要一行 */
-.client-row1 .client-name.client-name-tob { font-size: 17px; max-width: 72vw; }
-.client-subname { font-size: 12px; color: #888; margin-top: 2px; font-weight: 400; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-row1 .client-name.client-name-tob { font-size: 17px; max-width: none; }
+.client-subname { font-size: 12px; color: #888; margin-top: 2px; font-weight: 400; width: 100%; white-space: normal; word-break: break-word; overflow: visible; }
 /* 电话编辑行：手机端强制一行横排（来源列窄），输入框紧凑不溢出；touch-action 防双击缩放 */
 .cl-ph-row{ flex-direction:row !important; flex-wrap:nowrap !important; }
 .cl-ph-row input{ min-width:0; padding:8px 6px; font-size:13px; touch-action:manipulation; }
@@ -7420,13 +7421,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 195;                         // v195：账号管理列表邮箱完整显示(去掉ellipsis截断，长邮箱允许换行，操作按钮区flex-shrink:0)
+const WB_VERSION = 196;                         // v196：客户卡片姓名/TOB公司名/副名去掉ellipsis硬截断，改word-break允许换行完整显示(同v195账号邮箱截断根因)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 113;                 // v195 发版：112→113
+const WB_DISPLAY_VERSION = 114;                 // v196 发版：113→114
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
