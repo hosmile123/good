@@ -21,6 +21,7 @@
 <!-- v194-cachebust: TOB 客户新增「中标项目/来源链接」字段(标题/甲方/金额/阶段/日期/公告链接/来源/需求多选chip)，表单与卡片均显示，非TOB自动隐藏 -->
 <!-- v195-cachebust: 账号管理列表邮箱完整显示——去掉ellipsis截断(去掉overflow:hidden+text-overflow:ellipsis)，改用word-break:break-all允许长邮箱换行，align-items:flex-start+gap调整，操作按钮区flex-shrink:0不被挤压 -->
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
+<!-- v198-cachebust: 手机端「下拉回到主页」手势——从页面顶部向下拉(>90px且基本竖直)直接回主页并清空导航栈；电脑端/正常滚动不受影响 -->
 <!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
@@ -4303,6 +4304,42 @@ function wbInitNavStack(){
     mo.observe(document.body, {attributes:true, attributeFilter:['style'], subtree:true});
   }catch(e){}
   window.addEventListener('popstate', function(){ try{ wbOnBack(); }catch(e){ console.warn('wbOnBack', e); } });
+  wbInitPullHome();   // v198：手机端「下拉回到主页」手势（依赖手机端门控）
+}
+
+// v198：手机端「下拉回到主页」——直接回主页并清空整页/弹窗栈（电脑端不启用）
+function wbGoHome(){
+  // 关闭所有打开的 modal 层
+  while(WB_MODAL_STACK.length){ var id = WB_MODAL_STACK.pop(); try{ wbCloseModalById(id); }catch(e){} }
+  // 关闭侧边栏
+  if(wbSidebarOpen()){ try{ closeSidebar(); }catch(e){} }
+  // 清空整页栈并回主页
+  WB_PAGE_STACK.length = 0;
+  WB_NAV_BACKING = true;
+  try{ switchPage('home'); }catch(e){}
+  WB_NAV_BACKING = false;
+}
+// v198：手机端「从顶部下拉」手势 → 直接回主页（不影响正常滚动；仅在非主页且滚动位置在顶部时触发）
+function wbInitPullHome(){
+  if(!wbIsPhone()) return;
+  var sx=0, sy=0, st=0, ok=false;
+  document.addEventListener('touchstart', function(e){
+    ok = !!(e.touches && e.touches.length === 1);
+    if(!ok) return;
+    var t = e.touches[0];
+    sx = t.clientX; sy = t.clientY;
+    st = (window.scrollY || document.documentElement.scrollTop || 0);
+  }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if(!ok){ ok=false; return; }
+    ok = false;
+    var t = e.changedTouches && e.changedTouches[0];
+    if(!t) return;
+    var dy = t.clientY - sy, dx = t.clientX - sx;
+    if(dy > 90 && Math.abs(dx) < dy*0.6 && st <= 4 && wbCurrentPage() !== 'home'){
+      wbGoHome();
+    }
+  }, {passive:true});
 }
 
 function toggleSidebar(){
@@ -7515,13 +7552,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 197;                         // v197：手机端返回键导航栈(一层层回退，到首页再按才退出)；整页切换/弹窗关闭接入返回栈
+const WB_VERSION = 198;                         // v198：手机端「下拉回到主页」手势(从顶部下拉直接回主页)；沿用 v197 返回栈
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 115;                 // v197 发版：114→115
+const WB_DISPLAY_VERSION = 116;                 // v198 发版：115→116
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
