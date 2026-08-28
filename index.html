@@ -20,6 +20,7 @@
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
 <!-- v194-cachebust: TOB 客户新增「中标项目/来源链接」字段(标题/甲方/金额/阶段/日期/公告链接/来源/需求多选chip)，表单与卡片均显示，非TOB自动隐藏 -->
 <!-- v195-cachebust: 账号管理列表邮箱完整显示——去掉ellipsis截断(去掉overflow:hidden+text-overflow:ellipsis)，改用word-break:break-all允许长邮箱换行，align-items:flex-start+gap调整，操作按钮区flex-shrink:0不被挤压 -->
+<!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
@@ -4192,6 +4193,14 @@ async function switchPage(pageId) {
     toast('该账号未开通此功能（工作/生活/娱乐分区未勾选）');
     return;
   }
+  // 手机端：把"离开的当前页"压入返回栈，并写入一条 history（用于返回键逐级回退）
+  if(wbIsPhone() && !WB_NAV_BACKING){
+    var _wbCur = wbCurrentPage();
+    if(_wbCur && _wbCur !== pageId){
+      WB_PAGE_STACK.push(_wbCur);
+      history.pushState({wb:1}, '');
+    }
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.m-nav-item').forEach(m => m.classList.remove('active'));
@@ -4209,6 +4218,91 @@ async function switchPage(pageId) {
   if(pageId === 'routine'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入作息页时立即同步「经期/戒烟」标签与子页内容
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
   window.scrollTo(0, 0);
+}
+
+// ===== 手机端返回键导航栈（v197：首页→功能页→弹窗 一层层回退，回到首页再按才退出；电脑端不启用） =====
+var WB_PAGE_STACK = [];     // 整页切换历史（存"被离开的" pageId）
+var WB_MODAL_STACK = [];    // 当前打开的 modal 层（按打开顺序，存元素 id）
+var WB_NAV_INIT = false;
+var WB_NAV_BACKING = false; // 由返回键触发的 switchPage 不再重复入栈
+
+function wbCurrentPage(){
+  var a = document.querySelector('.page.active');
+  return a ? a.id.replace(/^page-/, '') : 'home';
+}
+function wbIsModalLike(el){
+  if(!el || !(el instanceof HTMLElement)) return false;
+  if(el.classList.contains('game-modal')) return true;
+  var id = el.id || '';
+  if(/Modal$/.test(id) || /Gate$/.test(id) || /Mask$/.test(id)) return true;
+  return false;
+}
+function wbCloseModalById(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  try{
+    if(el.classList.contains('game-modal') && typeof closeGameModal === 'function'){ closeGameModal(id); return; }
+    if(id === 'calcModal' && typeof closeCalcModal === 'function'){ closeCalcModal(); return; }
+    if(id === 'sbOverlay'){ if(typeof closeSidebar === 'function') closeSidebar(); return; }
+    if(typeof el._wbClose === 'function'){ el._wbClose(); return; }
+    if(typeof closeModal === 'function'){ closeModal(id); }
+  }catch(e){ try{ if(typeof closeModal === 'function') closeModal(id); }catch(_){} }
+}
+function wbTopModalId(){
+  var best = null, bestZ = -1, bestOrder = -1;
+  for(var i=0;i<WB_MODAL_STACK.length;i++){
+    var id = WB_MODAL_STACK[i];
+    var el = document.getElementById(id);
+    if(!el) continue;
+    if(el.style.display !== 'flex' && el.style.display !== 'block') continue;
+    var z = parseInt((el.style.zIndex || (getComputedStyle(el).zIndex)) || '0', 10) || 0;
+    if(z > bestZ || (z === bestZ && i > bestOrder)){ best = id; bestZ = z; bestOrder = i; }
+  }
+  return best;
+}
+function wbSidebarOpen(){
+  var ov = document.getElementById('sbOverlay');
+  return !!(ov && ov.classList.contains('show'));
+}
+function wbOnBack(){
+  // 1) 侧边栏（最外层遮罩）优先关闭
+  if(wbSidebarOpen()){ closeSidebar(); if(wbTopModalId() || wbCurrentPage() !== 'home') history.pushState({wb:1}, ''); return; }
+  // 2) 有打开的弹窗 → 关掉最顶层
+  var mid = wbTopModalId();
+  if(mid){
+    wbCloseModalById(mid);
+    if(wbTopModalId() || wbCurrentPage() !== 'home') history.pushState({wb:1}, '');
+    return;
+  }
+  // 3) 整页回退到上一页
+  if(wbCurrentPage() !== 'home'){
+    var prev = WB_PAGE_STACK.pop();
+    WB_NAV_BACKING = true;
+    if(prev) switchPage(prev); else switchPage('home');
+    WB_NAV_BACKING = false;
+    if(wbCurrentPage() !== 'home') history.pushState({wb:1}, '');
+    return;
+  }
+  // 4) 已在首页且无弹窗 → 不维持，放行浏览器退出
+}
+function wbInitNavStack(){
+  if(WB_NAV_INIT) return;
+  WB_NAV_INIT = true;
+  if(!wbIsPhone()) return;   // 仅手机端拦截返回键；电脑端完全不受影响
+  try{
+    var mo = new MutationObserver(function(muts){
+      for(var k=0;k<muts.length;k++){
+        var el = muts[k].target;
+        if(!wbIsModalLike(el) || !el.id) continue;
+        var shown = (el.style.display === 'flex' || el.style.display === 'block');
+        var idx = WB_MODAL_STACK.indexOf(el.id);
+        if(shown && idx === -1) WB_MODAL_STACK.push(el.id);
+        else if(!shown && idx > -1) WB_MODAL_STACK.splice(idx, 1);
+      }
+    });
+    mo.observe(document.body, {attributes:true, attributeFilter:['style'], subtree:true});
+  }catch(e){}
+  window.addEventListener('popstate', function(){ try{ wbOnBack(); }catch(e){ console.warn('wbOnBack', e); } });
 }
 
 function toggleSidebar(){
@@ -7421,13 +7515,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 196;                         // v196：客户卡片姓名/TOB公司名/副名去掉ellipsis硬截断，改word-break允许换行完整显示(同v195账号邮箱截断根因)
+const WB_VERSION = 197;                         // v197：手机端返回键导航栈(一层层回退，到首页再按才退出)；整页切换/弹窗关闭接入返回栈
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 114;                 // v196 发版：113→114
+const WB_DISPLAY_VERSION = 115;                 // v197 发版：114→115
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12287,6 +12381,7 @@ function boot(){
       if(sub) sub.textContent = '登录后将以本账号授权电脑端扫码登录';
     }
   }
+  wbInitNavStack();
 }
 
 // 扫码 / 登录成功后统一钩子：清理轮询 + 处理待授权票据
