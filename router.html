@@ -36,11 +36,10 @@
   </div>
 <script>
 (function(){
-  // 三镜像：GitHub Pages（稳定主）+ Vercel（稳定备）+ CloudStudio（本次部署临时链接，每次变）
+  // v228：双稳定镜像（CloudStudio 临时链接已失效 500，从候选移除，避免拖慢探测）
   var MIRRORS=[
     {name:"GitHub Pages", url:"https://hosmile123.github.io/good/"},
-    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"},
-    {name:"CloudStudio",  url:"https://59b014f3b9374d90a05ac7066600384e.app.workbuddy.link/"}
+    {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"}
   ];
   var TIMEOUT=3000;   // 单镜像探测超时
   var SAFETY=5000;    // 全局安全兜底：超过此时间必定显示手动链接
@@ -72,12 +71,11 @@
     });
   }
 
-  // Image 探测法：全浏览器兼容（含微信 WebView / 老式浏览器）
-  // onload 和 onerror 都表示"服务器有响应 = 可达"，仅超时 = 不可达
+  // 探测：仅 HTTP 2xx 视为可达（v228 修复：img.onerror 不再算可达——失效镜像返回 500 时
+  // 会被误判为最快并跳转，导致"打开慢/打不开"；改用 fetch 校验状态码）
   function ping(m){
     return new Promise(function(resolve){
       var start=Date.now();
-      var img=new Image();
       var done=false;
       function finish(ok){
         if(done) return;
@@ -85,9 +83,17 @@
         resolve({m:m,ok:ok,ms:Date.now()-start});
       }
       var to=setTimeout(function(){finish(false);},TIMEOUT);
-      img.onload=function(){clearTimeout(to);finish(true);};
-      img.onerror=function(){clearTimeout(to);finish(true);};  // 非图片也算可达
-      img.src=m.url+"?_="+Date.now();
+      if(typeof fetch === 'undefined'){
+        // 老浏览器降级：Image 探测，onload=可达，onerror=不可达
+        var img=new Image();
+        img.onload=function(){clearTimeout(to);finish(true);};
+        img.onerror=function(){clearTimeout(to);finish(false);};
+        img.src=m.url+"?_="+Date.now();
+        return;
+      }
+      fetch(m.url+"?_="+Date.now(), {method:'GET', mode:'cors', cache:'no-store'})
+        .then(function(r){ clearTimeout(to); finish(r.ok); })
+        .catch(function(){ clearTimeout(to); finish(false); });
     });
   }
 
