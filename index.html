@@ -26,6 +26,7 @@
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
+<!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -508,6 +509,215 @@ body.sb-collapsed .sidebar-item:hover::after {
 .todo-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
 .todo-cat-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--primary-light); color: var(--primary); }
 .todo-delete { color: var(--text-light); cursor: pointer; font-size: 16px; padding: 4px; }
+
+/* ===== v218: 笔记分类 ===== */
+.note-cat-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 4px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.note-cat-bar::-webkit-scrollbar { display: none; }
+.note-cat-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+  background: #f4f5f7; color: #555;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: transform .15s, box-shadow .15s;
+  flex-shrink: 0;
+  position: relative;
+}
+.note-cat-chip:active { transform: scale(0.96); }
+.note-cat-chip.add-chip {
+  background: #f8f9fa; color: #999; border: 1px dashed #d0d4d9;
+  font-weight: 500;
+}
+.note-cat-chip .cat-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.note-cat-chip .cat-more {
+  font-size: 12px; opacity: .55; margin-left: 2px; padding: 0 2px; border-radius: 4px;
+}
+.note-cat-chip .cat-more:hover { opacity: 1; background: rgba(0,0,0,.08); }
+.note-cat-chip .cat-count {
+  font-size: 11px; opacity: .7; margin-left: 2px; font-weight: 500;
+}
+.note-cat-color-picker {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;
+}
+.note-cat-color-swatch {
+  width: 26px; height: 26px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform .15s;
+}
+.note-cat-color-swatch.selected { border-color: #222; transform: scale(1.08); }
+.note-cat-color-swatch:active { transform: scale(0.92); }
+/* 笔记卡片左下角分类色标 */
+.note-cat-dot-on-card {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 5px; vertical-align: middle;
+}
+
+/* ===== v218: 生活习惯·作息表 ===== */
+.rt-schedule-list { display: flex; flex-direction: column; gap: 10px; }
+.rt-schedule-card {
+  padding: 14px; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  cursor: pointer; transition: transform .15s, box-shadow .15s;
+}
+.rt-schedule-card:active { transform: scale(0.99); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+.rt-schedule-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.rt-schedule-cycle {
+  display: inline-flex; gap: 4px; margin-bottom: 8px;
+}
+.rt-schedule-cycle .day-chip {
+  width: 22px; height: 22px; border-radius: 6px;
+  font-size: 11px; line-height: 22px; text-align: center; font-weight: 700;
+  background: #f4f5f7; color: #999;
+}
+.rt-schedule-cycle .day-chip.on { background: var(--primary); color: #fff; }
+.rt-schedule-summary { font-size: 12px; color: var(--text-light); }
+.rt-slot-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 6px;
+  background: #f8f9fa; border-radius: 10px;
+}
+.rt-slot-row .rt-slot-del {
+  width: 24px; height: 24px; border-radius: 50%; border: none;
+  background: #fff; color: #ff4d4f; font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; cursor: pointer;
+}
+.rt-slot-row .rt-slot-time {
+  font-size: 13px; font-weight: 600; color: var(--primary);
+  min-width: 112px;
+}
+.rt-slot-row .rt-slot-label {
+  flex: 1; font-size: 13px; color: var(--text-primary);
+  border: none; background: transparent; padding: 4px 0; min-width: 0;
+}
+.rt-slot-row .rt-slot-label:focus { outline: none; border-bottom: 1px dashed var(--primary); }
+.rt-day-pick {
+  display: inline-flex; gap: 6px; margin: 6px 0 12px;
+}
+.rt-day-pick .day-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: #f4f5f7; color: #666;
+  border: 1px solid transparent;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.rt-day-pick .day-btn.on {
+  background: var(--primary); color: #fff;
+}
+
+/* ===== v218: 待办月历 ===== */
+.td-cal-wrapper { padding: 0 2px; }
+.td-cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px 12px;
+}
+.td-cal-header .td-cal-title {
+  font-size: 18px; font-weight: 700; color: var(--text-primary);
+}
+.td-cal-nav {
+  display: flex; gap: 6px;
+}
+.td-cal-nav button {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--border); background: #fff;
+  font-size: 18px; cursor: pointer; color: #666;
+  display: flex; align-items: center; justify-content: center;
+}
+.td-cal-nav button.today {
+  border-color: var(--primary); color: var(--primary); font-size: 11px; font-weight: 700;
+  width: auto; padding: 0 12px; border-radius: 16px;
+}
+.td-cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  padding: 4px 0 6px; border-bottom: 1px solid #f0f1f3;
+}
+.td-cal-weekdays div {
+  text-align: center; font-size: 11px; color: var(--text-light); font-weight: 600;
+  padding: 4px 0;
+}
+.td-cal-weekdays div:nth-child(6),
+.td-cal-weekdays div:nth-child(7) { color: #fa8c16; }
+.td-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; padding: 6px 0;
+}
+.td-cal-cell {
+  min-height: 64px; padding: 4px 2px;
+  border-radius: 8px; background: #fafbfc;
+  position: relative; cursor: pointer; transition: background .15s;
+  display: flex; flex-direction: column; align-items: center;
+}
+.td-cal-cell:hover { background: #f0f4ff; }
+.td-cal-cell.other-month { opacity: .35; }
+.td-cal-cell.today .td-cal-num {
+  background: var(--primary); color: #fff;
+}
+.td-cal-cell.selected { background: #e6f7ff !important; box-shadow: inset 0 0 0 2px var(--primary); }
+.td-cal-num {
+  font-size: 12px; font-weight: 600;
+  width: 22px; height: 22px; line-height: 22px;
+  border-radius: 50%;
+  margin-bottom: 2px;
+}
+.td-cal-cell.weekend .td-cal-num { color: #fa8c16; }
+.td-cal-cell.today.weekend .td-cal-num { background: #fa8c16; color: #fff; }
+.td-cal-cell .td-cal-flag {
+  position: absolute; top: 3px; right: 3px;
+  font-size: 9px; color: #fa541c; font-weight: 700;
+  background: #fff7e6; padding: 0 3px; border-radius: 6px;
+}
+.td-cal-chips {
+  display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
+  max-width: 100%; overflow: hidden;
+}
+.td-cal-chip {
+  font-size: 9px; padding: 1px 3px; border-radius: 3px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600;
+}
+.td-cal-more {
+  font-size: 8px; color: #999; padding: 0 2px;
+}
+.td-cal-day-todos { margin-top: 10px; }
+.td-cal-day-todos h4 {
+  margin: 0 0 8px; font-size: 14px; color: var(--text-primary);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.td-cal-day-todos h4 .badge {
+  font-size: 11px; background: var(--primary-light); color: var(--primary);
+  padding: 2px 8px; border-radius: 10px; font-weight: 600;
+}
+.td-cal-recent {
+  margin-top: 14px;
+  padding-top: 14px; border-top: 1px dashed #eef0f3;
+}
+.td-cal-recent h4 { margin: 0 0 10px; font-size: 14px; color: var(--text-primary); }
+.td-cal-recent-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 4px;
+  background: #f8f9fa; border-radius: 10px;
+}
+.td-cal-recent-item .td-cal-recent-text {
+  flex: 1; font-size: 13px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.td-cal-recent-item.done .td-cal-recent-text { text-decoration: line-through; color: #999; }
+.td-cal-recent-item .td-cal-recent-date {
+  font-size: 11px; color: #fa541c; flex-shrink: 0; font-weight: 600;
+}
+.td-cal-recent-item.done .td-cal-recent-date { color: #999; }
+.td-cal-empty {
+  text-align: center; padding: 28px 0; color: var(--text-light);
+  font-size: 13px;
+}
 
 /* ===== Client ===== */
 .client-summary { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
@@ -2374,6 +2584,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('td',this,'td-list')">待办</button>
     <button class="subtab" onclick="switchSub('td',this,'td-journal')">日志</button>
+    <button class="subtab" onclick="switchSub('td',this,'td-cal')">📅 日历</button>
   </div>
 
   <!-- 待办 -->
@@ -2441,6 +2652,29 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <div class="section-label">📁 过往记录</div>
     <div class="card" id="journalList"><div class="empty-state"><div class="icon">📒</div><p>写下今日的收获与复盘。<br>在这里记录工作事项、客户反馈，<br>不必刻意长篇大论。</p></div></div>
   </div>
+
+  <!-- 月历 -->
+  <div class="subtab-content" id="td-cal">
+    <div class="td-cal-wrapper">
+      <div class="td-cal-header">
+        <div class="td-cal-title" id="tdCalTitle">2026年8月</div>
+        <div class="td-cal-nav">
+          <button onclick="tdCalPrev()">‹</button>
+          <button class="today" onclick="tdCalToday()">今天</button>
+          <button onclick="tdCalNext()">›</button>
+        </div>
+      </div>
+      <div class="td-cal-weekdays">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+      </div>
+      <div class="td-cal-grid" id="tdCalGrid"></div>
+      <div class="td-cal-day-todos" id="tdCalDayTodos" style="display:none"></div>
+      <div class="td-cal-recent">
+        <h4>📋 最近待办</h4>
+        <div id="tdCalRecent"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ========== 生活习惯 HUB ========== -->
@@ -2451,6 +2685,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <button class="subtab active" onclick="switchSub('rt',this,'rt-sleeprise')">早睡早起</button>
     <button class="subtab" id="rtSmokeTab" onclick="switchSub('rt',this,'rt-smoke')"><span id="rtSmokeLabel">经期</span></button>
     <button class="subtab" onclick="switchSub('rt',this,'rt-weight')">体重</button>
+    <button class="subtab" onclick="switchSub('rt',this,'rt-schedule')">📅 作息表</button>
   </div>
 
   <!-- 早睡早起（合并） -->
@@ -2675,6 +2910,53 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
     <div class="section-label">📋 体重记录 <span id="weightListTitle" style="font-weight:400;color:var(--text-light)"></span></div>
     <div class="card" style="padding:0" id="weightList"></div>
+  </div>
+
+  <!-- v218: 作息表 子标签 -->
+  <div class="subtab-content" id="rt-schedule">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:14px;color:var(--text-secondary)">📋 一份作息表 = 标题 + 一周生效日 + 一组时间段（起止 / 名称 / 启用）</div>
+      <button class="badge-btn" onclick="openRtScheduleLib()" style="background:#FFF3E0;color:#E65100;border:1px solid #FFD7B0">📚 作息库</button>
+    </div>
+    <div id="rtSchedList" class="rt-schedule-list"></div>
+    <button class="btn-primary" style="width:100%;margin-top:14px;background:var(--primary)" onclick="openRtScheduleEdit()">＋ 新建作息表</button>
+  </div>
+</div>
+
+<!-- v218: 作息表编辑弹窗 -->
+<div id="rtSchedEditModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:10001;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+      <div id="rtSchedEditTitle" style="font-size:16px;font-weight:700">编辑作息表</div>
+      <button onclick="closeRtScheduleEdit()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1">
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:6px">作息表标题</div>
+      <input id="rtSchedName" type="text" maxlength="20" placeholder="如：周末作息" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      <div style="font-size:12px;color:var(--text-light);margin:14px 0 6px">生效日（多选）</div>
+      <div class="rt-day-pick" id="rtSchedDays"></div>
+      <div style="font-size:12px;color:var(--text-light);margin:14px 0 6px;display:flex;justify-content:space-between;align-items:center">
+        <span>时间段</span>
+        <button class="badge-btn" onclick="rtSchedAddSlot()" style="background:#f0f4ff;color:#3B5BDB;font-size:12px">＋ 新增</button>
+      </div>
+      <div id="rtSchedSlots"></div>
+    </div>
+    <div style="padding:10px 18px;border-top:1px solid #f0f0f0;background:#fafbfc;display:flex;gap:8px">
+      <button class="btn-primary" style="flex:1;background:#ff4d4f" id="rtSchedDelBtn" onclick="rtSchedAskDelete()">🗑 删除</button>
+      <button class="btn-primary" style="flex:1;background:#999" onclick="closeRtScheduleEdit()">取消</button>
+      <button class="btn-primary" style="flex:1" onclick="rtSchedSave()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- v218: 作息库（预设模板列表） -->
+<div id="rtSchedLibModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:10002;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700">📚 作息库</div>
+      <button onclick="closeRtScheduleLib()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div id="rtSchedLibList" style="padding:14px 18px;overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -4316,13 +4598,15 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
 <!-- ========== 笔记 ========== -->
 <div class="page" id="page-notes">
-  <div class="page-header"><div><div class="page-title">笔记</div><div class="page-subtitle">随手记录 · 灵感想法 · 备忘清单</div></div></div>
+  <div class="page-header"><div><div class="page-title">笔记</div><div class="page-subtitle">随手记录 · 灵感想法 · 备忘清单</div></div><button class="badge-btn" onclick="openNoteCatMgr()">分类管理</button></div>
 
   <!-- List View -->
   <div id="notesListView">
     <div class="card" style="padding:10px 12px;margin-bottom:12px">
       <input type="text" id="notesSearch" placeholder="🔍 搜索笔记" oninput="renderNotesList()" style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:12px;font-size:14px;font-family:inherit;background:#f8f9fa">
     </div>
+    <!-- v218：笔记分类标签栏 -->
+    <div class="note-cat-bar" id="noteCatBar"></div>
     <div class="section-label" id="notesCountLabel">📝 全部笔记</div>
     <div id="notesGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
   </div>
@@ -4337,6 +4621,10 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div class="form-group">
         <input type="text" id="noteTitle" placeholder="标题" style="width:100%;padding:10px 0;border:none;border-bottom:1px solid var(--border);font-size:18px;font-weight:600;font-family:inherit;background:transparent">
       </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light)">分类</label>
+        <select id="noteCatSel" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box"></select>
+      </div>
       <div class="form-group" style="margin-bottom:0">
         <textarea id="noteBody" placeholder="开始写笔记..." rows="12" style="width:100%;padding:10px 0;border:none;font-size:14px;font-family:inherit;resize:vertical;line-height:1.6;background:transparent"></textarea>
       </div>
@@ -4349,6 +4637,35 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
   <!-- Floating Add Button -->
   <button id="notesAddBtn" onclick="openNoteEditor()" style="position:fixed;right:20px;bottom:80px;width:56px;height:56px;border-radius:50%;background:#ff9800;color:#fff;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(255,152,0,0.4);z-index:100;cursor:pointer">+</button>
+</div>
+
+<!-- v218: 笔记分类管理弹窗 -->
+<div id="noteCatMgrModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:10001;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:420px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700">🏷️ 分类管理</div>
+      <button onclick="closeNoteCatMgr()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div id="noteCatMgrList" style="padding:14px 18px;overflow-y:auto;flex:1"></div>
+    <div style="padding:12px 18px;border-top:1px solid #f0f0f0;background:#fafbfc">
+      <button class="btn-primary" style="width:100%;background:var(--primary)" onclick="closeNoteCatMgr();openNoteCatEdit()">＋ 新增分类</button>
+    </div>
+  </div>
+</div>
+
+<!-- v218: 笔记分类新增/编辑弹窗 -->
+<div id="noteCatEditModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:10002;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:380px;padding:20px">
+    <div id="noteCatEditTitle" style="font-size:16px;font-weight:700;margin-bottom:14px">新增分类</div>
+    <div style="font-size:12px;color:var(--text-light);margin-bottom:6px">分类名称</div>
+    <input id="noteCatEditName" type="text" placeholder="如：旅行、学习" maxlength="10" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+    <div style="font-size:12px;color:var(--text-light);margin:14px 0 8px">标题颜色（点击选择）</div>
+    <div class="note-cat-color-picker" id="noteCatColorPicker"></div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn-primary" style="flex:1;background:#999" onclick="closeNoteCatEdit()">取消</button>
+      <button class="btn-primary" style="flex:1;background:var(--primary)" id="noteCatEditOkBtn" onclick="saveNoteCatEdit()">保存</button>
+    </div>
+  </div>
 </div>
 
 <!-- ========== 娱乐 HUB ========== -->
@@ -5290,10 +5607,10 @@ async function switchPage(pageId) {
   // close sidebar on mobile after nav
   closeSidebar();
   if(pageId === 'diary') switchPageDiary();
-  if(pageId === 'notes') renderNotesList();
+  if(pageId === 'notes'){ try{ renderNotesCatBar(); }catch(e){ console.error('renderNotesCatBar', e); } renderNotesList(); }
   if(pageId === 'todo') renderAppointmentsTodos();
   if(pageId === 'cloud') renderCloudSheets();
-  if(pageId === 'routine'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入生活习惯页时立即同步「经期/戒烟」标签与子页内容
+  if(pageId === 'routine'){ try{ applySmokePageMode(); rtSchedGetList(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入生活习惯页时立即同步「经期/戒烟」标签与子页内容
   if(pageId === 'daysmatter'){ try{ if(typeof dmRender==='function') dmRender(); }catch(e){ console.error('dmRender:', e); } }
   if(pageId === 'daysmatter-archive'){ try{ if(typeof dmRenderArchive==='function') dmRenderArchive(); }catch(e){ console.error('dmRenderArchive:', e); } }
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
@@ -5430,6 +5747,8 @@ function switchSub(group, btn, targetId) {
     if(group==='rt' && targetId==='rt-smoke'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }
     if(group==='td'){ renderAppointmentsTodos(); }
     if(group==='rt' && targetId==='rt-sleeprise'){ initSrForm(); renderRoutine(); }
+    if(group==='rt' && targetId==='rt-schedule'){ try{ rtSchedRenderList(); }catch(e){ console.error('rtSchedRenderList', e); } }
+    if(group==='td' && targetId==='td-cal'){ try{ renderTodoCalendar(); }catch(e){ console.error('renderTodoCalendar', e); } }
     if(group==='diary' && targetId==='diary-vault'){ try{ renderVault(); }catch(e){ console.error('renderVault:', e); } }
   } catch(e) { console.error('switchSub error:', e); }
 }
@@ -8596,13 +8915,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 217;                         // v217：同步徽标改为「仅首页显示」——固定在首页首行居中(top:8px)，切到其他页面自动隐藏(wbSyncBadgeVisibility 按 wbCurrentPage()==='home' 控制)；账号管理后端切换沿用 v216
+const WB_VERSION = 218;                         // v218：①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 134;                 // v217 发版：133→134
+const WB_DISPLAY_VERSION = 135;                 // v218 发版：134→135
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -9067,6 +9386,96 @@ function updateTodo(id){
   var cat=document.getElementById('todoEditCat').value;
   t.text=text; t.time=time; t.cat=cat; t.date=time?time.slice(0,10):t.date;
   saveTodos(list); closeModal('todoEditModal'); renderTodo(); toast('已更新');
+}
+
+/* ---------- 待办月历 ---------- */
+var TD_CAL_YEAR = new Date().getFullYear();
+var TD_CAL_MONTH = new Date().getMonth();   // 0-11
+var TD_CAL_SEL = null;
+function tdCalLocalToday(){
+  var d=new Date(); var p=function(n){return (n<10?'0':'')+n;};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function renderTodoCalendar(){
+  var grid=document.getElementById('tdCalGrid'); if(!grid) return;
+  if(!TD_CAL_SEL) TD_CAL_SEL=tdCalLocalToday();
+  var list=getTodos();
+  var byDate={};
+  list.forEach(function(t){ var k=t.date||''; if(!k) return; (byDate[k]||(byDate[k]=[])).push(t); });
+  var y=TD_CAL_YEAR, m=TD_CAL_MONTH;
+  var first=new Date(y,m,1);
+  var startDay=first.getDay();                 // 0=周日
+  var daysInMonth=new Date(y,m+1,0).getDate();
+  var daysInPrev=new Date(y,m,0).getDate();
+  var todayStr=tdCalLocalToday();
+  var title=document.getElementById('tdCalTitle');
+  if(title) title.textContent=y+'年'+(m+1)+'月';
+  var cells=[];
+  for(var i=startDay-1;i>=0;i--) cells.push({d:daysInPrev-i, other:true, dateStr:null});
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var wkd=new Date(y,m,d).getDay();
+    cells.push({d:d, other:false, dateStr:ds, weekend:(wkd===0||wkd===6)});
+  }
+  while(cells.length%7!==0) cells.push({d:'', other:true, dateStr:null});
+  while(cells.length<42) cells.push({d:'', other:true, dateStr:null});
+  var html=cells.map(function(c){
+    if(c.other) return '<div class="td-cal-cell other-month"></div>';
+    var todos=byDate[c.dateStr]||[];
+    var isToday=c.dateStr===todayStr;
+    var isSel=c.dateStr===TD_CAL_SEL;
+    var chips='';
+    todos.slice(0,3).forEach(function(t){
+      var txt=t.text.length>6?t.text.slice(0,6)+'…':t.text;
+      chips+='<div class="td-cal-chip" style="'+catColor(t.cat)+'">'+esc(txt)+'</div>';
+    });
+    if(todos.length>3) chips+='<div class="td-cal-more">+'+ (todos.length-3)+'</div>';
+    var flag=todos.length?'<div class="td-cal-flag"></div>':'';
+    var cls='td-cal-cell'+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
+    return '<div class="'+cls+'" onclick="tdCalSelectDate(\''+c.dateStr+'\')">'+
+      '<div class="td-cal-num">'+c.d+'</div>'+flag+
+      '<div class="td-cal-chips">'+chips+'</div></div>';
+  }).join('');
+  grid.innerHTML=html;
+  renderTdCalDay(TD_CAL_SEL, byDate);
+  renderTdCalRecent();
+}
+function tdCalPrev(){ TD_CAL_MONTH--; if(TD_CAL_MONTH<0){TD_CAL_MONTH=11;TD_CAL_YEAR--;} renderTodoCalendar(); }
+function tdCalNext(){ TD_CAL_MONTH++; if(TD_CAL_MONTH>11){TD_CAL_MONTH=0;TD_CAL_YEAR++;} renderTodoCalendar(); }
+function tdCalToday(){ var d=new Date(); TD_CAL_YEAR=d.getFullYear(); TD_CAL_MONTH=d.getMonth(); TD_CAL_SEL=tdCalLocalToday(); renderTodoCalendar(); }
+function tdCalSelectDate(ds){
+  TD_CAL_SEL=ds; renderTodoCalendar();
+  var box=document.getElementById('tdCalDayTodos');
+  if(box) box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function renderTdCalDay(ds, byDate){
+  var box=document.getElementById('tdCalDayTodos'); if(!box) return;
+  var todos=(byDate&&byDate[ds])||[];
+  if(!todos.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML='<h4>'+ds+' 的待办 <span class="badge">'+(todos.filter(function(t){return !t.done;}).length)+' 未完成</span></h4>'+
+    todos.map(function(t){
+      return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
+        '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
+        '<div class="td-cal-recent-date" style="'+catColor(t.cat)+'">'+esc(t.cat)+'</div></div>';
+    }).join('');
+}
+function tdCalToggle(id){
+  var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
+  t.done=!t.done; saveTodos(list); renderTodoCalendar();
+}
+function renderTdCalRecent(){
+  var box=document.getElementById('tdCalRecent'); if(!box) return;
+  var list=getTodos().slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  var pending=list.filter(function(t){return !t.done;});
+  var done=list.filter(function(t){return t.done;});
+  var show=pending.concat(done).slice(0,30);
+  if(!show.length){ box.innerHTML='<div class="td-cal-empty">暂无待办，去「待办」添加一条吧 📝</div>'; return; }
+  box.innerHTML=show.map(function(t){
+    return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
+      '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
+      '<div class="td-cal-recent-date" style="'+catColor(t.cat)+'">'+esc(t.cat)+' · '+(t.date||'')+'</div></div>';
+  }).join('');
 }
 
 /* ---------- 娱乐 ---------- */
@@ -11361,6 +11770,282 @@ function saveRoutineSettings(){
   saveRoutine(r); closeModal('routineModal'); renderRoutine(); applySmokePageMode(); toast('已保存设置');
 }
 
+/* =================================================
+   v218: 生活习惯·作息表
+   数据：r.schedule.list = [{ id, name, days:[0..6], slots:[{id,start,end,label,enabled}] }]
+   ================================================= */
+var RT_DAY_NAMES = ['日','一','二','三','四','五','六'];  // 周日=0
+
+function rtSchedGetList(){
+  var r = getRoutine();
+  if(!r.schedule) r.schedule = {};
+  if(!Array.isArray(r.schedule.list)){
+    // 首次进入：预置一份「周末作息」+ 一份「工作日作息」
+    r.schedule.list = [
+      { id:'sch_init_weekend', name:'周末作息', days:[0,6], builtin:true,
+        slots:[
+          {id:_uid(),start:'08:10',end:'08:30',label:'吃早餐',enabled:true},
+          {id:_uid(),start:'09:00',end:'09:30',label:'晨练',   enabled:true},
+          {id:_uid(),start:'10:00',end:'10:30',label:'娱乐放松',enabled:true},
+          {id:_uid(),start:'12:00',end:'12:30',label:'吃午餐',enabled:true},
+          {id:_uid(),start:'13:00',end:'14:00',label:'午休',  enabled:true},
+          {id:_uid(),start:'14:00',end:'15:00',label:'兴趣爱好',enabled:true},
+          {id:_uid(),start:'18:00',end:'18:30',label:'吃晚餐',enabled:true},
+          {id:_uid(),start:'19:00',end:'19:30',label:'散步娱乐',enabled:true},
+          {id:_uid(),start:'21:00',end:'21:30',label:'运动健身',enabled:true},
+          {id:_uid(),start:'22:00',end:'22:30',label:'洗漱',  enabled:true},
+          {id:_uid(),start:'22:30',end:'23:00',label:'睡觉',  enabled:true}
+        ]
+      },
+      { id:'sch_init_workday', name:'工作日作息', days:[1,2,3,4,5], builtin:true,
+        slots:[
+          {id:_uid(),start:'06:30',end:'07:00',label:'起床洗漱',enabled:true},
+          {id:_uid(),start:'07:00',end:'07:30',label:'吃早餐',enabled:true},
+          {id:_uid(),start:'07:30',end:'08:00',label:'通勤/准备',enabled:true},
+          {id:_uid(),start:'12:00',end:'13:00',label:'午餐午休',enabled:true},
+          {id:_uid(),start:'18:00',end:'19:00',label:'晚餐',enabled:true},
+          {id:_uid(),start:'22:30',end:'23:00',label:'准备睡觉',enabled:true},
+          {id:_uid(),start:'23:00',end:'23:30',label:'睡觉',   enabled:true}
+        ]
+      }
+    ];
+    saveRoutine(r);
+  }
+  return r.schedule.list;
+}
+function rtSchedSaveList(list){
+  var r = getRoutine();
+  if(!r.schedule) r.schedule = {};
+  r.schedule.list = list;
+  saveRoutine(r);
+}
+function rtSchedRenderList(){
+  var box = document.getElementById('rtSchedList');
+  if(!box) return;
+  var list = rtSchedGetList();
+  if(!list.length){
+    box.innerHTML = '<div style="text-align:center;padding:36px 16px;color:var(--text-light)"><div style="font-size:42px;margin-bottom:8px">📅</div><div style="font-size:14px">还没有作息表</div><div style="font-size:12px;margin-top:4px">点击下面「＋ 新建作息表」开始</div></div>';
+    return;
+  }
+  box.innerHTML = list.map(function(s){
+    var dayChips = RT_DAY_NAMES.map(function(d,i){
+      return '<span class="day-chip'+(s.days&&s.days.indexOf(i)>=0?' on':'')+'">'+d+'</span>';
+    }).join('');
+    return '<div class="rt-schedule-card" onclick="openRtScheduleEdit(\''+s.id+'\')">'
+         + '<div class="rt-schedule-name">📅 '+esc(s.name||'未命名')+'</div>'
+         + '<div class="rt-schedule-cycle">'+dayChips+'</div>'
+         + '<div class="rt-schedule-summary">'+((s.slots||[]).length)+' 个时间段 · '+(s.builtin?'模板':'自定义')+'</div>'
+         + '</div>';
+  }).join('');
+}
+
+/* --------- 编辑弹窗 --------- */
+var _rtSchedEditId = null;        // null = 新增
+var _rtSchedEditDays = [0,0,0,0,0,0,0];  // 周日..周六
+var _rtSchedEditSlots = [];       // 编辑器内临时数据
+var _rtSchedDeletePending = null; // 已按下"删除"待二次确认
+
+function rtSchedDaysRender(){
+  var box = document.getElementById('rtSchedDays'); if(!box) return;
+  box.innerHTML = RT_DAY_NAMES.map(function(d,i){
+    return '<span class="day-btn'+(_rtSchedEditDays[i]?' on':'')+'" data-idx="'+i+'" onclick="rtSchedToggleDay('+i+')">'+d+'</span>';
+  }).join('');
+}
+function rtSchedToggleDay(i){
+  _rtSchedEditDays[i] = _rtSchedEditDays[i] ? 0 : 1;
+  rtSchedDaysRender();
+}
+function rtSchedSlotsRender(){
+  var box = document.getElementById('rtSchedSlots'); if(!box) return;
+  if(!_rtSchedEditSlots.length){
+    box.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:18px 0;font-size:13px">还没有时间段，点击上方「＋ 新增」</div>';
+    return;
+  }
+  box.innerHTML = _rtSchedEditSlots.map(function(s,i){
+    return '<div class="rt-slot-row">'
+         + '<button class="rt-slot-del" onclick="rtSchedRemoveSlot('+i+')" title="删除">−</button>'
+         + '<span class="rt-slot-time">'
+         +   '<input type="time" value="'+(s.start||'')+'" onchange="_rtSchedEditSlots['+i+'].start=this.value" style="background:transparent;border:none;font-size:13px;font-weight:600;color:var(--primary);width:54px">'
+         +   ' − '
+         +   '<input type="time" value="'+(s.end||'')+'" onchange="_rtSchedEditSlots['+i+'].end=this.value" style="background:transparent;border:none;font-size:13px;font-weight:600;color:var(--primary);width:54px">'
+         + '</span>'
+         + '<input class="rt-slot-label" type="text" maxlength="14" value="'+esc(s.label||'')+'" placeholder="如：吃早餐" onchange="_rtSchedEditSlots['+i+'].label=this.value">'
+         + '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-light);cursor:pointer"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="_rtSchedEditSlots['+i+'].enabled=this.checked">启用</label>'
+         + '</div>';
+  }).join('');
+}
+function rtSchedAddSlot(){
+  _rtSchedEditSlots.push({ id:_uid(), start:'08:00', end:'08:30', label:'', enabled:true });
+  rtSchedSlotsRender();
+}
+function rtSchedRemoveSlot(i){
+  _rtSchedEditSlots.splice(i, 1);
+  rtSchedSlotsRender();
+}
+function rtSchedDaysToNames(arr){
+  return (arr||[]).filter(function(x){return x;}).map(function(_,i){ return RT_DAY_NAMES[i]; }).join('、') || '未选择';
+}
+function openRtScheduleEdit(id){
+  var list = rtSchedGetList();
+  var s = id ? list.find(function(x){ return x.id === id; }) : null;
+  _rtSchedEditId = s ? s.id : null;
+  _setVal('rtSchedName', s ? s.name : '');
+  _rtSchedEditDays = [0,0,0,0,0,0,0];
+  if(s && Array.isArray(s.days)) s.days.forEach(function(i){ _rtSchedEditDays[i] = 1; });
+  _rtSchedEditSlots = s ? JSON.parse(JSON.stringify(s.slots||[])) : [];
+  rtSchedDaysRender();
+  rtSchedSlotsRender();
+  document.getElementById('rtSchedEditTitle').textContent = s ? '编辑作息表' : '新建作息表';
+  // 内置模板不显示删除按钮（在编辑器里改 slots/days 即可）
+  document.getElementById('rtSchedDelBtn').style.display = (s && s.builtin) ? 'none' : '';
+  var m = document.getElementById('rtSchedEditModal');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeRtScheduleEdit(); };
+  _rtSchedDeletePending = null;
+}
+function closeRtScheduleEdit(){
+  var m = document.getElementById('rtSchedEditModal'); if(m) m.style.display = 'none';
+  _rtSchedEditId = null;
+  _rtSchedDeletePending = null;
+}
+function rtSchedSave(){
+  var name = ((document.getElementById('rtSchedName')||{}).value||'').trim();
+  if(!name){ toast('请输入作息表标题'); return; }
+  var days = [];
+  _rtSchedEditDays.forEach(function(v,i){ if(v) days.push(i); });
+  if(!days.length){ toast('请至少选择 1 个生效日'); return; }
+  var list = rtSchedGetList();
+  if(_rtSchedEditId){
+    var s = list.find(function(x){ return x.id === _rtSchedEditId; });
+    if(s){ s.name = name; s.days = days; s.slots = _rtSchedEditSlots; }
+    toast('已保存');
+  } else {
+    list.unshift({ id:'sch_'+_uid(), name:name, days:days, slots:_rtSchedEditSlots, builtin:false });
+    toast('已新增作息表');
+  }
+  rtSchedSaveList(list);
+  closeRtScheduleEdit();
+  rtSchedRenderList();
+}
+function rtSchedAskDelete(){
+  if(!_rtSchedEditId){ closeRtScheduleEdit(); return; }
+  var s = rtSchedGetList().find(function(x){ return x.id === _rtSchedEditId; });
+  if(!s) return;
+  wbConfirm('确定删除作息表「'+s.name+'」？', function(ok){
+    if(!ok) return;
+    var list = rtSchedGetList().filter(function(x){ return x.id !== _rtSchedEditId; });
+    rtSchedSaveList(list);
+    closeRtScheduleEdit();
+    rtSchedRenderList();
+    toast('已删除');
+  });
+}
+
+/* --------- 作息库 --------- */
+var RT_SCHED_PRESETS = [
+  {
+    name:'工作日作息', days:[1,2,3,4,5],
+    slots:[
+      {start:'06:30',end:'07:00',label:'起床洗漱'},
+      {start:'07:00',end:'07:30',label:'吃早餐'},
+      {start:'07:30',end:'08:00',label:'通勤/准备'},
+      {start:'12:00',end:'13:00',label:'午餐午休'},
+      {start:'18:00',end:'19:00',label:'晚餐'},
+      {start:'22:30',end:'23:00',label:'准备睡觉'},
+      {start:'23:00',end:'23:30',label:'睡觉'}
+    ]
+  },
+  {
+    name:'周末作息', days:[0,6],
+    slots:[
+      {start:'08:10',end:'08:30',label:'吃早餐'},
+      {start:'09:00',end:'09:30',label:'晨练'},
+      {start:'10:00',end:'10:30',label:'娱乐放松'},
+      {start:'12:00',end:'12:30',label:'吃午餐'},
+      {start:'13:00',end:'14:00',label:'午休'},
+      {start:'14:00',end:'15:00',label:'兴趣爱好'},
+      {start:'18:00',end:'18:30',label:'吃晚餐'},
+      {start:'19:00',end:'19:30',label:'散步娱乐'},
+      {start:'21:00',end:'21:30',label:'运动健身'},
+      {start:'22:00',end:'22:30',label:'洗漱'},
+      {start:'22:30',end:'23:00',label:'睡觉'}
+    ]
+  },
+  {
+    name:'学生·早自习', days:[1,2,3,4,5],
+    slots:[
+      {start:'06:00',end:'06:20',label:'起床'},
+      {start:'06:20',end:'06:45',label:'吃早餐'},
+      {start:'07:00',end:'07:50',label:'早自习'},
+      {start:'12:00',end:'13:00',label:'午餐午休'},
+      {start:'13:00',end:'17:00',label:'上课'},
+      {start:'17:30',end:'18:30',label:'晚餐'},
+      {start:'19:00',end:'21:30',label:'晚自习'},
+      {start:'22:00',end:'22:30',label:'睡觉'}
+    ]
+  },
+  {
+    name:'健身减脂日程', days:[1,3,5],
+    slots:[
+      {start:'06:30',end:'07:00',label:'起床'},
+      {start:'07:00',end:'07:30',label:'晨间有氧'},
+      {start:'08:00',end:'12:00',label:'工作'},
+      {start:'12:00',end:'12:30',label:'低卡午餐'},
+      {start:'18:30',end:'19:30',label:'力量训练'},
+      {start:'19:30',end:'20:00',label:'蛋白餐'},
+      {start:'22:30',end:'23:00',label:'睡觉'}
+    ]
+  },
+  {
+    name:'夜班作息', days:[1,2,3,4,5],
+    slots:[
+      {start:'09:00',end:'09:30',label:'起床'},
+      {start:'09:30',end:'10:00',label:'吃早餐'},
+      {start:'16:00',end:'17:00',label:'晚餐'},
+      {start:'22:00',end:'22:30',label:'夜宵'},
+      {start:'23:00',end:'07:00',label:'夜班'}
+    ]
+  }
+];
+function openRtScheduleLib(){
+  var m = document.getElementById('rtSchedLibModal'); if(!m) return;
+  document.getElementById('rtSchedLibList').innerHTML = RT_SCHED_PRESETS.map(function(p, i){
+    var days = (p.days||[]).map(function(d){ return RT_DAY_NAMES[d]; }).join('、');
+    return '<div onclick="rtSchedApplyPreset('+i+')" '
+         + 'style="display:flex;align-items:center;gap:10px;padding:14px;border:1px solid #f0f0f0;border-radius:12px;margin-bottom:10px;cursor:pointer;background:#fafbfc">'
+         + '<div style="font-size:34px">📋</div>'
+         + '<div style="flex:1;min-width:0">'
+         +   '<div style="font-size:15px;font-weight:700">'+esc(p.name)+'</div>'
+         +   '<div style="font-size:12px;color:#888;margin-top:4px">'+days+' · '+((p.slots||[]).length)+' 个时间段</div>'
+         + '</div>'
+         + '<div style="color:var(--primary);font-size:13px">采用 ›</div>'
+         + '</div>';
+  }).join('');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeRtScheduleLib(); };
+}
+function closeRtScheduleLib(){
+  var m = document.getElementById('rtSchedLibModal'); if(m) m.style.display = 'none';
+}
+function rtSchedApplyPreset(idx){
+  var p = RT_SCHED_PRESETS[idx]; if(!p) return;
+  var list = rtSchedGetList();
+  // 避免完全重叠同名（添加 "副本"）
+  var dupN = 0; var newName = p.name;
+  list.forEach(function(s){ if(s.name && s.name.indexOf(p.name) === 0) dupN++; });
+  if(dupN > 0) newName = p.name + ' 副本' + dupN;
+  var clones = (p.slots||[]).map(function(sl){
+    return { id: _uid(), start: sl.start, end: sl.end, label: sl.label||'', enabled: true };
+  });
+  list.unshift({ id:'sch_'+_uid(), name: newName, days:(p.days||[]).slice(), slots:clones, builtin:false });
+  rtSchedSaveList(list);
+  closeRtScheduleLib();
+  rtSchedRenderList();
+  toast('已采用模板：'+newName);
+}
+
+/* ================================================= */
+
 /* ---------- 运动旅行渲染 ---------- */
 var FIT_DIST_TYPES = ['跑步','徒步'];
 function fitTypeChange(){
@@ -11735,35 +12420,230 @@ function renderHome(){
 function notesKey(){ return 'notes'; }
 function getNotes(){
   var d = _load(notesKey(), null);
-  if(d === null){ d = { items: [] }; _save(notesKey(), d); }
+  if(d === null){ d = { items: [], cats: [] }; _save(notesKey(), d); }
   if(!Array.isArray(d.items)) d.items = [];
+  if(!Array.isArray(d.cats)) d.cats = [];
   return d;
 }
 function saveNotes(d){ _save(notesKey(), d); }
+
+/* v218: 笔记分类数据层 —— 三类固定 + 用户可加自定义 */
+var NOTE_DEFAULT_CATS = [
+  { id:'cat_work',  name:'工作', color:'#52C41A', builtin:true },
+  { id:'cat_life',  name:'生活', color:'#FF4D4F', builtin:true },
+  { id:'cat_other', name:'其他', color:'#8C8C8C', builtin:true }
+];
+function getNotesCats(){
+  var d = getNotes();
+  NOTE_DEFAULT_CATS.forEach(function(dc){
+    var i = d.cats.findIndex(function(x){ return x.id === dc.id; });
+    if(i < 0){ d.cats.push({ id:dc.id, name:dc.name, color:dc.color, builtin:true }); }
+    else if(d.cats[i].builtin){ d.cats[i].name = dc.name; d.cats[i].color = dc.color; }
+  });
+  d.cats.sort(function(a,b){
+    if(!!a.builtin !== !!b.builtin) return a.builtin ? -1 : 1;
+    return (a.order||0) - (b.order||0);
+  });
+  saveNotes(d);
+  return d.cats;
+}
+function findNoteCat(id){
+  return getNotesCats().find(function(c){ return c.id === id; })
+      || NOTE_DEFAULT_CATS.find(function(c){ return c.id === id; })
+      || null;
+}
+function noteCountByCat(){
+  var items = (getNotes().items || []);
+  var map = { __all: items.length };
+  NOTE_DEFAULT_CATS.forEach(function(c){ map[c.id] = 0; });
+  items.forEach(function(n){
+    var cid = n.cat || 'cat_other';
+    map[cid] = (map[cid]||0) + 1;
+  });
+  return map;
+}
+let currentNoteCat = '__all';
+function setCurrentNoteCat(cat){
+  currentNoteCat = cat;
+  renderNotesCatBar();
+  renderNotesList();
+}
+function chipActiveStyle(id, current, color){
+  if(current !== id) return '';
+  var c = color || '#5B6CF9';
+  return 'background:'+c+';color:#fff';
+}
+function renderNotesCatBar(){
+  var bar = document.getElementById('noteCatBar');
+  if(!bar) return;
+  var cats = getNotesCats();
+  var counts = noteCountByCat();
+  var html = '';
+  html += '<span class="note-cat-chip'+(currentNoteCat==='__all'?' active':'')+'" onclick="setCurrentNoteCat(\'__all\')" '
+        + 'style="'+chipActiveStyle('__all', currentNoteCat)+'">'
+        + '全部 <span class="cat-count">'+counts.__all+'</span></span>';
+  cats.forEach(function(c){
+    var on = (currentNoteCat === c.id);
+    var s = '<span class="note-cat-chip'+(on?' active':'')+'" onclick="setCurrentNoteCat(\''+c.id+'\')" '
+          + 'style="'+chipActiveStyle(c.id, currentNoteCat, c.color)+'">'
+          + '<span class="cat-dot" style="background:'+c.color+'"></span>'
+          + esc(c.name)+' <span class="cat-count">'+(counts[c.id]||0)+'</span>';
+    if(!c.builtin){
+      s += '<span class="cat-more" onclick="event.stopPropagation();openNoteCatMgr(\''+c.id+'\')" title="编辑/删除">⋯</span>';
+    }
+    s += '</span>';
+    html += s;
+  });
+  html += '<span class="note-cat-chip add-chip" onclick="openNoteCatEdit()">＋</span>';
+  bar.innerHTML = html;
+}
+
+/* v218: 分类管理弹窗（含 ⋯ 入口和管理弹窗） */
+function openNoteCatMgr(highlightId){
+  var m = document.getElementById('noteCatMgrModal'); if(!m) return;
+  var list = getNotesCats();
+  var counts = noteCountByCat();
+  var html = list.map(function(c){
+    var cnt = counts[c.id] || 0;
+    var builtinTag = c.builtin ? '<span style="font-size:10px;background:#f4f5f7;color:#888;padding:2px 6px;border-radius:6px;margin-left:6px">默认</span>' : '';
+    var editBtn = c.builtin ? '' : '<button onclick="closeNoteCatMgr();openNoteCatEdit(\''+c.id+'\')" style="border:none;background:#f0f4ff;color:#3B5BDB;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;margin-right:4px">编辑</button>';
+    var delBtn = c.builtin ? '<span style="font-size:11px;color:#bbb;padding:6px 10px">不可删除</span>' : '<button onclick="askDelNoteCat(\''+c.id+'\')" style="border:none;background:#fff1f0;color:#cf1322;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer">删除</button>';
+    return '<div id="ncMgr_'+c.id+'" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f3f4f6">'
+         + '<span style="width:14px;height:14px;border-radius:4px;background:'+c.color+';flex-shrink:0"></span>'
+         + '<div style="flex:1;font-size:14px;font-weight:600;color:#333">'+esc(c.name)+builtinTag+'<div style="font-size:11px;color:#888;margin-top:2px">'+cnt+' 条笔记</div></div>'
+         + editBtn + delBtn + '</div>';
+  }).join('');
+  document.getElementById('noteCatMgrList').innerHTML = html || '<div style="text-align:center;color:#999;padding:30px 0">暂无分类</div>';
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeNoteCatMgr(); };
+}
+function closeNoteCatMgr(){
+  var m = document.getElementById('noteCatMgrModal'); if(m) m.style.display = 'none';
+}
+function askDelNoteCat(id){
+  var c = findNoteCat(id); if(!c || c.builtin){ toast('默认分类不可删除'); return; }
+  var cnt = noteCountByCat()[id] || 0;
+  if(cnt > 0){
+    wbConfirm('该分类下还有 '+cnt+' 条笔记，删除后这些笔记会自动归到「其他」。\n\n确定删除分类「'+c.name+'」？', function(ok){
+      if(!ok) return;
+      var d = getNotes();
+      d.items.forEach(function(n){ if((n.cat||'')===id) n.cat='cat_other'; });
+      d.cats = d.cats.filter(function(x){ return x.id !== id; });
+      saveNotes(d);
+      if(currentNoteCat === id){ currentNoteCat = '__all'; }
+      renderNotesCatBar(); renderNotesList();
+      closeNoteCatMgr();
+      toast('已删除分类');
+    });
+  } else {
+    wbConfirm('确定删除分类「'+c.name+'」？', function(ok){
+      if(!ok) return;
+      var d = getNotes();
+      d.cats = d.cats.filter(function(x){ return x.id !== id; });
+      saveNotes(d);
+      if(currentNoteCat === id){ currentNoteCat = '__all'; }
+      renderNotesCatBar(); renderNotesList();
+      closeNoteCatMgr();
+      toast('已删除分类');
+    });
+  }
+}
+
+/* v218: 分类新增/编辑弹窗 */
+var _noteCatEditId = null;
+var _noteCatEditColor = '#52C41A';
+var NOTE_CAT_COLOR_PALETTE = ['#52C41A','#FF4D4F','#8C8C8C','#1890FF','#722ED1','#FA8C16','#13C2C2','#EB2F96','#5B6CF9','#A0D911','#F5222D','#2F54EB'];
+function openNoteCatEdit(id){
+  _noteCatEditId = id || null;
+  var m = document.getElementById('noteCatEditModal'); if(!m) return;
+  var title = document.getElementById('noteCatEditTitle');
+  var nameInput = document.getElementById('noteCatEditName');
+  var picker = document.getElementById('noteCatColorPicker');
+  if(id){
+    var c = findNoteCat(id); if(!c){ toast('分类不存在'); return; }
+    title.textContent = '编辑分类';
+    nameInput.value = c.name;
+    _noteCatEditColor = c.color;
+  } else {
+    title.textContent = '新增分类';
+    nameInput.value = '';
+    _noteCatEditColor = NOTE_CAT_COLOR_PALETTE[Math.floor(Math.random()*NOTE_CAT_COLOR_PALETTE.length)];
+  }
+  picker.innerHTML = NOTE_CAT_COLOR_PALETTE.map(function(col){
+    return '<span class="note-cat-color-swatch'+(col===_noteCatEditColor?' selected':'')+'" '
+         + 'style="background:'+col+'" data-color="'+col+'" onclick="pickNoteCatColor(this)"></span>';
+  }).join('');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeNoteCatEdit(); };
+  setTimeout(function(){ nameInput.focus(); }, 60);
+}
+function closeNoteCatEdit(){
+  var m = document.getElementById('noteCatEditModal'); if(m) m.style.display = 'none';
+  _noteCatEditId = null;
+}
+function pickNoteCatColor(el){
+  _noteCatEditColor = el.getAttribute('data-color');
+  document.querySelectorAll('.note-cat-color-swatch').forEach(function(s){ s.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+function saveNoteCatEdit(){
+  var name = ((document.getElementById('noteCatEditName')||{}).value||'').trim();
+  if(!name){ toast('请输入分类名称'); return; }
+  if(name.length > 10){ toast('名称最多 10 个字'); return; }
+  var d = getNotes();
+  if(_noteCatEditId){
+    var c = d.cats.find(function(x){ return x.id === _noteCatEditId; });
+    if(!c){ toast('分类不存在'); return; }
+    c.name = name; c.color = _noteCatEditColor;
+    toast('已更新');
+  } else {
+    var existed = d.cats.find(function(x){ return x.name === name; });
+    if(existed){ toast('同名分类已存在'); return; }
+    d.cats.push({ id:'cat_c_'+_uid(), name:name, color:_noteCatEditColor, builtin:false, order:NOTE_DEFAULT_CATS.length+1 });
+    toast('已新增分类');
+  }
+  saveNotes(d);
+  closeNoteCatEdit();
+  renderNotesCatBar(); renderNotesList();
+  var mg = document.getElementById('noteCatMgrModal');
+  if(mg && mg.style.display === 'flex'){ openNoteCatMgr(); }
+}
 function renderNotesList(){
   var d = getNotes();
   var kw = ((document.getElementById('notesSearch')||{}).value||'').trim().toLowerCase();
+  var cats = getNotesCats();
   var list = d.items || [];
+  // v218：分类筛选
+  if(currentNoteCat !== '__all'){
+    list = list.filter(function(n){ return (n.cat || 'cat_other') === currentNoteCat; });
+  }
   if(kw){ list = list.filter(function(n){ return (n.title+' '+n.body).toLowerCase().indexOf(kw)>=0; }); }
   list.sort(function(a,b){ return (b.updated||0)-(a.updated||0); });
   var grid = document.getElementById('notesGrid');
   var label = document.getElementById('notesCountLabel');
   if(!grid) return;
-  if(label) label.textContent = '📝 全部笔记 (' + list.length + ')';
+  // v218：标签显示当前分类名
+  var curCat = (currentNoteCat==='__all') ? null : findNoteCat(currentNoteCat);
+  if(label) label.textContent = '📝 ' + ((curCat && curCat.name) || '全部笔记') + ' (' + list.length + ')';
   if(list.length === 0){
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--text-light)"><div style="font-size:48px;margin-bottom:8px">📝</div><div style="font-size:14px">还没有笔记</div><div style="font-size:12px;margin-top:4px">点击右下角 + 按钮开始记录</div></div>';
+    var emptyHint = (currentNoteCat!=='__all') ? ('该分类下还没有笔记，点击 + 添加') : '点击右下角 + 按钮开始记录';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--text-light)"><div style="font-size:48px;margin-bottom:8px">📝</div><div style="font-size:14px">还没有笔记</div><div style="font-size:12px;margin-top:4px">'+emptyHint+'</div></div>';
     return;
   }
   grid.innerHTML = list.map(function(n){
     var date = n.updated ? new Date(n.updated).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
     var bodyPreview = (n.body||'').replace(/\s+/g,' ').trim().slice(0,120) || '无附加文案';
     var srcTag = n.fromJournal ? ' <span style="font-size:10px;background:#F6FFED;color:#52C41A;padding:1px 6px;border-radius:8px;vertical-align:middle">📒 来自日志</span>' : '';
+    var c = findNoteCat(n.cat||'cat_other');
+    var dot = c ? '<span class="note-cat-dot-on-card" style="background:'+c.color+'"></span>' : '';
     return '<div class="card" style="padding:12px;cursor:pointer;transition:.15s;max-height:145px;overflow:hidden" onclick="viewNoteFull(\''+(n.id||'')+'\')">'+
-      '<div style="font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(n.title||'未命名')+srcTag+'</div>'+
+      '<div style="font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+dot+esc(n.title||'未命名')+srcTag+'</div>'+
       '<div style="font-size:12px;color:var(--text-light);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(bodyPreview)+'</div>'+
       '<div style="font-size:11px;color:var(--text-light);margin-top:6px">'+date+'</div>'+
       '</div>';
   }).join('');
+  // v218：同时刷新一次分类栏计数（防止新增/删除后计数滞后）
+  try{ renderNotesCatBar(); }catch(e){}
 }
 // v140: 笔记卡片点击查看全部内容（固定高度+弹窗）
 function viewNoteFull(id){
@@ -11793,17 +12673,25 @@ function openNoteEditor(id){
   var body = document.getElementById('noteBody');
   var meta = document.getElementById('noteMeta');
   var delBtn = document.getElementById('noteDeleteBtn');
+  var catSel = document.getElementById('noteCatSel');
   if(title) title.value = '';
   if(body) body.value = '';
   if(meta) meta.textContent = '';
   if(delBtn) delBtn.style.display = id ? 'inline-block' : 'none';
   ev.dataset.noteId = id || '';
+  // v218：填充分类下拉
+  if(catSel){
+    var cats = getNotesCats();
+    catSel.innerHTML = cats.map(function(c){ return '<option value="'+c.id+'">'+esc(c.name)+'</option>'; }).join('');
+    catSel.value = currentNoteCat && currentNoteCat !== '__all' ? currentNoteCat : 'cat_other';
+  }
   if(id){
     var d = getNotes();
     var n = (d.items||[]).find(function(x){ return x.id === id; });
     if(n){
       if(title) title.value = n.title || '';
       if(body) body.value = n.body || '';
+      if(catSel) catSel.value = n.cat || 'cat_other';
       var dt = n.updated ? new Date(n.updated) : new Date();
       var count = (n.body||'').length + (n.title||'').length;
       if(meta) meta.textContent = dt.toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) + ' | ' + count + '字';
@@ -11822,14 +12710,15 @@ function saveNote(){
   var title = ((document.getElementById('noteTitle')||{}).value||'').trim();
   var body = ((document.getElementById('noteBody')||{}).value||'').trim();
   if(!title && !body){ toast('标题和内容不能都为空'); return; }
+  var cat = ((document.getElementById('noteCatSel')||{}).value||'') || 'cat_other';  // v218：分类
   var d = getNotes();
   if(!d.items) d.items = [];
   var now = Date.now();
   if(id){
     var idx = d.items.findIndex(function(x){ return x.id === id; });
-    if(idx >= 0){ d.items[idx].title = title; d.items[idx].body = body; d.items[idx].updated = now; }
+    if(idx >= 0){ d.items[idx].title = title; d.items[idx].body = body; d.items[idx].cat = cat; d.items[idx].updated = now; }
   } else {
-    d.items.unshift({ id: _uid(), title: title, body: body, created: now, updated: now });
+    d.items.unshift({ id: _uid(), title: title, body: body, cat: cat, created: now, updated: now });
   }
   saveNotes(d);
   closeNoteEditor();
