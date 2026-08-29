@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v224-cachebust: 客户中心「人员」筛选——普通用户(非管理员)整栏隐藏(display:none + 清空 + _clState.person 重置为 all 防误过滤)，仅见自己 ownerUid 客户；管理员保留全部人员下拉筛选(wbAllAccounts 排除 admin) -->
+<!-- v225-cachebust: 待办「📅 预约回访」列表只显示三档客户——逾期(早于今天)/今天/明天(本地时区 tdCalLocalToday+1)，更久之后的预约不再显示；新增橙色「明天」徽章；排序 今天>逾期>明天>日期升序；此前显示所有有 apptDate 的客户 -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -6261,28 +6261,37 @@ function toggleTodo(el) {
   textEl.style.color = isDone ? 'var(--text-light)' : 'var(--text-primary)';
 }
 // 预约客户 → 待办展示（客户设置了「下次需要联系的日期」后，自动出现在待办里）
+// v225：只显示「逾期 / 今天 / 明天」的客户，更久之后的预约不打扰日常
 function renderAppointmentsTodos(){
   var box = document.getElementById('apptTodoBox'); if(!box) return;
   var list = getClients();
-  var today = _today();
+  var today = tdCalLocalToday();
+  // 明天（本地时区）
+  var t = new Date(); t.setDate(t.getDate()+1);
+  var p2 = function(n){ return (n<10?'0':'')+n; };
+  var tomorrow = t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate());
   var appts = list.filter(function(c){
-    return c.apptDate;
+    if(!c.apptDate) return false;
+    // 仅保留：逾期(早于今天) / 今天 / 明天
+    return c.apptDate < today || c.apptDate === today || c.apptDate === tomorrow;
   }).map(function(c){
-    var overdue = c.apptDate && c.apptDate < today;
+    var overdue = c.apptDate < today;
     var isToday = c.apptDate === today;
-    return { c:c, overdue:overdue, isToday:isToday };
+    var isTmrw = c.apptDate === tomorrow;
+    return { c:c, overdue:overdue, isToday:isToday, isTmrw:isTmrw };
   });
-  // 排序：今天的优先，其次逾期未处理，再按日期升序
+  // 排序：今天的优先，其次逾期未处理，再次明天，再按日期升序
   appts.sort(function(a,b){
     if(a.isToday!==b.isToday) return a.isToday?-1:1;
     if(a.overdue!==b.overdue) return a.overdue?-1:1;
+    if(a.isTmrw!==b.isTmrw) return a.isTmrw?-1:1;
     return (a.c.apptDate||'').localeCompare(b.c.apptDate||'');
   });
   if(appts.length===0){ box.innerHTML=''; box.style.display='none'; return; }
   box.style.display='block';
   box.innerHTML = '<div style="font-size:13px;font-weight:600;color:#EB2F96;margin:0 0 8px 2px">📅 预约回访（'+appts.length+'）</div>' + appts.map(function(o){
     var c=o.c;
-    var badge = o.isToday ? '<span style="font-size:10px;background:#EB2F96;color:#fff;padding:1px 7px;border-radius:8px;margin-left:6px">今天</span>' : (o.overdue?'<span style="font-size:10px;background:#C62828;color:#fff;padding:1px 7px;border-radius:8px;margin-left:6px">逾期</span>':'');
+    var badge = o.isToday ? '<span style="font-size:10px;background:#EB2F96;color:#fff;padding:1px 7px;border-radius:8px;margin-left:6px">今天</span>' : (o.isTmrw?'<span style="font-size:10px;background:#FF9800;color:#fff;padding:1px 7px;border-radius:8px;margin-left:6px">明天</span>' : (o.overdue?'<span style="font-size:10px;background:#C62828;color:#fff;padding:1px 7px;border-radius:8px;margin-left:6px">逾期</span>':''));
     return '<div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border-left:3px solid #EB2F96">'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:14px;font-weight:600">📞 联系 '+esc(c.name)+badge+'</div>'+
@@ -9390,13 +9399,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 224;                         // v224：客户中心人员筛选——普通用户（非管理员）隐藏「👥 人员」整栏（仅见自己客户，人员维度无意义）；管理员保留全部人员筛选；非管理员 person 状态重置为 all 防误过滤
+const WB_VERSION = 225;                         // v225：待办「预约回访」只显示逾期/今天/明天三档客户（本地时区 tdCalLocalToday），更久之后的不再打扰；明天新增橙色「明天」徽章；排序 今天>逾期>明天>日期升序
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 141;                 // v224 发版：140→141
+const WB_DISPLAY_VERSION = 142;                 // v225 发版：141→142
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
