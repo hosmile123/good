@@ -24,6 +24,7 @@
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
+<!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -2299,6 +2300,12 @@ function renderAdminPanel(){
   box.innerHTML = accs.map(function(a){
     var isAdmin = a.role==='admin';
     var expChk = (a.exportEnabled||isAdmin) ? 'checked' : '';
+    var bk = (localStorage.getItem('wb_bkpref_' + a.email) || 'auto');
+    var bkSel = '<select onchange="setAccountBackend(\''+a.email+'\', this.value)" title="该账号优先使用的后端（双写始终开启，切换不影响数据与跨平台同步）" style="font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:8px;color:#333;background:#fff;flex-shrink:0;max-width:140px">'
+      + '<option value="auto"'+('auto'===bk?' selected':'')+'>自动(双写)</option>'
+      + '<option value="scf"'+('scf'===bk?' selected':'')+'>优先SCF</option>'
+      + '<option value="supa"'+('supa'===bk?' selected':'')+'>优先Supa</option>'
+      + '</select>';
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #f3f4f6">'
       + '<div style="font-size:22px;flex-shrink:0">'+esc(a.avatar||'👤')+'</div>'
       + '<div style="flex:1;min-width:0">'
@@ -2306,9 +2313,17 @@ function renderAdminPanel(){
       +   '<div style="font-size:11px;color:#999;margin-top:2px">'+esc(a.email)+(isAdmin?' · 管理员':' · 人员')+'</div>'
       + '</div>'
       + '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;white-space:nowrap;flex-shrink:0">导出<input type="checkbox" '+(isAdmin?'disabled ':'')+expChk+' onchange="toggleAccountExport(\''+a.email+'\', this.checked)"></label>'
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0"><span style="font-size:10px;color:#aaa">后端</span>'+bkSel+'</div>'
       + (isAdmin?'':'<button class="btn btn-outline btn-sm" style="color:#ff4d4f;border-color:#ffccc7;flex-shrink:0" onclick="deleteAccount(\''+a.email+'\')">删除</button>')
       + '</div>';
   }).join('');
+}
+function setAccountBackend(email, mode){
+  try { localStorage.setItem('wb_bkpref_' + email, mode); } catch(e){}
+  // 若正在设置的就是当前登录账号，立即对当前会话生效（其余账号在各自登录时读取）
+  if(email === WB_SESSION) wbApplyBackendPref(email);
+  var label = (mode==='auto') ? '自动双写（SCF优先）' : (mode==='scf' ? '优先腾讯云 SCF' : '优先 Supabase');
+  toast('已设置 '+email+' 的后端：'+label);
 }
 function setAccountNick(inp){ var email=inp.getAttribute('data-email'); wbUpdateAccount(email, {nick: inp.value.trim()||email}); toast('已备注昵称：'+inp.value.trim()); }
 function toggleAccountExport(email, on){ wbUpdateAccount(email, {exportEnabled: on}); }
@@ -8579,13 +8594,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 215;                         // v215：同步可见化+大体积数据 gzip 压缩上传(storeGz)+放宽 1MB 上限——根治"静默不同步/完全没变化"（413 上限/离线回退看不见原因）
+const WB_VERSION = 216;                         // v216：账号管理新增「后端切换」——按账号设置优先后端(自动双写/优先SCF/优先Supabase)，仅改变读写优先级，双写永远开启，不影响功能与跨平台同步；同步徽标固定在首页首行居中
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 132;                 // v214 发版：131→132
+const WB_DISPLAY_VERSION = 133;                 // v216 发版：132→133
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -8619,7 +8634,7 @@ const API_BASE = (function(){
 // 两后端共用同一 JWT 签名密钥，前端只存一个 wb_token，两端都能验证。
 // 备用后端已上线（https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api），
 // 可用 localStorage 的 wb_api_base_supa 覆盖（便于调试/切换）。
-const API_BACKENDS = (function(){
+let API_BACKENDS = (function(){
   var list = [{ id:'scf', url: API_BASE }];
   try {
     var supa = localStorage.getItem('wb_api_base_supa') || 'https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api';
@@ -8627,6 +8642,19 @@ const API_BACKENDS = (function(){
   } catch(e){}
   return list;
 })();
+// v216：备份完整后端列表——双写必须始终包含所有后端，顺序重排不影响双写（永不丢数据）
+let _WB_ALL_BACKENDS = API_BACKENDS.slice();
+// 按账号偏好重排后端顺序：把偏好后端放到 [0]（优先读 + 首个写入），其余后端仍双写。
+//   双写始终开启，因此切换「优先后端」既不会丢数据，也不会影响跨平台同步（两端始终持有完整副本）。
+//   mode: 'auto'(默认,SCF优先) | 'scf'(腾讯云SCF优先) | 'supa'(Supabase优先)
+function wbApplyBackendPref(email){
+  try {
+    var mode = (email && localStorage.getItem('wb_bkpref_' + email)) || 'auto';
+    var all = _WB_ALL_BACKENDS.slice();
+    all.sort(function(a,b){ return (mode==='supa' ? (a.id==='supa'?-1:1) : (a.id==='scf'?-1:1)); });
+    API_BACKENDS = all;
+  } catch(e){}
+}
 let API_TOKEN = localStorage.getItem('wb_token') || '';
 
 // 单次请求（带 SERVER_OFFLINE 语义化：非 JSON 响应/网络错误/JSON 解析失败 → 视为后端不可用）
@@ -12081,6 +12109,7 @@ async function wbLoginOK(user, fromCloud){
   if(!API_TOKEN){ _wbSyncSet('offline','本地模式（未连接云端，数据仅存本机）'); }
   WB_SESSION = user;
   localStorage.setItem('wb_session', user);
+  wbApplyBackendPref(user); // v216：按本账号偏好重排后端顺序（双写不变）
   // 会话有效期：区分设备。手机 → 持久登录 180 天；电脑 / 平板 → 仅当天有效，次日 0 点强制退出重登。
   var _ua = navigator.userAgent || '';
   var _phone = /iPhone|iPod|Android.*Mobile|Windows Phone|BlackBerry/i.test(_ua);
@@ -12800,7 +12829,7 @@ function wbEnsureSyncBadge(){
   try{
     var el = document.createElement('div');
     el.id = 'wbSyncBadge';
-    el.style.cssText = 'position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:99999;';
+    el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:99999;';
     document.body.appendChild(el);
     _wbSyncSet('init','');
   }catch(e){}
@@ -13768,6 +13797,7 @@ function boot(){
   if(sess && sessExp > Date.now()){
     // 会话有效，自动恢复（无需重新登录）
     WB_SESSION = sess;
+    wbApplyBackendPref(sess); // v216：按本账号偏好重排后端顺序（双写不变）
     wbRestore(sess);
     wbApplyProfile(sess);
     wbShowOverlay(false);
