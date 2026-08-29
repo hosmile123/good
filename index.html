@@ -28,6 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
+<!-- v220-cachebust: 作息表环形钟美版——仿参考图：24主刻度(每小时)+96次刻度(每15min)+12个2h数字标签(00/02/.../22)+slot弧内嵌分类文字(旋转贴合弧线)+按当前时间角动态定位红线/红圈/红pill -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -680,9 +681,13 @@ body.sb-collapsed .sidebar-item:hover::after {
 .rt-sched-legend .leg-item { display: flex; align-items: center; gap: 4px; }
 .rt-sched-legend .leg-dot { width: 8px; height: 8px; border-radius: 50%; }
 .rt-sched-now-tag {
-  position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
-  background: #ff4d4f; color: #fff; font-size: 10px; padding: 2px 6px;
-  border-radius: 10px; font-weight: 700; box-shadow: 0 2px 6px rgba(255,77,79,.35);
+  position: absolute; display: none;
+  background: #ff4d4f; color: #fff; font-size: 11px; font-weight: 700;
+  padding: 3px 8px; border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(255,77,79,.35);
+  white-space: nowrap; pointer-events: none;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  letter-spacing: .3px;
 }
 
 .rt-sched-timeline {
@@ -9376,13 +9381,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 219;                         // v219：删除待办日志subtab / 月历chip联动 / 笔记字体颜色+加粗 / 作息表环形钟+时间轴 / 倒数日详情页(BIRTHDAY标签+人生进度+记忆时间轴+⋯菜单)
+const WB_VERSION = 220;                         // v220：作息表环形钟美版（密刻度+每2h标签+弧内分类文字+显著当前时间红线/红点/红pill，按当前时间角动态定位）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 136;                 // v219 发版：135→136
+const WB_DISPLAY_VERSION = 137;                 // v220 发版：136→137
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12323,63 +12328,120 @@ function rtSchedRenderList(){
   // 排序
   daySlots.sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
 
-  // 3) 渲染环形钟 SVG
+  // 3) 渲染环形钟 SVG — v220 仿参考图（密刻度+2小时标签+弧内分类标签+显著当前时间）
   var W = 240, cx = 120, cy = 120;
-  var rOut = 105, rIn = 70;
-  var catColor = { life:'#FFC107', work:'#FF8C42', sleep:'#4A90E2', study:'#9B59B6', exercise:'#52C41A', other:'#999' };
+  var rLabel = 120;        // hour labels
+  var rTickOut = 116;      // major tick outer
+  var rTickIn = 108;       // major tick inner
+  var rMinorOut = 113;     // minor tick outer
+  var rMinorIn = 110;      // minor tick inner
+  var rOut = 104;          // color band outer
+  var rIn = 82;            // color band inner
+  var rMid = 93;           // category text position
+  var catColor = { life:'#F5C24A', work:'#FF8C42', sleep:'#5B9CF6', study:'#9B7BD8', exercise:'#4EBE6B', other:'#A0A0A0' };
+  var catIcon  = { life:'🏠', work:'💼', sleep:'😴', study:'📚', exercise:'🏃', other:'🎯' };
+  var catName  = { life:'生活', work:'工作', sleep:'睡眠', study:'学习', exercise:'健康', other:'其他' };
   var svgParts = [];
-  // 底圈
-  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rOut+'" fill="#f6f7fa" stroke="#e8eaf0" stroke-width="1"/>');
-  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rIn+'" fill="#fff" stroke="#f0f2f5" stroke-width="1"/>');
-  // 小时刻度（4 个主刻度 0/6/12/18）
-  [0,6,12,18].forEach(function(h){
-    var a = h/24*Math.PI*2 - Math.PI/2;
-    var x1 = cx + (rOut-0)*Math.cos(a);
-    var y1 = cy + (rOut-0)*Math.sin(a);
-    var x2 = cx + (rOut+6)*Math.cos(a);
-    var y2 = cy + (rOut+6)*Math.sin(a);
-    var lx = cx + (rOut+18)*Math.cos(a);
-    var ly = cy + (rOut+18)*Math.sin(a);
-    svgParts.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#999" stroke-width="1.5"/>');
-    svgParts.push('<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" font-size="11" fill="#999" text-anchor="middle" dominant-baseline="middle" font-weight="600">'+String(h).padStart(2,'0')+'</text>');
-  });
-  // 24 个小刻度
-  for(var h2=0;h2<24;h2++){
-    if([0,6,12,18].indexOf(h2)>=0) continue;
-    var a2 = h2/24*Math.PI*2 - Math.PI/2;
-    var x1 = cx + (rOut-0)*Math.cos(a2);
-    var y1 = cy + (rOut-0)*Math.sin(a2);
-    var x2 = cx + (rOut+3)*Math.cos(a2);
-    var y2 = cy + (rOut+3)*Math.sin(a2);
-    svgParts.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#bbb" stroke-width="0.5"/>');
-  }
-  // slot 弧
+
+  // 合并相邻同 cat 的 slot
+  var merged = [];
   daySlots.forEach(function(sl){
     var p = rtSchedParseTime(sl.start), q = rtSchedParseTime(sl.end);
     if(p===null || q===null) return;
-    if(q<=p) q += 24; // 跨天
-    var a1 = p/(24*60)*Math.PI*2 - Math.PI/2;
-    var a2 = q/(24*60)*Math.PI*2 - Math.PI/2;
+    if(q<=p) q += 24;
+    if(merged.length && merged[merged.length-1].cat===sl.cat && merged[merged.length-1].end===p){
+      merged[merged.length-1].end = q;
+    } else {
+      merged.push({ start:p, end:q, cat:sl.cat });
+    }
+  });
+
+  // 底圈（外环薄圈+内圆薄圈）
+  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rLabel+'" fill="#fafbfc"/>');
+  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rIn+'" fill="#fafbfc"/>');
+
+  // 24 major ticks（每小时）
+  for(var h=0; h<24; h++){
+    var a = h/24*Math.PI*2 - Math.PI/2;
+    var x1 = cx + rTickIn*Math.cos(a);
+    var y1 = cy + rTickIn*Math.sin(a);
+    var x2 = cx + rTickOut*Math.cos(a);
+    var y2 = cy + rTickOut*Math.sin(a);
+    svgParts.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#888" stroke-width="1.2" stroke-linecap="round"/>');
+  }
+  // 96 minor ticks（每 15 分钟）
+  for(var m=0; m<24*4; m++){
+    if(m%4===0) continue;
+    var a2 = m/(24*4)*Math.PI*2 - Math.PI/2;
+    var mx1 = cx + rMinorIn*Math.cos(a2);
+    var my1 = cy + rMinorIn*Math.sin(a2);
+    var mx2 = cx + rMinorOut*Math.cos(a2);
+    var my2 = cy + rMinorOut*Math.sin(a2);
+    svgParts.push('<line x1="'+mx1.toFixed(1)+'" y1="'+my1.toFixed(1)+'" x2="'+mx2.toFixed(1)+'" y2="'+my2.toFixed(1)+'" stroke="#c0c4cc" stroke-width="0.6" stroke-linecap="round"/>');
+  }
+  // hour labels（每 2h：00/02/04/.../22）
+  for(var hh=0; hh<24; hh+=2){
+    var a3 = hh/24*Math.PI*2 - Math.PI/2;
+    var lx = cx + rLabel*Math.cos(a3);
+    var ly = cy + rLabel*Math.sin(a3);
+    svgParts.push('<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" font-size="10" fill="#888" text-anchor="middle" dominant-baseline="middle" font-weight="600" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">'+String(hh).padStart(2,'0')+'</text>');
+  }
+
+  // slot 彩色弧段
+  merged.forEach(function(sl){
+    var a1 = sl.start/(24*60)*Math.PI*2 - Math.PI/2;
+    var a2 = sl.end/(24*60)*Math.PI*2 - Math.PI/2;
     var large = (a2-a1) > Math.PI ? 1 : 0;
     var col = catColor[sl.cat] || catColor.life;
     function pt(r,a){ return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
     var p1 = pt(rOut,a1), p2 = pt(rOut,a2), p3 = pt(rIn,a2), p4 = pt(rIn,a1);
-    svgParts.push('<path d="M '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' A '+rOut+' '+rOut+' 0 '+large+' 1 '+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' L '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' A '+rIn+' '+rIn+' 0 '+large+' 0 '+p4[0].toFixed(1)+' '+p4[1].toFixed(1)+' Z" fill="'+col+'" opacity="0.9"/>');
+    svgParts.push('<path d="M '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' A '+rOut+' '+rOut+' 0 '+large+' 1 '+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' L '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' A '+rIn+' '+rIn+' 0 '+large+' 0 '+p4[0].toFixed(1)+' '+p4[1].toFixed(1)+' Z" fill="'+col+'" opacity="0.95"/>');
   });
+
+  // 弧内分类文字（图标+名称）—— 弧太短的不画
+  merged.forEach(function(sl){
+    var arcLen = (sl.end - sl.start)/(24*60)*Math.PI*2;
+    if(arcLen < 0.18) return;   // < 10° 跳过
+    var aM = ((sl.start+sl.end)/2)/(24*60)*Math.PI*2 - Math.PI/2;
+    var tx = cx + rMid*Math.cos(aM);
+    var ty = cy + rMid*Math.sin(aM);
+    // 旋转：让文字沿弧线方向（切线）；下半圈反转避免倒立
+    var deg = (aM + Math.PI/2) * 180/Math.PI;
+    if(deg > 90 && deg < 270) deg -= 180;
+    svgParts.push('<text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle" transform="rotate('+deg.toFixed(0)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">'+catIcon[sl.cat]+' '+catName[sl.cat]+'</text>');
+  });
+
   clock.innerHTML = svgParts.join('');
 
-  // 4) 当前时间指针（仅今日）
+  // 4) 当前时间（仅今日）—— 红线 + 圆点 + 红色 pill
   if(rtSchedViewDate === todayStr){
     var now = new Date();
     var mins = now.getHours()*60 + now.getMinutes();
     var aN = mins/(24*60)*Math.PI*2 - Math.PI/2;
-    var nx1 = cx + 0*Math.cos(aN), ny1 = cy + 0*Math.sin(aN);
-    var nx2 = cx + rOut*Math.cos(aN), ny2 = cy + rOut*Math.sin(aN);
-    clock.insertAdjacentHTML('beforeend','<line x1="'+nx1.toFixed(1)+'" y1="'+ny1.toFixed(1)+'" x2="'+nx2.toFixed(1)+'" y2="'+ny2.toFixed(1)+'" stroke="#ff4d4f" stroke-width="2"/>');
-    clock.insertAdjacentHTML('beforeend','<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#ff4d4f"/>');
+    // 红线从 rIn 延伸到 rLabel+2
+    var nx1 = cx + (rIn-2)*Math.cos(aN);
+    var ny1 = cy + (rIn-2)*Math.sin(aN);
+    var nx2 = cx + (rLabel+4)*Math.cos(aN);
+    var ny2 = cy + (rLabel+4)*Math.sin(aN);
+    clock.insertAdjacentHTML('beforeend','<line x1="'+nx1.toFixed(1)+'" y1="'+ny1.toFixed(1)+'" x2="'+nx2.toFixed(1)+'" y2="'+ny2.toFixed(1)+'" stroke="#ff4d4f" stroke-width="2.2" stroke-linecap="round"/>');
+    // 红圆点（落在彩色环外缘上）
+    var dx = cx + rOut*Math.cos(aN);
+    var dy = cy + rOut*Math.sin(aN);
+    clock.insertAdjacentHTML('beforeend','<circle cx="'+dx.toFixed(1)+'" cy="'+dy.toFixed(1)+'" r="4" fill="#fff" stroke="#ff4d4f" stroke-width="2.2"/>');
+    // 中心小红点
+    clock.insertAdjacentHTML('beforeend','<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff4d4f"/>');
+    // HTML pill 定位
     if(nowTag){
       nowTag.style.display = 'block';
-      nowTag.textContent = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+      nowTag.textContent = '◀ ' + String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+      // 计算 pill 在容器中的位置（容器 240x240，svg 居中 240x240）
+      // 红色 pill 中心放在弧外侧 r ~ 138，映射回容器 0-240 坐标
+      var px = cx + 138*Math.cos(aN);
+      var py = cy + 138*Math.sin(aN);
+      nowTag.style.left = (px - 38) + 'px';   // 估算 pill 宽 76
+      nowTag.style.top  = (py - 13) + 'px';   // 高 26
+      // 转 18 点方向（左侧）时箭头朝右；其他位置时调箭头方向
+      // 简化：固定左指
     }
   } else {
     if(nowTag) nowTag.style.display = 'none';
