@@ -27,6 +27,7 @@
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
+<!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -561,6 +562,20 @@ body.sb-collapsed .sidebar-item:hover::after {
   margin-right: 5px; vertical-align: middle;
 }
 
+/* v219: 笔记字体颜色/加粗 */
+.note-color-swatch {
+  display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent; transition: .15s;
+  position: relative; box-sizing: border-box;
+}
+.note-color-swatch.default { background: #fff; border-color: #ddd; }
+.note-color-swatch.active { border-color: #222; transform: scale(1.12); }
+.note-color-swatch:not(.default).active::after {
+  content: ''; position: absolute; inset: 4px; border-radius: 50%;
+  border: 2px solid #fff;
+}
+#noteBoldBtn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
 /* ===== v218: 生活习惯·作息表 ===== */
 .rt-schedule-list { display: flex; flex-direction: column; gap: 10px; }
 .rt-schedule-card {
@@ -611,6 +626,121 @@ body.sb-collapsed .sidebar-item:hover::after {
 }
 .rt-day-pick .day-btn.on {
   background: var(--primary); color: #fff;
+}
+
+/* ===== v219: 作息表·美版（环形钟+时间轴） ===== */
+.rt-sched-week {
+  display: flex; align-items: center; gap: 6px; margin: 4px 0 14px;
+}
+.rt-sched-week .rt-week-btn {
+  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+  background: #fff; color: #666; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.rt-sched-strip {
+  display: flex; gap: 6px; flex: 1; overflow-x: auto; scrollbar-width: none;
+}
+.rt-sched-strip::-webkit-scrollbar { display: none; }
+.rt-day-pill {
+  flex: 1; min-width: 42px; padding: 8px 4px; border-radius: 14px;
+  background: #f6f7fa; color: #666; text-align: center;
+  cursor: pointer; transition: .15s; flex-shrink: 0;
+  border: 1.5px solid transparent;
+}
+.rt-day-pill .rt-pill-dow { font-size: 10px; opacity: .8; }
+.rt-day-pill .rt-pill-day { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.rt-day-pill .rt-pill-sub { font-size: 9px; color: #aaa; margin-top: 1px; }
+.rt-day-pill.today { background: linear-gradient(135deg, #52C41A, #95DE64); color: #fff; }
+.rt-day-pill.today .rt-pill-sub { color: rgba(255,255,255,.85); }
+.rt-day-pill.sel { border-color: var(--primary); }
+.rt-day-pill:not(.today):not(.sel):hover { background: #eef0f4; }
+.rt-day-pill.sel:not(.today) { background: #e6f7ff; }
+
+.rt-sched-clock-wrap {
+  display: flex; justify-content: center; margin: 6px 0 18px;
+  position: relative;
+}
+.rt-sched-clock {
+  position: relative; width: 240px; height: 240px;
+}
+.rt-sched-clock svg { width: 100%; height: 100%; }
+.rt-sched-clock-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.rt-sched-clock-num { font-size: 56px; font-weight: 800; color: #222; line-height: 1; }
+.rt-sched-clock-label { font-size: 12px; color: #999; margin-top: 4px; }
+.rt-sched-legend {
+  position: absolute; top: 6px; right: -6px;
+  background: #fff; border-radius: 10px; padding: 4px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 10px; color: #555;
+}
+.rt-sched-legend .leg-item { display: flex; align-items: center; gap: 4px; }
+.rt-sched-legend .leg-dot { width: 8px; height: 8px; border-radius: 50%; }
+.rt-sched-now-tag {
+  position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+  background: #ff4d4f; color: #fff; font-size: 10px; padding: 2px 6px;
+  border-radius: 10px; font-weight: 700; box-shadow: 0 2px 6px rgba(255,77,79,.35);
+}
+
+.rt-sched-timeline {
+  position: relative; padding-left: 16px;
+}
+.rt-sched-timeline::before {
+  content: ''; position: absolute; left: 5px; top: 8px; bottom: 8px;
+  width: 2px; background: linear-gradient(180deg, #e8eaf0 0%, #f0f2f5 100%);
+  border-radius: 2px;
+}
+.rt-sched-event {
+  position: relative; margin-bottom: 14px; padding-left: 18px;
+}
+.rt-sched-event .rt-ev-dot {
+  position: absolute; left: -16px; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #ddd;
+}
+.rt-sched-event .rt-ev-time {
+  font-size: 11px; color: #999; font-weight: 600; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.rt-sched-event .rt-ev-time .rt-ev-dur { color: #bbb; font-weight: 500; }
+.rt-sched-event .rt-ev-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+  cursor: pointer; transition: .15s;
+}
+.rt-sched-event .rt-ev-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+.rt-sched-event .rt-ev-card:active { transform: scale(0.99); }
+.rt-sched-event .rt-ev-icon {
+  width: 36px; height: 36px; border-radius: 10px; display: flex;
+  align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+}
+.rt-sched-event .rt-ev-body { flex: 1; min-width: 0; }
+.rt-sched-event .rt-ev-title { font-size: 14px; font-weight: 600; color: #222; }
+.rt-sched-event .rt-ev-meta { font-size: 11px; color: #999; margin-top: 2px; }
+.rt-sched-event .rt-ev-arrow { color: #ccc; font-size: 14px; }
+.rt-sched-empty {
+  text-align: center; padding: 24px 0; color: #bbb; font-size: 13px;
+}
+.rt-sched-toolbar {
+  display: flex; gap: 8px; margin-top: 14px; padding: 8px 0 4px;
+  border-top: 1px dashed #e8eaf0;
+}
+.rt-sched-toolbar button {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+  background: #fff; font-size: 13px; font-weight: 600; color: #555;
+  cursor: pointer; transition: .15s;
+}
+.rt-sched-toolbar button:hover { background: #f6f7fa; }
+.rt-sched-toolbar button.primary {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.rt-sched-toolbar button.primary:hover { background: #3B5BDB; }
+/* slot 编辑器加 cat 选择 */
+.rt-slot-cat {
+  font-size: 11px; padding: 2px 4px; border: 1px solid #e8eaf0;
+  border-radius: 6px; background: #fff; cursor: pointer;
 }
 
 /* ===== v218: 待办月历 ===== */
@@ -682,6 +812,12 @@ body.sb-collapsed .sidebar-item:hover::after {
   font-size: 9px; padding: 1px 3px; border-radius: 3px;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-weight: 600;
+}
+.td-cal-chip.done {
+  text-decoration: line-through;
+  opacity: .42;
+  filter: grayscale(1);
+  font-weight: 500;
 }
 .td-cal-more {
   font-size: 8px; color: #999; padding: 0 2px;
@@ -2583,7 +2719,6 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('td',this,'td-list')">待办</button>
-    <button class="subtab" onclick="switchSub('td',this,'td-journal')">日志</button>
     <button class="subtab" onclick="switchSub('td',this,'td-cal')">📅 日历</button>
   </div>
 
@@ -2626,31 +2761,6 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div class="todo-item" data-cat="佣金待结算" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">核对 7 月佣金明细，提交流水结算申请</div><div class="todo-meta">2026-08-05</div></div><span class="todo-cat-tag" style="background:#FFF7E6;color:#FA8C16">佣金待结算</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
     </div>
     <p style="text-align:center;color:var(--text-light);font-size:12px;margin-top:12px">完成的每一项，都是业绩的基石</p>
-  </div>
-
-  <!-- 日志 -->
-  <div class="subtab-content" id="td-journal">
-    <div style="display:flex;gap:0;margin-bottom:16px;background:#F5F5F5;border-radius:24px;padding:3px">
-      <button style="flex:1;padding:8px 16px;border:none;background:var(--primary);color:white;border-radius:21px;font-size:14px;cursor:pointer;font-weight:500">随笔记录</button>
-      <button style="flex:1;padding:8px 16px;border:none;background:transparent;color:var(--text-secondary);border-radius:21px;font-size:14px;cursor:pointer">快速打卡</button>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">✏️ 今日随笔</div><span style="font-size:12px;color:var(--primary);font-weight:600">B 加粗</span></div>
-      <textarea class="journal-textarea" id="journalText" placeholder="在这里记录今日工作事项、客户反馈、市场信息..."></textarea>
-      <div class="journal-mood">
-        <button class="mood-btn selected" onclick="selectMood(this)">😊 平静</button>
-        <button class="mood-btn" onclick="selectMood(this)">🔥 开心</button>
-        <button class="mood-btn" onclick="selectMood(this)">😤 疲惫</button>
-        <button class="mood-btn" onclick="selectMood(this)">💡 迷茫</button>
-      </div>
-      <div style="display:flex;gap:8px">
-        <input type="date" id="logDate" style="flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px">
-        <button class="btn-primary" style="border-radius:10px" onclick="saveJournal()">保存</button>
-      </div>
-      <p style="font-size:11px;color:var(--text-light);margin-top:8px">保存随笔将自动记入当日工作日志</p>
-    </div>
-    <div class="section-label">📁 过往记录</div>
-    <div class="card" id="journalList"><div class="empty-state"><div class="icon">📒</div><p>写下今日的收获与复盘。<br>在这里记录工作事项、客户反馈，<br>不必刻意长篇大论。</p></div></div>
   </div>
 
   <!-- 月历 -->
@@ -2912,14 +3022,44 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <div class="card" style="padding:0" id="weightList"></div>
   </div>
 
-  <!-- v218: 作息表 子标签 -->
+  <!-- v219: 作息表·美版（环形钟+时间轴） -->
   <div class="subtab-content" id="rt-schedule">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:14px;color:var(--text-secondary)">📋 一份作息表 = 标题 + 一周生效日 + 一组时间段（起止 / 名称 / 启用）</div>
-      <button class="badge-btn" onclick="openRtScheduleLib()" style="background:#FFF3E0;color:#E65100;border:1px solid #FFD7B0">📚 作息库</button>
+      <div id="rtSchedDayTitle" style="font-size:16px;font-weight:700;color:var(--text-primary)">今日 · 0 个日程</div>
+      <div style="display:flex;gap:6px">
+        <button class="badge-btn" onclick="rtSchedGoToday()" style="background:#F6FFED;color:#52C41A;border:1px solid #B7EB8F">📍 就是今天</button>
+        <button class="badge-btn" onclick="openRtScheduleLib()" style="background:#FFF3E0;color:#E65100;border:1px solid #FFD7B0">📚 作息库</button>
+      </div>
     </div>
-    <div id="rtSchedList" class="rt-schedule-list"></div>
-    <button class="btn-primary" style="width:100%;margin-top:14px;background:var(--primary)" onclick="openRtScheduleEdit()">＋ 新建作息表</button>
+
+    <!-- 周日期条 -->
+    <div class="rt-sched-week">
+      <button class="rt-week-btn" onclick="rtSchedWeek(-1)">‹</button>
+      <div class="rt-sched-strip" id="rtSchedStrip"></div>
+      <button class="rt-week-btn" onclick="rtSchedWeek(1)">›</button>
+    </div>
+
+    <!-- 24小时环形钟 -->
+    <div class="rt-sched-clock-wrap">
+      <div class="rt-sched-clock">
+        <svg id="rtSchedClock" viewBox="0 0 240 240"></svg>
+        <div class="rt-sched-clock-center">
+          <div class="rt-sched-clock-num" id="rtSchedCount">0</div>
+          <div class="rt-sched-clock-label">个日程</div>
+        </div>
+        <div class="rt-sched-legend" id="rtSchedLegend"></div>
+        <div class="rt-sched-now-tag" id="rtSchedNowTag" style="display:none">--:--</div>
+      </div>
+    </div>
+
+    <!-- 时间轴列表 -->
+    <div class="rt-sched-timeline" id="rtSchedTimeline"></div>
+
+    <!-- 底部工具条 -->
+    <div class="rt-sched-toolbar">
+      <button onclick="openRtScheduleEdit()" class="primary">＋ 新建作息表</button>
+      <button onclick="openRtScheduleLib()">📚 作息库</button>
+    </div>
   </div>
 </div>
 
@@ -3806,6 +3946,80 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     .dm-empty { text-align:center; color:#999; padding:50px 20px; font-size:14px; }
     .dm-fab { position:fixed; right:16px; bottom:max(16px, env(safe-area-inset-bottom)); width:52px; height:52px; border-radius:50%; background:#1976d2; color:#fff; font-size:28px; border:none; box-shadow:0 3px 8px rgba(0,0,0,.18); z-index:1000; cursor:pointer; }
     @media (max-width:768px){ .dm-fab { bottom: calc(env(safe-area-inset-bottom) + 74px); } }
+
+    /* v219: 倒数日详情页 */
+    .dm-detail-mask { position:fixed; inset:0; background:#f7f3ec; z-index:2000; display:none; flex-direction:column; }
+    .dm-detail-mask.open { display:flex; }
+    .dm-d-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:transparent; }
+    .dm-d-back { color:#7B61FF; font-size:16px; font-weight:600; cursor:pointer; padding:6px 4px; background:none; border:none; }
+    .dm-d-more { width:32px; height:32px; border-radius:50%; background:transparent; color:#999; font-size:22px; line-height:1; cursor:pointer; border:none; }
+    .dm-d-body { padding:0 16px 80px; overflow-y:auto; flex:1; }
+    .dm-d-hero {
+      position:relative; background:linear-gradient(135deg,#F5E6B8 0%,#FAEBC8 50%,#F5DDB3 100%);
+      border-radius:24px; padding:24px 22px 22px; overflow:hidden;
+      box-shadow: 0 6px 18px rgba(180,150,80,.18);
+    }
+    .dm-d-hero::before {
+      content:''; position:absolute; right:-40px; top:-40px; width:180px; height:180px;
+      border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 70%);
+      pointer-events:none;
+    }
+    .dm-d-tag-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; position:relative; }
+    .dm-d-tag { display:inline-block; padding:4px 12px; border-radius:14px; font-size:11px; font-weight:700; letter-spacing:1.2px; }
+    .dm-d-tag.file { background:rgba(212,180,110,.22); color:#A07B30; }
+    .dm-d-tag.age { background:rgba(255,255,255,.55); color:#8B5A1A; }
+    .dm-d-title { font-size:30px; font-weight:800; color:#2E2418; margin-bottom:6px; position:relative; }
+    .dm-d-days-row { display:flex; align-items:baseline; gap:6px; margin:8px 0 4px; position:relative; }
+    .dm-d-days-num { font-size:64px; font-weight:900; color:#B8902A; line-height:1; letter-spacing:-1px; }
+    .dm-d-days-unit { font-size:18px; color:#B8902A; font-weight:600; }
+    .dm-d-sub { font-size:12px; color:#8B7340; margin:8px 0 14px; position:relative; }
+    .dm-d-pill-row { display:flex; gap:8px; flex-wrap:wrap; position:relative; }
+    .dm-d-pill { padding:4px 10px; background:rgba(255,255,255,.6); color:#5A4520; border-radius:12px; font-size:12px; font-weight:500; }
+    .dm-d-age-block { margin-top:18px; padding:14px 16px; background:rgba(255,255,255,.55); border-radius:14px; position:relative; }
+    .dm-d-age-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+    .dm-d-age-label { font-size:12px; color:#8B7340; font-weight:600; }
+    .dm-d-age-pct { font-size:12px; color:#B8902A; font-weight:700; }
+    .dm-d-age-decimal { font-size:18px; font-weight:700; color:#3A2C18; }
+    .dm-d-age-decimal .dm-d-age-unit { font-size:12px; color:#8B7340; font-weight:500; margin-left:2px; }
+    .dm-d-age-bar { position:relative; height:6px; background:rgba(180,150,80,.18); border-radius:3px; margin-top:10px; overflow:hidden; }
+    .dm-d-age-bar-fill { position:absolute; left:0; top:0; height:100%; background:linear-gradient(90deg,#D4B46E,#B8902A); border-radius:3px; transition:width .35s; }
+    .dm-d-age-bar-tick { position:absolute; top:-4px; width:1px; height:14px; background:rgba(180,150,80,.4); }
+    .dm-d-age-tick-row { display:flex; justify-content:space-between; font-size:11px; color:#A07B30; margin-top:6px; }
+    .dm-d-memory-section { margin-top:24px; }
+    .dm-d-memory-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .dm-d-memory-title { font-size:16px; font-weight:700; color:#2E2418; }
+    .dm-d-memory-add-link { color:#7B61FF; font-size:13px; font-weight:600; cursor:pointer; background:none; border:none; padding:0; }
+    .dm-d-memory-empty {
+      background:#fff; border-radius:18px; padding:24px 22px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.04);
+    }
+    .dm-d-memory-empty-title { font-size:15px; font-weight:600; color:#2E2418; margin-bottom:6px; }
+    .dm-d-memory-empty-text { font-size:13px; color:#8B7340; line-height:1.6; margin-bottom:14px; }
+    .dm-d-memory-add-btn {
+      display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:20px;
+      background:linear-gradient(135deg,#A89BFF,#7B61FF); color:#fff; font-size:13px; font-weight:600;
+      border:none; cursor:pointer; box-shadow: 0 2px 8px rgba(123,97,255,.28);
+    }
+    .dm-d-memory-item {
+      background:#fff; border-radius:14px; padding:14px 16px; margin-bottom:10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04); position:relative;
+    }
+    .dm-d-memory-item-date { font-size:11px; color:#A07B30; font-weight:600; margin-bottom:4px; }
+    .dm-d-memory-item-text { font-size:14px; color:#2E2418; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+    .dm-d-memory-item-del { position:absolute; right:10px; top:10px; color:#ccc; font-size:14px; background:none; border:none; cursor:pointer; padding:2px 4px; }
+    .dm-d-menu {
+      position:absolute; right:16px; top:50px; background:#fff; border-radius:12px; padding:6px 0;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12); min-width:140px; z-index:10; display:none;
+    }
+    .dm-d-menu.open { display:block; }
+    .dm-d-menu-item { padding:10px 16px; font-size:14px; color:#333; cursor:pointer; }
+    .dm-d-menu-item:hover { background:#f5f5f5; }
+    .dm-d-menu-item.danger { color:#ff4d4f; }
+    .dm-d-mem-input { width:100%; min-height:80px; padding:10px; border:1px solid #e0d8c8; border-radius:10px; font-size:14px; font-family:inherit; box-sizing:border-box; resize:vertical; }
+    .dm-d-mem-save { display:flex; gap:8px; margin-top:12px; }
+    .dm-d-mem-save button { flex:1; padding:9px; border-radius:10px; border:none; font-size:13px; font-weight:600; cursor:pointer; }
+    .dm-d-mem-save .save { background:#7B61FF; color:#fff; }
+    .dm-d-mem-save .cancel { background:#f0eee8; color:#666; }
   </style>
 
   <script>
@@ -4014,12 +4228,218 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var label=(d===0?'今天':(d<0?'已经':'还有'));
       var col=e.color||DM_COLORS[0];
       var exact = e.showTime ? '<div class="dm-card-exact">'+dmExactDiff(e).text+'</div>' : '';
-      return '<div class="dm-card'+(e.highlight?' hl':'')+'" onclick="dmOpenEditor(\''+e.id+'\')">'+
+      return '<div class="dm-card'+(e.highlight?' hl':'')+'" onclick="dmOpenDetail(\''+e.id+'\')">'+
         '<div class="dm-card-cover" style="background:'+col+'22;color:'+col+'">'+dmEsc(e.emoji||book.icon)+'</div>'+
         '<div class="dm-card-info"><div class="dm-card-title">'+dmEsc(e.title)+'</div>'+
         '<div class="dm-card-date">'+(e.pinned?'📌 ':'')+book.icon+' '+dmEsc(book.name)+' · '+dmDateLabel(e)+'</div></div>'+
         '<div class="dm-card-right" style="background:linear-gradient(135deg,'+col+','+dmShade(col,-38)+')">'+
         '<div class="dm-card-days">'+abs+'</div><div class="dm-card-unit">'+label+'</div>'+exact+'</div></div>';
+    }
+
+    /* ---------- v219: 详情页 ---------- */
+    var dmDetailId = null;
+    var dmMemories = {};   // eventId -> [{id,date,text}]
+    var LS_MEMORIES = 'workbench_daysmatter_memories';
+    function dmLoadMemories(){
+      try{ var r=localStorage.getItem(LS_MEMORIES); if(r) dmMemories=JSON.parse(r); }catch(e){}
+      if(!dmMemories || typeof dmMemories!=='object') dmMemories = {};
+    }
+    function dmSaveMemories(){ try{ localStorage.setItem(LS_MEMORIES, JSON.stringify(dmMemories)); }catch(e){} }
+    function dmGetMemories(id){ return (dmMemories[id]||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }); }
+    function dmIsBirthdayEvent(e){
+      if(!e) return false;
+      if(e.type==='birthday') return true;
+      var n=(e.title||'').toLowerCase();
+      return n.indexOf('生日')>=0 || n.indexOf('birthday')>=0;
+    }
+    function dmAgeProgress(e){
+      if(!e || !e.birthYear || !/^\d{4}$/.test(String(e.birthYear))) return null;
+      var by = parseInt(e.birthYear,10);
+      var md = (e.date||'').match(/^(\d{2,4})-(\d{2})-(\d{2})$/);
+      if(!md) return null;
+      var bm = parseInt(md[2],10)-1, bd = parseInt(md[3],10);
+      var today = new Date();
+      var ty = today.getFullYear(), tm = today.getMonth(), td = today.getDate();
+      var thisYearBirth = new Date(ty, bm, bd);
+      var lastBirth, nextBirth, currentAge, progress;
+      if(today < thisYearBirth){
+        lastBirth = new Date(ty-1, bm, bd);
+        nextBirth = thisYearBirth;
+        currentAge = ty - by - 1;
+      } else {
+        lastBirth = thisYearBirth;
+        nextBirth = new Date(ty+1, bm, bd);
+        currentAge = ty - by;
+      }
+      var totalMs = nextBirth - lastBirth;
+      var passedMs = today - lastBirth;
+      progress = Math.max(0, Math.min(1, passedMs / totalMs));
+      var decimalAge = currentAge + progress;
+      var nextAge = currentAge + 1;
+      return { lastBirth:lastBirth, nextBirth:nextBirth, currentAge:currentAge, nextAge:nextAge, progress:progress, decimalAge:decimalAge };
+    }
+    function dmOpenDetail(id){
+      dmDetailId = id;
+      var e = dmEvents.find(function(x){ return x.id===id; });
+      if(!e){ return; }
+      dmLoadMemories();
+      var book = dmBookById(e.bookId);
+      var nt = dmNextDate(e);
+      var d = nt.days;
+      var abs = Math.abs(d);
+      var label = (d===0?'今天':(d<0?'已经':'还有'));
+      var col = e.color || DM_COLORS[0];
+      var isBirthday = dmIsBirthdayEvent(e);
+      var ageInfo = isBirthday ? dmAgeProgress(e) : null;
+      // 公历/农历标签
+      var ds = e.date || '';
+      var datePill = '<span class="dm-d-pill">'+ds+'</span>';
+      var lunarText = '';
+      try{
+        if(typeof solar2lunar==='function'){
+          var parts = ds.split('-');
+          var lr = solar2lunar(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
+          if(lr) lunarText = '<span class="dm-d-pill">农历 '+lr.monthStr+lr.dayStr+'</span>';
+        }
+      }catch(err){}
+      // 记忆列表
+      var mems = dmGetMemories(id);
+      var memHtml = '';
+      if(mems.length){
+        memHtml = mems.map(function(m){
+          return '<div class="dm-d-memory-item" data-mid="'+m.id+'">'+
+            '<button class="dm-d-memory-item-del" onclick="dmDelMemory(\''+id+'\',\''+m.id+'\')">✕</button>'+
+            '<div class="dm-d-memory-item-date">📅 '+esc(m.date||'')+'</div>'+
+            '<div class="dm-d-memory-item-text">'+esc(m.text||'')+'</div>'+
+            '</div>';
+        }).join('');
+      } else {
+        memHtml = '<div class="dm-d-memory-empty">'+
+          '<div class="dm-d-memory-empty-title">还没有记忆</div>'+
+          '<div class="dm-d-memory-empty-text">把这一天发生的事记下来，<br>礼物、晚餐、对话都能放进来。</div>'+
+          '<button class="dm-d-memory-add-btn" onclick="dmOpenMemoryEditor(\''+id+'\')">＋ 新增记忆</button>'+
+          '</div>';
+      }
+      // 年龄块
+      var ageBlock = '';
+      if(ageInfo){
+        var pct = (ageInfo.progress*100).toFixed(1);
+        ageBlock = '<div class="dm-d-age-block">'+
+          '<div class="dm-d-age-head">'+
+            '<span class="dm-d-age-label">人生进度</span>'+
+            '<span class="dm-d-age-pct">本岁进度 '+pct+'%</span>'+
+          '</div>'+
+          '<div class="dm-d-age-decimal">'+ageInfo.decimalAge.toFixed(8)+' <span class="dm-d-age-unit">岁</span></div>'+
+          '<div class="dm-d-age-bar"><div class="dm-d-age-bar-fill" style="width:'+pct+'%"></div></div>'+
+          '<div class="dm-d-age-tick-row"><span>'+ageInfo.currentAge+'岁</span><span>'+ageInfo.nextAge+'岁</span></div>'+
+        '</div>';
+      }
+      // 主标签（生日时显示 "BIRTHDAY FILE" + 年龄）
+      var tagRowHtml;
+      if(isBirthday && ageInfo){
+        tagRowHtml = '<div class="dm-d-tag-row">'+
+          '<span class="dm-d-tag file">BIRTHDAY FILE</span>'+
+          '<span class="dm-d-tag age">'+ageInfo.nextAge+'岁生日</span>'+
+        '</div>';
+      } else {
+        tagRowHtml = '<div class="dm-d-tag-row">'+
+          '<span class="dm-d-tag file" style="background:'+col+'22;color:'+col+'">'+(book.icon||'📌')+' '+esc((book.name||'').toUpperCase())+'</span>'+
+          '<span class="dm-d-tag age" style="background:'+col+'11;color:'+col+'">'+(e.pinned?'已置顶':'已收藏')+'</span>'+
+        '</div>';
+      }
+      var body = document.getElementById('dm-d-body');
+      body.innerHTML =
+        '<div class="dm-d-hero">'+
+          tagRowHtml +
+          '<div class="dm-d-title">'+esc(e.title||'未命名')+'</div>'+
+          '<div class="dm-d-days-row"><span class="dm-d-days-num">'+abs+'</span><span class="dm-d-days-unit">天</span></div>'+
+          '<div class="dm-d-sub">距离 '+ds+(lunarText?('（'+lunarText.replace(/<[^>]+>/g,'')+'）'):'')+' '+(d<0?'已过':(d===0?'就是今天':'还有'))+'</div>'+
+          '<div class="dm-d-pill-row">'+datePill+lunarText+'</div>'+
+          ageBlock +
+        '</div>'+
+        '<div class="dm-d-memory-section">'+
+          '<div class="dm-d-memory-head">'+
+            '<div class="dm-d-memory-title">记忆时间轴</div>'+
+            (mems.length?'<button class="dm-d-memory-add-link" onclick="dmOpenMemoryEditor(\''+id+'\')">📝 记一笔</button>':'')+
+          '</div>'+ memHtml +
+        '</div>';
+      // 打开
+      var m = document.getElementById('dm-detail'); if(m) m.classList.add('open');
+    }
+    function dmCloseDetail(){
+      var m = document.getElementById('dm-detail'); if(m) m.classList.remove('open');
+      dmDetailId = null;
+      var menu = document.getElementById('dm-d-menu'); if(menu) menu.classList.remove('open');
+    }
+    function dmToggleDetailMenu(ev){
+      if(ev) ev.stopPropagation();
+      var menu = document.getElementById('dm-d-menu'); if(!menu) return;
+      menu.classList.toggle('open');
+    }
+    document.addEventListener('click', function(e){
+      var menu = document.getElementById('dm-d-menu');
+      if(!menu || !menu.classList.contains('open')) return;
+      if(e.target.closest && (e.target.closest('.dm-d-more') || e.target.closest('.dm-d-menu'))) return;
+      menu.classList.remove('open');
+    });
+    function dmDetailEdit(){ dmCloseDetail(); setTimeout(function(){ dmOpenEditor(dmDetailId); }, 80); }
+    function dmDetailDelete(){
+      if(!dmDetailId) return;
+      var e = dmEvents.find(function(x){ return x.id===dmDetailId; });
+      if(!e) return;
+      if(!confirm('确定删除「'+e.title+'」？此操作不可恢复')) return;
+      dmEvents = dmEvents.filter(function(x){ return x.id!==dmDetailId; });
+      dmSaveEvents(); dmCloseDetail(); dmRender();
+    }
+    function dmDetailArchive(){
+      if(!dmDetailId) return;
+      var e = dmEvents.find(function(x){ return x.id===dmDetailId; });
+      if(!e) return;
+      e.archived = !e.archived; if(e.archived) e.hidden = false;
+      dmSaveEvents(); dmCloseDetail(); dmRender();
+      toast(e.archived?'已归档':'已取消归档');
+    }
+    function dmDetailHide(){
+      if(!dmDetailId) return;
+      var e = dmEvents.find(function(x){ return x.id===dmDetailId; });
+      if(!e) return;
+      e.hidden = !e.hidden; if(e.hidden) e.archived = false;
+      dmSaveEvents(); dmCloseDetail(); dmRender();
+      toast(e.hidden?'已隐藏':'已取消隐藏');
+    }
+    function dmOpenMemoryEditor(eid){
+      // 简化：弹一个轻量编辑面板（直接内联）
+      var wrap = document.querySelector('.dm-d-memory-section');
+      if(!wrap) return;
+      var today = new Date(); var ds = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+      var html = '<div class="dm-d-memory-item" style="border:2px solid #7B61FF">'+
+        '<div class="dm-d-memory-item-date">📅 <input type="date" id="dm-mem-date" value="'+ds+'" style="border:none;background:transparent;font-size:11px;font-weight:600;color:#A07B30;outline:none"></div>'+
+        '<textarea id="dm-mem-text" class="dm-d-mem-input" placeholder="写下这天的回忆…"></textarea>'+
+        '<div class="dm-d-mem-save">'+
+          '<button class="save" onclick="dmSaveMemory(\''+eid+'\')">保存</button>'+
+          '<button class="cancel" onclick="dmOpenDetail(\''+eid+'\')">取消</button>'+
+        '</div></div>';
+      // 插入到 section 头部
+      var empty = wrap.querySelector('.dm-d-memory-empty');
+      if(empty) empty.outerHTML = html;
+      else wrap.insertAdjacentHTML('afterbegin', html);
+    }
+    function dmSaveMemory(eid){
+      var date = (document.getElementById('dm-mem-date')||{}).value || '';
+      var text = ((document.getElementById('dm-mem-text')||{}).value || '').trim();
+      if(!text){ toast('请输入内容'); return; }
+      if(!dmMemories[eid]) dmMemories[eid] = [];
+      dmMemories[eid].unshift({ id: 'mem_'+_uid(), date: date, text: text });
+      dmSaveMemories();
+      dmOpenDetail(eid);
+    }
+    function dmDelMemory(eid, mid){
+      if(!confirm('确定删除这条记忆？')) return;
+      if(!dmMemories[eid]) return;
+      dmMemories[eid] = dmMemories[eid].filter(function(m){ return m.id!==mid; });
+      if(!dmMemories[eid].length) delete dmMemories[eid];
+      dmSaveMemories();
+      dmOpenDetail(eid);
     }
     function dmShade(hex,amt){
       var n=parseInt(hex.slice(1),16);
@@ -4051,6 +4471,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var st=document.getElementById('dm-showTime'); if(st) st.checked=!!(ev&&ev.showTime);
       var hl=document.getElementById('dm-highlight'); if(hl) hl.checked=!!(ev&&ev.highlight);
       var tmi=document.getElementById('dm-time'); if(tmi) tmi.value=(ev&&ev.time)||'00:00';
+      var by=document.getElementById('dm-birthYear'); if(by) by.value=(ev&&ev.birthYear)||'';
       dmSetCal(ev?(ev.cal||'solar'):'solar');
       dmUpdateDateText(); dmUpdateBookText(); dmUpdateRepeatText(); dmUpdateColorText(); dmUpdateEmojiText();
       dmToggleTimeRow();
@@ -4105,6 +4526,8 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var date=document.getElementById('dm-date').value;
       if(!title){ alert('请填写事件名称'); return; }
       if(!date){ alert('请选择目标日期'); return; }
+      var birthYearVal = (document.getElementById('dm-birthYear')||{}).value || '';
+      birthYearVal = String(birthYearVal).replace(/\D/g,'').slice(0,4);
       var v={
         title:title, date:date, bookId:dmSelectedBook,
         pinned:document.getElementById('dm-pinned').checked,
@@ -4112,7 +4535,8 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         showTime:document.getElementById('dm-showTime').checked,
         highlight:document.getElementById('dm-highlight').checked,
         time:document.getElementById('dm-time').value||'00:00',
-        color:dmPickedColor, emoji:dmPickedEmoji
+        color:dmPickedColor, emoji:dmPickedEmoji,
+        birthYear: birthYearVal
       };
       if(dmEditingId){
         var ev=dmEvents.find(function(e){ return e.id===dmEditingId; });
@@ -4237,6 +4661,16 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     /* ---------- 导出（显式，避免 eval） ---------- */
     window.dmOpenEditor = dmOpenEditor;
     window.dmCloseEditor = dmCloseEditor;
+    window.dmOpenDetail = dmOpenDetail;
+    window.dmCloseDetail = dmCloseDetail;
+    window.dmToggleDetailMenu = dmToggleDetailMenu;
+    window.dmDetailEdit = dmDetailEdit;
+    window.dmDetailDelete = dmDetailDelete;
+    window.dmDetailArchive = dmDetailArchive;
+    window.dmDetailHide = dmDetailHide;
+    window.dmOpenMemoryEditor = dmOpenMemoryEditor;
+    window.dmSaveMemory = dmSaveMemory;
+    window.dmDelMemory = dmDelMemory;
     window.dmSetCat = dmSetCat;
     window.dmSaveEvent = dmSaveEvent;
     window.dmDelEvent = dmDelEvent;
@@ -4324,6 +4758,11 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         <span class="dm-row-right" id="dm-book-text">❤️ 生活</span>
         <span class="dm-row-arrow">›</span>
       </div>
+      <div class="dm-row" onclick="event.stopPropagation()">
+        <span class="dm-row-icon">🎂</span>
+        <span class="dm-row-label">出生年份（生日填）</span>
+        <input type="number" id="dm-birthYear" placeholder="如 1999" min="1900" max="2100" style="width:90px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;text-align:right;outline:none" onclick="event.stopPropagation()">
+      </div>
       <div class="dm-row">
         <span class="dm-row-icon">📌</span>
         <span class="dm-row-label">置顶</span>
@@ -4390,6 +4829,21 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button class="dm-m-savebtn" onclick="dmSaveEvent()">保存</button>
     </div>
   </div>
+</div>
+
+<!-- v219: 倒数日详情页 -->
+<div class="dm-detail-mask" id="dm-detail" onclick="if(event.target===this)dmCloseDetail()">
+  <div class="dm-d-header">
+    <button class="dm-d-back" onclick="dmCloseDetail()">← 纪念日</button>
+    <button class="dm-d-more" onclick="dmToggleDetailMenu(event)">⋯</button>
+    <div class="dm-d-menu" id="dm-d-menu">
+      <div class="dm-d-menu-item" onclick="dmDetailEdit()">✏️ 编辑</div>
+      <div class="dm-d-menu-item" onclick="dmDetailArchive()">📦 归档</div>
+      <div class="dm-d-menu-item" onclick="dmDetailHide()">🙈 隐藏</div>
+      <div class="dm-d-menu-item danger" onclick="dmDetailDelete()">🗑 删除</div>
+    </div>
+  </div>
+  <div class="dm-d-body" id="dm-d-body"></div>
 </div>
 
 <!-- 倒数日：子面板 -->
@@ -4624,6 +5078,13 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div class="form-group">
         <label style="font-size:12px;color:var(--text-light)">分类</label>
         <select id="noteCatSel" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box"></select>
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;color:var(--text-light)">字体</label>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div id="noteColorPalette" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+          <button type="button" id="noteBoldBtn" onclick="toggleNoteBold()" style="margin-left:auto;width:36px;height:30px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:700;font-size:14px" title="加粗">B</button>
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:0">
         <textarea id="noteBody" placeholder="开始写笔记..." rows="12" style="width:100%;padding:10px 0;border:none;font-size:14px;font-family:inherit;resize:vertical;line-height:1.6;background:transparent"></textarea>
@@ -8915,13 +9376,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 218;                         // v218：①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办)
+const WB_VERSION = 219;                         // v219：删除待办日志subtab / 月历chip联动 / 笔记字体颜色+加粗 / 作息表环形钟+时间轴 / 倒数日详情页(BIRTHDAY标签+人生进度+记忆时间轴+⋯菜单)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 135;                 // v218 发版：134→135
+const WB_DISPLAY_VERSION = 136;                 // v219 发版：135→136
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -9427,7 +9888,7 @@ function renderTodoCalendar(){
     var chips='';
     todos.slice(0,3).forEach(function(t){
       var txt=t.text.length>6?t.text.slice(0,6)+'…':t.text;
-      chips+='<div class="td-cal-chip" style="'+catColor(t.cat)+'">'+esc(txt)+'</div>';
+      chips+='<div class="td-cal-chip'+(t.done?' done':'')+'" style="'+catColor(t.cat)+'">'+esc(txt)+'</div>';
     });
     if(todos.length>3) chips+='<div class="td-cal-more">+'+ (todos.length-3)+'</div>';
     var flag=todos.length?'<div class="td-cal-flag"></div>':'';
@@ -11820,24 +12281,176 @@ function rtSchedSaveList(list){
   saveRoutine(r);
 }
 function rtSchedRenderList(){
-  var box = document.getElementById('rtSchedList');
-  if(!box) return;
-  var list = rtSchedGetList();
-  if(!list.length){
-    box.innerHTML = '<div style="text-align:center;padding:36px 16px;color:var(--text-light)"><div style="font-size:42px;margin-bottom:8px">📅</div><div style="font-size:14px">还没有作息表</div><div style="font-size:12px;margin-top:4px">点击下面「＋ 新建作息表」开始</div></div>';
-    return;
-  }
-  box.innerHTML = list.map(function(s){
-    var dayChips = RT_DAY_NAMES.map(function(d,i){
-      return '<span class="day-chip'+(s.days&&s.days.indexOf(i)>=0?' on':'')+'">'+d+'</span>';
-    }).join('');
-    return '<div class="rt-schedule-card" onclick="openRtScheduleEdit(\''+s.id+'\')">'
-         + '<div class="rt-schedule-name">📅 '+esc(s.name||'未命名')+'</div>'
-         + '<div class="rt-schedule-cycle">'+dayChips+'</div>'
-         + '<div class="rt-schedule-summary">'+((s.slots||[]).length)+' 个时间段 · '+(s.builtin?'模板':'自定义')+'</div>'
+  // v219: 重新设计——按当前选中日期聚合所有命中模板的 slots，显示在 24h 环形钟 + 时间轴上
+  var strip = document.getElementById('rtSchedStrip');
+  var clock = document.getElementById('rtSchedClock');
+  var tl = document.getElementById('rtSchedTimeline');
+  var countEl = document.getElementById('rtSchedCount');
+  var titleEl = document.getElementById('rtSchedDayTitle');
+  var legendEl = document.getElementById('rtSchedLegend');
+  var nowTag = document.getElementById('rtSchedNowTag');
+  if(!strip || !clock || !tl) return;
+
+  // 1) 渲染当前周的日期条
+  if(!rtSchedViewDate) rtSchedViewDate = tdCalLocalToday();
+  var view = new Date(rtSchedViewDate + 'T00:00:00');
+  var startOfWeek = new Date(view);
+  startOfWeek.setDate(view.getDate() - view.getDay()); // 周日开头
+  var todayStr = tdCalLocalToday();
+  strip.innerHTML = Array.from({length:7}, function(_,i){
+    var d = new Date(startOfWeek); d.setDate(startOfWeek.getDate() + i);
+    var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    var isToday = ds === todayStr;
+    var isSel = ds === rtSchedViewDate;
+    return '<div class="rt-day-pill'+(isToday?' today':'')+(isSel&&!isToday?' sel':'')+'" data-date="'+ds+'" onclick="rtSchedPickDate(\''+ds+'\')">'
+         + '<div class="rt-pill-dow">'+RT_DAY_NAMES[d.getDay()]+'</div>'
+         + '<div class="rt-pill-day">'+d.getDate()+'</div>'
+         + '<div class="rt-pill-sub">'+rtSchedLunarMini(d)+'</div>'
          + '</div>';
   }).join('');
+
+  // 2) 聚合当日 slots
+  var wd = view.getDay();
+  var list = rtSchedGetList();
+  var daySlots = [];
+  list.forEach(function(s){
+    if(!s || !Array.isArray(s.days) || s.days.indexOf(wd)<0) return;
+    (s.slots||[]).forEach(function(sl){
+      if(!sl.enabled) return;
+      daySlots.push({ start:sl.start, end:sl.end, label:sl.label||s.name||'未命名', cat:sl.cat||'life', templateName:s.name, templateId:s.id });
+    });
+  });
+  // 排序
+  daySlots.sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
+
+  // 3) 渲染环形钟 SVG
+  var W = 240, cx = 120, cy = 120;
+  var rOut = 105, rIn = 70;
+  var catColor = { life:'#FFC107', work:'#FF8C42', sleep:'#4A90E2', study:'#9B59B6', exercise:'#52C41A', other:'#999' };
+  var svgParts = [];
+  // 底圈
+  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rOut+'" fill="#f6f7fa" stroke="#e8eaf0" stroke-width="1"/>');
+  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rIn+'" fill="#fff" stroke="#f0f2f5" stroke-width="1"/>');
+  // 小时刻度（4 个主刻度 0/6/12/18）
+  [0,6,12,18].forEach(function(h){
+    var a = h/24*Math.PI*2 - Math.PI/2;
+    var x1 = cx + (rOut-0)*Math.cos(a);
+    var y1 = cy + (rOut-0)*Math.sin(a);
+    var x2 = cx + (rOut+6)*Math.cos(a);
+    var y2 = cy + (rOut+6)*Math.sin(a);
+    var lx = cx + (rOut+18)*Math.cos(a);
+    var ly = cy + (rOut+18)*Math.sin(a);
+    svgParts.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#999" stroke-width="1.5"/>');
+    svgParts.push('<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" font-size="11" fill="#999" text-anchor="middle" dominant-baseline="middle" font-weight="600">'+String(h).padStart(2,'0')+'</text>');
+  });
+  // 24 个小刻度
+  for(var h2=0;h2<24;h2++){
+    if([0,6,12,18].indexOf(h2)>=0) continue;
+    var a2 = h2/24*Math.PI*2 - Math.PI/2;
+    var x1 = cx + (rOut-0)*Math.cos(a2);
+    var y1 = cy + (rOut-0)*Math.sin(a2);
+    var x2 = cx + (rOut+3)*Math.cos(a2);
+    var y2 = cy + (rOut+3)*Math.sin(a2);
+    svgParts.push('<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#bbb" stroke-width="0.5"/>');
+  }
+  // slot 弧
+  daySlots.forEach(function(sl){
+    var p = rtSchedParseTime(sl.start), q = rtSchedParseTime(sl.end);
+    if(p===null || q===null) return;
+    if(q<=p) q += 24; // 跨天
+    var a1 = p/(24*60)*Math.PI*2 - Math.PI/2;
+    var a2 = q/(24*60)*Math.PI*2 - Math.PI/2;
+    var large = (a2-a1) > Math.PI ? 1 : 0;
+    var col = catColor[sl.cat] || catColor.life;
+    function pt(r,a){ return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
+    var p1 = pt(rOut,a1), p2 = pt(rOut,a2), p3 = pt(rIn,a2), p4 = pt(rIn,a1);
+    svgParts.push('<path d="M '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' A '+rOut+' '+rOut+' 0 '+large+' 1 '+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' L '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' A '+rIn+' '+rIn+' 0 '+large+' 0 '+p4[0].toFixed(1)+' '+p4[1].toFixed(1)+' Z" fill="'+col+'" opacity="0.9"/>');
+  });
+  clock.innerHTML = svgParts.join('');
+
+  // 4) 当前时间指针（仅今日）
+  if(rtSchedViewDate === todayStr){
+    var now = new Date();
+    var mins = now.getHours()*60 + now.getMinutes();
+    var aN = mins/(24*60)*Math.PI*2 - Math.PI/2;
+    var nx1 = cx + 0*Math.cos(aN), ny1 = cy + 0*Math.sin(aN);
+    var nx2 = cx + rOut*Math.cos(aN), ny2 = cy + rOut*Math.sin(aN);
+    clock.insertAdjacentHTML('beforeend','<line x1="'+nx1.toFixed(1)+'" y1="'+ny1.toFixed(1)+'" x2="'+nx2.toFixed(1)+'" y2="'+ny2.toFixed(1)+'" stroke="#ff4d4f" stroke-width="2"/>');
+    clock.insertAdjacentHTML('beforeend','<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#ff4d4f"/>');
+    if(nowTag){
+      nowTag.style.display = 'block';
+      nowTag.textContent = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    }
+  } else {
+    if(nowTag) nowTag.style.display = 'none';
+  }
+
+  // 5) 中间数字 + 标题
+  if(countEl) countEl.textContent = daySlots.length;
+  if(titleEl){
+    var isToday2 = rtSchedViewDate === todayStr;
+    titleEl.textContent = (isToday2?'今日':view.getMonth()+1+'月'+view.getDate()+'日')+' · '+(daySlots.length)+' 个日程';
+  }
+
+  // 6) 图例
+  if(legendEl){
+    var usedCats = {};
+    daySlots.forEach(function(s){ usedCats[s.cat] = (usedCats[s.cat]||0)+1; });
+    var catNames = { life:'生活', work:'工作', sleep:'睡眠', study:'学习', exercise:'运动', other:'其他' };
+    var items = Object.keys(usedCats).map(function(c){
+      return '<div class="leg-item"><span class="leg-dot" style="background:'+(catColor[c]||'#999')+'"></span>'+catNames[c]+' '+usedCats[c]+'</div>';
+    });
+    legendEl.innerHTML = items.join('') || '';
+  }
+
+  // 7) 时间轴列表
+  if(daySlots.length === 0){
+    tl.innerHTML = '<div class="rt-sched-empty">📭 这一日没有日程，<br>点击下方「＋ 新建作息表」或「📚 作息库」添加</div>';
+  } else {
+    tl.innerHTML = daySlots.map(function(sl){
+      var p = rtSchedParseTime(sl.start), q = rtSchedParseTime(sl.end);
+      if(q<=p) q += 24;
+      var dur = q-p;
+      var hh = Math.floor(dur/60), mm = dur%60;
+      var durStr = (hh>0?hh+'时':'')+(mm>0?mm+'分':'');
+      var col = catColor[sl.cat] || catColor.life;
+      var iconMap = { life:'🍱', work:'💼', sleep:'🌙', study:'📚', exercise:'🏃', other:'🎯' };
+      var tagMap = { life:'生活', work:'通用', sleep:'休息', study:'学习', exercise:'健身', other:'其他' };
+      return '<div class="rt-sched-event" onclick="openRtScheduleEdit(\''+sl.templateId+'\')">'
+        + '<div class="rt-ev-dot" style="background:'+col+'"></div>'
+        + '<div class="rt-ev-time">'+sl.start+' ~ '+sl.end+(durStr?' · <span class="rt-ev-dur">'+durStr+'</span>':'')+'</div>'
+        + '<div class="rt-ev-card">'
+        + '<div class="rt-ev-icon" style="background:'+col+'22">'+iconMap[sl.cat]+'</div>'
+        + '<div class="rt-ev-body">'
+        + '<div class="rt-ev-title">'+esc(sl.label)+'</div>'
+        + '<div class="rt-ev-meta">'+esc(sl.templateName||'作息表')+' · '+esc(tagMap[sl.cat]||'其他')+'</div>'
+        + '</div>'
+        + '<div class="rt-ev-arrow">›</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
 }
+
+function rtSchedParseTime(t){
+  if(!t) return null;
+  var m = String(t).match(/^(\d{1,2}):(\d{1,2})$/);
+  if(!m) return null;
+  return parseInt(m[1],10)*60 + parseInt(m[2],10);
+}
+function rtSchedLunarMini(d){
+  // 简化：用日号 + '号' 即可（不接农历引擎，体积小）
+  return d.getDate()+'号';
+}
+function rtSchedPickDate(ds){ rtSchedViewDate = ds; rtSchedRenderList(); }
+function rtSchedWeek(delta){
+  var d = new Date(rtSchedViewDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta*7);
+  rtSchedViewDate = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  rtSchedRenderList();
+}
+function rtSchedGoToday(){ rtSchedViewDate = tdCalLocalToday(); rtSchedRenderList(); }
+var rtSchedViewDate = null;
 
 /* --------- 编辑弹窗 --------- */
 var _rtSchedEditId = null;        // null = 新增
@@ -11861,7 +12474,16 @@ function rtSchedSlotsRender(){
     box.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:18px 0;font-size:13px">还没有时间段，点击上方「＋ 新增」</div>';
     return;
   }
+  var catOpts = [
+    {v:'life',label:'生活',color:'#FFC107'},
+    {v:'work',label:'工作',color:'#FF8C42'},
+    {v:'sleep',label:'睡眠',color:'#4A90E2'},
+    {v:'study',label:'学习',color:'#9B59B6'},
+    {v:'exercise',label:'运动',color:'#52C41A'},
+    {v:'other',label:'其他',color:'#999'}
+  ];
   box.innerHTML = _rtSchedEditSlots.map(function(s,i){
+    var opts = catOpts.map(function(c){ return '<option value="'+c.v+'"'+(s.cat===c.v?' selected':'')+'>'+c.label+'</option>'; }).join('');
     return '<div class="rt-slot-row">'
          + '<button class="rt-slot-del" onclick="rtSchedRemoveSlot('+i+')" title="删除">−</button>'
          + '<span class="rt-slot-time">'
@@ -11870,12 +12492,13 @@ function rtSchedSlotsRender(){
          +   '<input type="time" value="'+(s.end||'')+'" onchange="_rtSchedEditSlots['+i+'].end=this.value" style="background:transparent;border:none;font-size:13px;font-weight:600;color:var(--primary);width:54px">'
          + '</span>'
          + '<input class="rt-slot-label" type="text" maxlength="14" value="'+esc(s.label||'')+'" placeholder="如：吃早餐" onchange="_rtSchedEditSlots['+i+'].label=this.value">'
+         + '<select class="rt-slot-cat" onchange="_rtSchedEditSlots['+i+'].cat=this.value">'+opts+'</select>'
          + '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-light);cursor:pointer"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="_rtSchedEditSlots['+i+'].enabled=this.checked">启用</label>'
          + '</div>';
   }).join('');
 }
 function rtSchedAddSlot(){
-  _rtSchedEditSlots.push({ id:_uid(), start:'08:00', end:'08:30', label:'', enabled:true });
+  _rtSchedEditSlots.push({ id:_uid(), start:'08:00', end:'08:30', label:'', cat:'life', enabled:true });
   rtSchedSlotsRender();
 }
 function rtSchedRemoveSlot(i){
@@ -12636,9 +13259,11 @@ function renderNotesList(){
     var srcTag = n.fromJournal ? ' <span style="font-size:10px;background:#F6FFED;color:#52C41A;padding:1px 6px;border-radius:8px;vertical-align:middle">📒 来自日志</span>' : '';
     var c = findNoteCat(n.cat||'cat_other');
     var dot = c ? '<span class="note-cat-dot-on-card" style="background:'+c.color+'"></span>' : '';
+    var titleStyle = (n.color?'color:'+n.color+';':'') + (n.bold?'font-weight:700;':'');
+    var bodyStyle = (n.color?'color:'+n.color+';':'') + (n.bold?'font-weight:700;':'');
     return '<div class="card" style="padding:12px;cursor:pointer;transition:.15s;max-height:145px;overflow:hidden" onclick="viewNoteFull(\''+(n.id||'')+'\')">'+
-      '<div style="font-size:15px;font-weight:600;margin-bottom:6px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+dot+esc(n.title||'未命名')+srcTag+'</div>'+
-      '<div style="font-size:12px;color:var(--text-light);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(bodyPreview)+'</div>'+
+      '<div style="font-size:15px;font-weight:'+(n.bold?'700':'600')+';margin-bottom:6px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+titleStyle+'">'+dot+esc(n.title||'未命名')+srcTag+'</div>'+
+      '<div style="font-size:12px;color:var(--text-light);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+bodyStyle+'">'+esc(bodyPreview)+'</div>'+
       '<div style="font-size:11px;color:var(--text-light);margin-top:6px">'+date+'</div>'+
       '</div>';
   }).join('');
@@ -12654,16 +13279,64 @@ function viewNoteFull(id){
   if(!n) return;
   var date = n.updated ? new Date(n.updated).toLocaleString('zh-CN') : '';
   var srcTag = n.fromJournal ? ' <span style="font-size:11px;background:#F6FFED;color:#52C41A;padding:2px 8px;border-radius:8px">📒 来自日志</span>' : '';
+  var styleStr = (n.color ? 'color:'+n.color+';' : '') + (n.bold ? 'font-weight:700' : '');
   _gm('noteViewModal',
     '<div class="gm-header"><div class="gm-title">📝 '+esc(n.title||'未命名')+srcTag+'</div><button class="gm-close" onclick="closeGameModal(\'noteViewModal\')">✕</button></div>'+
     '<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">'+esc(date)+'</div>'+
-    '<div style="font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word;padding:14px;background:#f8f9fa;border-radius:10px;max-height:55vh;overflow:auto">'+esc(n.body||'（无内容）')+'</div>'+
+    '<div style="font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word;padding:14px;background:#f8f9fa;border-radius:10px;max-height:55vh;overflow:auto;'+styleStr+'">'+esc(n.body||'（无内容）')+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px">'+
       '<button class="btn-primary" style="flex:1" onclick="closeGameModal(\'noteViewModal\');openNoteEditor(\''+id+'\')">✏️ 编辑</button>'+
       '<button class="btn-primary" style="flex:1;background:#999" onclick="closeGameModal(\'noteViewModal\')">取消</button>'+
     '</div>'
   );
 }
+
+/* v219：笔记字体颜色/加粗 */
+var NOTE_FONT_PALETTE = [
+  {v:'inherit',label:'默认',swatch:true},
+  {v:'#222222',label:'黑'},
+  {v:'#1890FF',label:'蓝'},
+  {v:'#52C41A',label:'绿'},
+  {v:'#FA8C16',label:'橙'},
+  {v:'#722ED1',label:'紫'},
+  {v:'#EB2F96',label:'粉'},
+  {v:'#13C2C2',label:'青'},
+  {v:'#F5222D',label:'红'},
+  {v:'#666666',label:'灰'}
+];
+function renderNoteFontPalette(){
+  var box = document.getElementById('noteColorPalette'); if(!box) return;
+  box.innerHTML = NOTE_FONT_PALETTE.map(function(c){
+    var cls = 'note-color-swatch' + (c.swatch ? ' default' : '');
+    var bg = c.swatch ? '#fff' : c.v;
+    return '<span class="'+cls+'" data-color="'+c.v+'" style="background:'+bg+'" title="'+c.label+'" onclick="pickNoteFontColor(this)"></span>';
+  }).join('');
+}
+function pickNoteFontColor(el){
+  document.querySelectorAll('#noteColorPalette .note-color-swatch').forEach(function(s){ s.classList.remove('active'); });
+  el.classList.add('active');
+  applyNoteBodyStyle();
+}
+function toggleNoteBold(){
+  var btn = document.getElementById('noteBoldBtn'); if(!btn) return;
+  btn.classList.toggle('active');
+  applyNoteBodyStyle();
+}
+function applyNoteBodyStyle(){
+  var body = document.getElementById('noteBody'); if(!body) return;
+  var sw = document.querySelector('#noteColorPalette .note-color-swatch.active');
+  var color = sw ? sw.getAttribute('data-color') : 'inherit';
+  var bold = (document.getElementById('noteBoldBtn')||{}).classList && document.getElementById('noteBoldBtn').classList.contains('active');
+  body.style.color = (color==='inherit'||!color) ? '' : color;
+  body.style.fontWeight = bold ? '700' : 'normal';
+}
+function getNoteEditorStyle(){
+  var sw = document.querySelector('#noteColorPalette .note-color-swatch.active');
+  var color = sw ? sw.getAttribute('data-color') : 'inherit';
+  var bold = (document.getElementById('noteBoldBtn')||{}).classList && document.getElementById('noteBoldBtn').classList.contains('active');
+  return { color: (color==='inherit') ? '' : (color||''), bold: !!bold };
+}
+
 function openNoteEditor(id){
   document.getElementById('notesListView').style.display = 'none';
   document.getElementById('notesAddBtn').style.display = 'none';
@@ -12685,6 +13358,12 @@ function openNoteEditor(id){
     catSel.innerHTML = cats.map(function(c){ return '<option value="'+c.id+'">'+esc(c.name)+'</option>'; }).join('');
     catSel.value = currentNoteCat && currentNoteCat !== '__all' ? currentNoteCat : 'cat_other';
   }
+  // v219：初始化字体调色板
+  renderNoteFontPalette();
+  var swatches = document.querySelectorAll('#noteColorPalette .note-color-swatch');
+  swatches.forEach(function(s){ s.classList.remove('active'); });
+  var boldBtn = document.getElementById('noteBoldBtn');
+  if(boldBtn) boldBtn.classList.remove('active');
   if(id){
     var d = getNotes();
     var n = (d.items||[]).find(function(x){ return x.id === id; });
@@ -12692,13 +13371,19 @@ function openNoteEditor(id){
       if(title) title.value = n.title || '';
       if(body) body.value = n.body || '';
       if(catSel) catSel.value = n.cat || 'cat_other';
+      // 还原字体样式
+      var curColor = n.color || 'inherit';
+      swatches.forEach(function(s){ if(s.getAttribute('data-color')===curColor) s.classList.add('active'); });
+      if(n.bold && boldBtn) boldBtn.classList.add('active');
       var dt = n.updated ? new Date(n.updated) : new Date();
       var count = (n.body||'').length + (n.title||'').length;
       if(meta) meta.textContent = dt.toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) + ' | ' + count + '字';
     }
   } else {
     if(meta) meta.textContent = new Date().toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) + ' | 0字';
+    if(swatches[0]) swatches[0].classList.add('active');  // 默认 inherit
   }
+  applyNoteBodyStyle();
 }
 function closeNoteEditor(){
   document.getElementById('notesListView').style.display = 'block';
@@ -12711,14 +13396,15 @@ function saveNote(){
   var body = ((document.getElementById('noteBody')||{}).value||'').trim();
   if(!title && !body){ toast('标题和内容不能都为空'); return; }
   var cat = ((document.getElementById('noteCatSel')||{}).value||'') || 'cat_other';  // v218：分类
+  var st = getNoteEditorStyle();  // v219：字体颜色+加粗
   var d = getNotes();
   if(!d.items) d.items = [];
   var now = Date.now();
   if(id){
     var idx = d.items.findIndex(function(x){ return x.id === id; });
-    if(idx >= 0){ d.items[idx].title = title; d.items[idx].body = body; d.items[idx].cat = cat; d.items[idx].updated = now; }
+    if(idx >= 0){ d.items[idx].title = title; d.items[idx].body = body; d.items[idx].cat = cat; d.items[idx].color = st.color; d.items[idx].bold = st.bold; d.items[idx].updated = now; }
   } else {
-    d.items.unshift({ id: _uid(), title: title, body: body, cat: cat, created: now, updated: now });
+    d.items.unshift({ id: _uid(), title: title, body: body, cat: cat, color: st.color, bold: st.bold, created: now, updated: now });
   }
   saveNotes(d);
   closeNoteEditor();
