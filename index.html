@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v206-cachebust: 倒数日修3处——①置顶真正置顶(pinned排最前，主列表+归档页一致) ②选择图标改上下滑选取(11分类纵向区块滚动，去掉横滑tab) ③编辑弹窗补回「归档/隐藏」操作行(可取消归档/隐藏恢复主页) -->
 <!-- v205-cachebust: 倒数日进阶设置4项全开放(显示精确时间/高亮突出/事件颜色12色/选择图标11分类132个，去掉Pro标记) + 内置农历引擎(1900-2100 lunarInfo表，公历农历自动换算，e.date恒存公历保证计算正确) -->
 <!-- v204-cachebust: 倒数日重做编辑页(图1:蓝条+列表行+进阶折叠+大蓝按钮) + 选择倒数本子面板(图2:可新增自定义倒数本) -->
 <!-- v203-cachebust: 倒数日新增「归档与隐藏」子页(归档/隐藏互斥+tab统计)、11分类130+图标选择器、12款渐变封面、自动贴开关；编辑弹窗脱离page容器(归档页也可打开) -->
@@ -3390,6 +3391,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     function dmRenderEvents(){
       var el=document.getElementById('dm-events'); if(!el) return;
       var list=dmVisible().filter(function(e){ return dmActiveCat==='all'||e.bookId===dmActiveCat; });
+      list.sort(function(a,b){ return ((b.pinned?1:0)-(a.pinned?1:0)); });   // v206：置顶真正置顶——pinned 排最前
       if(!list.length){ el.innerHTML='<div class="dm-empty">暂无倒数日<br>点击右下角 + 添加</div>'; return; }
       el.innerHTML=list.map(dmCardHtml).join('');
     }
@@ -3417,6 +3419,8 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var body=document.getElementById('dm-advanced-body'); if(body) body.style.display='none';
       var arr=document.getElementById('dm-advanced-arrow'); if(arr) arr.textContent='⌄';
       var del=document.getElementById('dm-del-btn'); if(del) del.style.display=id?'block':'none';
+      var ab=document.getElementById('dm-arch-btn'); if(ab){ ab.style.display=id?'flex':'none'; if(ev){ var a1=ab.querySelector('.dm-row-label'); if(a1) a1.textContent=ev.archived?'✓ 已归档——点击取消归档（回到主页）':'归档到「归档与隐藏」'; } }
+      var hb=document.getElementById('dm-hide-btn'); if(hb){ hb.style.display=id?'flex':'none'; if(ev){ var h1=hb.querySelector('.dm-row-label'); if(h1) h1.textContent=ev.hidden?'✓ 已隐藏——点击取消隐藏（回到主页）':'隐藏（仅归档页可见）'; } }
       var m=document.getElementById('dm-modal'); if(m) m.classList.add('open');
     }
     function dmUpdateDateText(){
@@ -3511,6 +3515,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       tabs.innerHTML='<div class="dm-tab '+(dmArchTab==='archived'?'active':'')+'" onclick="dmSetArchTab(\'archived\')">归档 <span style="opacity:.7">'+ac+'</span></div>'+
         '<div class="dm-tab '+(dmArchTab==='hidden'?'active':'')+'" onclick="dmSetArchTab(\'hidden\')">隐藏 <span style="opacity:.7">'+hc+'</span></div>';
       var items=dmEvents.filter(function(e){ return dmArchTab==='archived'?e.archived:e.hidden; });
+      items.sort(function(a,b){ return ((b.pinned?1:0)-(a.pinned?1:0)); });  // v206：置顶排最前
       if(!items.length){ list.innerHTML='<div class="dm-empty">'+(dmArchTab==='archived'?'归档事件将不出现在首页<br>不再重要的日子可以放在这里':'隐藏事件将不出现在首页<br>私密的日子可以放在这里')+'</div>'; return; }
       list.innerHTML=items.map(dmCardHtml).join('');
     }
@@ -3579,14 +3584,14 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     function dmPickColor(c){ dmPickedColor=c; dmUpdateColorText(); dmOpenColor(); }
 
     function dmOpenIcon(){
-      var pool=DM_POOLS.find(function(p){ return p.id===dmActivePool; })||DM_POOLS[0];
+      // v206：选择图标改为「上下滑选取」——全部 11 分类按区块纵向排布，上下滚动浏览
       dmOpenSub('icon', spTop('选择图标','dmCloseSubpanel()')+
-        '<div class="dm-pool-tabs">'+DM_POOLS.map(function(p){
-          return '<div class="dm-pool-tab '+(p.id===dmActivePool?'active':'')+'" onclick="dmSetPool(\''+p.id+'\')">'+p.name+'</div>';
-        }).join('')+'</div>'+
-        '<div style="padding:12px;background:#fff"><div class="dm-pool-grid">'+pool.list.map(function(em){
-          return '<div class="dm-pool-item '+(em===dmPickedEmoji?'active':'')+'" onclick="dmPickIcon(\''+em+'\')">'+em+'</div>';
-        }).join('')+'</div></div>');
+        '<div class="dm-pool-scroll">'+DM_POOLS.map(function(p){
+          return '<div class="dm-pool-sec"><div class="dm-pool-sec-title">'+p.name+'</div>'+
+            '<div class="dm-pool-grid">'+p.list.map(function(em){
+              return '<div class="dm-pool-item '+(em===dmPickedEmoji?'active':'')+'" onclick="dmPickIcon(\''+em+'\')">'+em+'</div>';
+            }).join('')+'</div></div>';
+        }).join('')+'</div>');
     }
     function dmSetPool(id){ dmActivePool=id; dmOpenIcon(); }
     function dmPickIcon(em){ dmPickedEmoji=em; dmUpdateEmojiText(); dmCloseSubpanel(); }
@@ -3728,6 +3733,14 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
           <span class="dm-row-right" id="dm-emoji-text">🎂</span>
           <span class="dm-row-arrow">›</span>
         </div>
+        <div class="dm-row" id="dm-arch-btn" style="display:none">
+          <span class="dm-row-icon">🗄️</span>
+          <span class="dm-row-label" style="color:#1976d2;cursor:pointer" onclick="dmToggleArchive()">归档到「归档与隐藏」</span>
+        </div>
+        <div class="dm-row" id="dm-hide-btn" style="display:none">
+          <span class="dm-row-icon">🙈</span>
+          <span class="dm-row-label" style="color:#1976d2;cursor:pointer" onclick="dmToggleHidden()">隐藏（仅归档页可见）</span>
+        </div>
         <div class="dm-row" id="dm-del-btn" style="display:none">
           <span class="dm-row-icon">🗑️</span>
           <span class="dm-row-label" style="color:#e64340" onclick="dmDelEvent()">删除这个倒数日</span>
@@ -3802,9 +3815,10 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   .dm-sp-check { color:#4caf50; font-size:22px; }
   .dm-sp-add { margin:16px; background:#1976d2; color:#fff; text-align:center; padding:14px; border-radius:24px; font-size:15px; font-weight:600; cursor:pointer; user-select:none; }
   .dm-sp-add:active { opacity:.85; }
-  .dm-pool-tabs { display:flex; gap:8px; overflow-x:auto; padding:10px 12px; background:#fff; -webkit-overflow-scrolling:touch; }
-  .dm-pool-tab { flex:0 0 auto; font-size:12px; padding:6px 11px; border-radius:999px; background:#f2f3f5; color:#666; cursor:pointer; white-space:nowrap; }
-  .dm-pool-tab.active { background:#1976d2; color:#fff; font-weight:600; }
+  .dm-pool-scroll { flex:1; overflow-y:auto; background:#fff; -webkit-overflow-scrolling:touch; padding:2px 12px 28px; }
+  .dm-pool-sec { padding:0 0 4px; }
+  .dm-pool-sec-title { font-size:13px; font-weight:600; color:#9e9e9e; padding:14px 4px 8px; display:flex; align-items:center; gap:6px; }
+  .dm-pool-sec-title::before { content:''; width:3px; height:13px; border-radius:2px; background:#1976d2; }
   .dm-pool-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; max-height:none; }
   .dm-pool-item { aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-size:24px; background:#f7f8fa; border-radius:12px; cursor:pointer; border:2px solid transparent; }
   .dm-pool-item.active { border-color:#1976d2; background:#e3f2fd; }
@@ -8222,13 +8236,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 205;                         // v205：倒数日进阶设置4项全开放(精确时间/高亮/颜色/图标，去Pro) + 内置农历引擎(1900-2100，公历农历自动换算)
+const WB_VERSION = 206;                         // v206：倒数日修3处——①置顶真正置顶(pinned排最前) ②选择图标改上下滑选取(全部分类纵向排布) ③补回编辑弹窗归档/隐藏(可取消恢复)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 123;                 // v205 发版：122→123
+const WB_DISPLAY_VERSION = 124;                 // v206 发版：123→124
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
