@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v207-cachebust: 模块改名「作息」→「生活习惯」——19处显示文案(侧边栏/底部导航/首页快捷/首页简介/页面标题/生活密码说明/受保护页面/分区说明/注释)；page-routine/id/变量不变，数据兼容 -->
 <!-- v206-cachebust: 倒数日修3处——①置顶真正置顶(pinned排最前，主列表+归档页一致) ②选择图标改上下滑选取(11分类纵向区块滚动，去掉横滑tab) ③编辑弹窗补回「归档/隐藏」操作行(可取消归档/隐藏恢复主页) -->
 <!-- v205-cachebust: 倒数日进阶设置4项全开放(显示精确时间/高亮突出/事件颜色12色/选择图标11分类132个，去掉Pro标记) + 内置农历引擎(1900-2100 lunarInfo表，公历农历自动换算，e.date恒存公历保证计算正确) -->
 <!-- v204-cachebust: 倒数日重做编辑页(图1:蓝条+列表行+进阶折叠+大蓝按钮) + 选择倒数本子面板(图2:可新增自定义倒数本) -->
@@ -1396,7 +1397,7 @@ body.sb-collapsed .sidebar-item:hover::after {
     <span class="icon">📔</span><span class="label">日记</span>
   </div>
   <div class="sidebar-item" data-page="routine" onclick="switchPage('routine')">
-    <span class="icon">🌙</span><span class="label">作息</span>
+    <span class="icon">🌙</span><span class="label">生活习惯</span>
   </div>
   <div class="sidebar-item" data-page="fitness" onclick="switchPage('fitness')">
     <span class="icon">🏃</span><span class="label">运动旅行</span>
@@ -1452,7 +1453,7 @@ function toggleSbCollapse(){
       <div class="modal-title" style="margin-bottom:0;font-size:15px">生活密码</div>
     </div>
     <div style="font-size:12px;color:var(--text-light);line-height:1.6;margin-bottom:10px">
-      为你的账号设置生活密码，电脑端打开日记 / 作息 / 运动旅行 / 记账等生活功能时需输入（功能与普通账号一致）。
+      为你的账号设置生活密码，电脑端打开日记 / 生活习惯 / 运动旅行 / 记账等生活功能时需输入（功能与普通账号一致）。
     </div>
     <button class="login-btn" style="background:#52C41A" onclick="closeInviteAdmin(); openLifePass(true)">设置我的生活密码</button>
     <button class="login-switch" onclick="closeInviteAdmin()">取消</button>
@@ -1466,7 +1467,7 @@ function toggleSbCollapse(){
     <!-- 手机端 / 强制设置：设置面板 -->
     <div id="lpSetupPanel">
       <div style="font-size:12px;color:var(--text-light);line-height:1.6;margin-bottom:12px">
-        生成一个 6 位随机数字，电脑端打开「日记 / 作息 / 运动旅行 / 记账」等生活功能时需输入此密码。点击「生成新的随机密码」即自动保存生效，无需再点保存；生成前以 ------ 掩码显示。
+        生成一个 6 位随机数字，电脑端打开「日记 / 生活习惯 / 运动旅行 / 记账」等生活功能时需输入此密码。点击「生成新的随机密码」即自动保存生效，无需再点保存；生成前以 ------ 掩码显示。
       </div>
       <div style="background:#f7f8fa;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
         <div style="font-size:11px;color:var(--text-light);margin-bottom:4px">当前生活密码</div>
@@ -1593,7 +1594,7 @@ function toggleSbCollapse(){
     <div class="quick-item" data-qpage="fun" onclick="switchPage('fun')"><div class="qi-emoji">🎮</div><span>娱乐</span></div>
     <div class="quick-item" onclick="openEditProfile()"><div class="qi-emoji">✏️</div><span>编辑资料</span></div>
     <div class="quick-item" data-qpage="diary" onclick="switchPage('diary')"><div class="qi-emoji">📔</div><span>日记</span></div>
-    <div class="quick-item" data-qpage="routine" onclick="switchPage('routine')"><div class="qi-emoji">🌙</div><span>作息</span></div>
+    <div class="quick-item" data-qpage="routine" onclick="switchPage('routine')"><div class="qi-emoji">🌙</div><span>生活习惯</span></div>
     <div class="quick-item" data-qpage="fitness" onclick="switchPage('fitness')"><div class="qi-emoji">🏃</div><span>运动旅行</span></div>
     <div class="quick-item" data-qpage="money" onclick="switchPage('money')"><div class="qi-emoji">💰</div><span>记账</span></div>
     <div class="quick-item" data-qpage="daysmatter" onclick="switchPage('daysmatter')"><div class="qi-emoji">📅</div><span>倒数日</span></div>
@@ -1615,7 +1616,7 @@ function toggleSbCollapse(){
 
   <div class="section-label">🌟 生活一眼看</div>
   <div class="card" style="background:#f8f9fc;font-size:13px;line-height:1.9;color:var(--text-primary)">
-    🌙 作息：连续早睡 7 天 ｜ 🔤 英语：连续打卡 21 天 ｜ 🏃 运动旅行：本周 3 次
+    🌙 生活习惯：连续早睡 7 天 ｜ 🔤 英语：连续打卡 21 天 ｜ 🏃 运动旅行：本周 3 次
   </div>
   </div>
 </div>
@@ -2419,9 +2420,9 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   </div>
 </div>
 
-<!-- ========== 作息习惯 HUB ========== -->
+<!-- ========== 生活习惯 HUB ========== -->
 <div class="page" id="page-routine">
-  <div class="page-header"><div><div class="page-title">作息习惯</div></div><button class="badge-btn" onclick="openRoutineSettings()">设置</button></div>
+  <div class="page-header"><div><div class="page-title">生活习惯</div></div><button class="badge-btn" onclick="openRoutineSettings()">设置</button></div>
 
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('rt',this,'rt-sleeprise')">早睡早起</button>
@@ -4730,7 +4731,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 /* ========== 账号分区（工作 / 生活 / 娱乐） ==========
    管理员在「找回码 / 账号管理」里给每个注册账号勾选工作、生活、娱乐分区。
    工作分区功能：工作(业绩)、客户、待办、笔记
-   生活分区功能：笔记、英语、日记、作息、运动旅行、记账
+   生活分区功能：笔记、英语、日记、生活习惯、运动旅行、记账
    娱乐分区功能：娱乐（游戏台 + 读书）
    笔记同时属于工作/生活两个分区。未勾选的分区，对应功能对该账号隐藏（侧边栏 / 底部导航 / 首页快捷入口均过滤）。
    默认新账号三个分区都勾选（全部可见），管理员可逐步收窄。 */
@@ -4742,7 +4743,7 @@ const PAGE_PARTITION = {
   english: ['life'],       // 英语
   fun: ['fun'],            // 娱乐（v142：独立分区，不再隶属生活）
   diary: ['life'],         // 日记
-  routine: ['life'],       // 作息
+  routine: ['life'],       // 生活习惯
   fitness: ['life'],       // 运动旅行
   money: ['life'],         // 记账
   daysmatter: ['life'],    // 倒数日（v200：生活分类倒计时）
@@ -4764,7 +4765,7 @@ var NAV_ITEMS = [
   { id: 'notes',   icon: '📝', label: '笔记' },
   { id: 'english', icon: '🔤', label: '英语' },
   { id: 'fun',     icon: '🎮', label: '娱乐' },
-  { id: 'routine', icon: '🌙', label: '作息' },
+  { id: 'routine', icon: '🌙', label: '生活习惯' },
   { id: 'fitness', icon: '🏃', label: '运动' }
 ];
 
@@ -4934,7 +4935,7 @@ async function switchPage(pageId) {
   if(pageId === 'notes') renderNotesList();
   if(pageId === 'todo') renderAppointmentsTodos();
   if(pageId === 'cloud') renderCloudSheets();
-  if(pageId === 'routine'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入作息页时立即同步「经期/戒烟」标签与子页内容
+  if(pageId === 'routine'){ try{ applySmokePageMode(); }catch(e){ console.error('applySmokePageMode:', e); } }  // v157：进入生活习惯页时立即同步「经期/戒烟」标签与子页内容
   if(pageId === 'daysmatter'){ try{ if(typeof dmRender==='function') dmRender(); }catch(e){ console.error('dmRender:', e); } }
   if(pageId === 'daysmatter-archive'){ try{ if(typeof dmRenderArchive==='function') dmRenderArchive(); }catch(e){ console.error('dmRenderArchive:', e); } }
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
@@ -8236,13 +8237,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 206;                         // v206：倒数日修3处——①置顶真正置顶(pinned排最前) ②选择图标改上下滑选取(全部分类纵向排布) ③补回编辑弹窗归档/隐藏(可取消恢复)
+const WB_VERSION = 207;                         // v207：模块改名「作息」→「生活习惯」(侧边栏/底部导航/首页快捷/页面标题/受保护页面/分区说明等19处显示文案，id/变量不变)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 124;                 // v206 发版：123→124
+const WB_DISPLAY_VERSION = 125;                 // v207 发版：124→125
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -8515,7 +8516,7 @@ function wbSyncSidebar(){
     s.classList.toggle('active', s.getAttribute('data-page')===pid);
   });
 }
-/* ================== 统一生活数据层（待办/娱乐/记账/作息/运动旅行 全部动态） ================== */
+/* ================== 统一生活数据层（待办/娱乐/记账/生活习惯/运动旅行 全部动态） ================== */
 function _dkey(p){ return 'wb_'+p+'_'+(WB_SESSION||'guest'); }
 function _load(p,def){ try{ var r=localStorage.getItem(_dkey(p)); return r?JSON.parse(r):def; }catch(e){ return def; } }
 // v39：统一数据层写入即标脏（与 Storage 原型钩子互为双保险，防抖+哈希比对保证不会重复上传）
@@ -10335,7 +10336,7 @@ function deleteDeposit(id){
   saveMoney(m); renderMoney(); openSaveModal();
 }
 
-/* ---------- 作息 / 运动旅行 数据层 ---------- */
+/* ---------- 生活习惯 / 运动旅行 数据层 ---------- */
 function getRoutine(){ var r=_load('routine',null); if(r===null){ r={ sleep:{targetBed:'23:30',targetRise:'06:30',dur:7.5,log:{}}, rise:{target:'06:30',log:{}}, smoke:{quitDate:'2026-05-10',price:24,perDay:20,goal:365,log:{}}, weight:{height:175,target:70,log:{}}, period:{cycleLen:28,log:{}} }; _save('routine',r); } return r; }
 function saveRoutine(r){ _save('routine',r); }
 function getFit(){ var f=_load('fit',null); if(f===null){ f={log:{}}; _save('fit',f); } return f; }
@@ -10447,7 +10448,7 @@ function deleteVisit(id){
   toast('已删除');
 }
 
-/* ---------- 作息渲染 ---------- */
+/* ---------- 生活习惯渲染 ---------- */
 function renderRoutine(){
   var r=getRoutine();
   // 合并统计：平均起床 / 平均入睡 / 平均睡眠
@@ -10634,7 +10635,7 @@ function saveWeight(){
   saveRoutine(r); renderRoutine(); toast('已记录体重');
 }
 
-/* ---------- 作息：图表 / 列表 / 设置 ---------- */
+/* ---------- 生活习惯：图表 / 列表 / 设置 ---------- */
 function sleepCountdown(tb){
   var parts=(tb||'23:30').split(':'); var th=+parts[0], tm=+parts[1];
   var now=new Date(); var target=new Date(now); target.setHours(th,tm,0,0);
@@ -11116,7 +11117,7 @@ function wbRestore(user){
   getClients();          // 确保客户数据已播种
   syncAllClientsToPerf();// 客户成交 → 业绩 单一数据源打通
   renderPerformance();   // 用统一业绩数据覆盖所有写死的统计数字
-  renderAllLife();       // 待办/娱乐/记账/作息/运动旅行/客户/首页 全部从数据层动态渲染
+  renderAllLife();       // 待办/娱乐/记账/生活习惯/运动旅行/客户/首页 全部从数据层动态渲染
   renderEngCheck();      // 英语打卡（含整月日历）
   renderCloudSheets();   // 云文档卡片列表（v143：替换旧 iframe 输入框）
   wbSave();              // 用当前结构写回基线（下次无版本变更时仅作快速恢复，版本变化时仍会被丢弃）
@@ -11337,7 +11338,7 @@ function renderHome(){
       // 本周运动旅行次数
       var monday = new Date(dt); monday.setDate(dt.getDate()-((dt.getDay()+6)%7));
       var fitWeek = Object.keys((fit.log)||{}).filter(function(k){ var dd=new Date(k); return dd>=monday; }).length;
-      life.innerHTML = '🌙 作息：连续早睡 <b>'+sleepStreak+'</b> 天 ｜ 🔤 英语：连续打卡 <b>'+eng+'</b> 天 ｜ 🏃 运动旅行：本周 <b>'+fitWeek+'</b> 次';
+      life.innerHTML = '🌙 生活习惯：连续早睡 <b>'+sleepStreak+'</b> 天 ｜ 🔤 英语：连续打卡 <b>'+eng+'</b> 天 ｜ 🏃 运动旅行：本周 <b>'+fitWeek+'</b> 次';
     }
     // 今日重点（动态聚合：待办 + 客户跟进）
     var focus = document.getElementById('homeFocus');
@@ -12143,7 +12144,7 @@ async function saveInviteCode(){
 
 /* ============ 生活密码（手机设置、电脑端验证解锁生活类功能） ============
    设计：密码存云端（hash），手机端设置/生成，电脑端打开受保护页面需输入验证。
-   受保护页面：日记/作息/运动旅行/记账 默认锁定不可取消，其余功能可自主增删。
+   受保护页面：日记/生活习惯/运动旅行/记账 默认锁定不可取消，其余功能可自主增删。
    解锁策略：电脑端验证成功后，本次登录期间保持解锁（_lifeUnlocked）。 */
 var _lifeProtected = ['diary','routine','fitness','money']; // 受保护页面（本地缓存）
 var _lifeHasPass = false;     // 是否已设置密码
@@ -12151,7 +12152,7 @@ var _lifeUnlocked = false;    // 本次登录是否已解锁
 var _lifePassCurrent = '';    // 当前生活密码明文（仅手机端本地保存用于展示；云端只存哈希无法回取）
 var LIFE_PAGES = [
   {id:'diary', name:'日记', fixed:true},
-  {id:'routine', name:'作息', fixed:true},
+  {id:'routine', name:'生活习惯', fixed:true},
   {id:'fitness', name:'运动旅行', fixed:true},
   {id:'money', name:'记账', fixed:true},
   {id:'notes', name:'笔记', fixed:false},
