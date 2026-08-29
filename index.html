@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
 <!-- v210-cachebust: 新增「设备管理」(退出菜单→📋管理所有设备)——列出全部在线设备(类型/名称/上次在线/当前标记)，可逐台踢出；Realtime广播带deviceId精准踢单台(不误伤同类型)，踢出后自动退出且需重新输账号密码 -->
 <!-- v209-cachebust: 修复手机端「退出电脑端」——①确认框失效(wbConfirm回调空且revoke抢先执行,点取消也踢)改用await wbConfirmAsync ②只find第一台→filter踢同类型全部 ③轮询15s→3s ④新增Supabase Realtime广播(Phoenix v2)秒级踢出,失败回退轮询 -->
@@ -5241,8 +5242,10 @@ async function setAccPartition(email, part, val){
 
 async function switchPage(pageId) {
   // 生活密码拦截（仅电脑端、受保护页面、未解锁时）—— 必须在清除 active 之前 return，避免空白
-  if(!wbIsPhone() && isLifeProtected(pageId) && !_lifeUnlocked){
-    await lpGuard(pageId);
+  // v212：倒数日被保护时，其子页「归档与隐藏」一并拦截（避免绕过）
+  var _lpCheck = (pageId === 'daysmatter-archive') ? 'daysmatter' : pageId;
+  if(!wbIsPhone() && isLifeProtected(_lpCheck) && !_lifeUnlocked){
+    await lpGuard(_lpCheck, pageId);
     return;
   }
   // 账号分区拦截：未勾选的分区功能对当前账号隐藏
@@ -8574,13 +8577,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 211;                         // v211：设备管理完善——已踢出变灰(禁用)；列表含全部缓存设备(离线也显示可踢)；boot自动恢复先check后register(被踢的离线设备下次打开自动失效需重登)
+const WB_VERSION = 212;                         // v212：生活密码新增「倒数日」勾选——勾选后电脑端打开倒数日(含归档与隐藏子页)需输生活密码
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 129;                 // v211 发版：128→129
+const WB_DISPLAY_VERSION = 130;                 // v212 发版：129→130
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12561,7 +12564,8 @@ var LIFE_PAGES = [
   {id:'english', name:'英语', fixed:false},
   {id:'todo', name:'待办', fixed:false},
   {id:'fun', name:'娱乐', fixed:false},
-  {id:'performance', name:'工作', fixed:false}
+  {id:'performance', name:'工作', fixed:false},
+  {id:'daysmatter', name:'倒数日', fixed:false}   // v212：勾选后电脑端打开倒数日也需生活密码
 ];
 function lpCfgKey(){ return 'wb_lifepass_cfg_' + (WB_SESSION||'guest'); }
 async function loadLifePassConfig(){
@@ -12696,7 +12700,7 @@ function lpDoVerify(){
 }
 function lpRelock(){ _lifeUnlocked=false; lpRenderStatus(); }
 // 电脑端打开受保护页面时调用：返回 true 表示可直接打开，false 表示已拦截（弹验证框 / 提示）
-async function lpGuard(pageId){
+async function lpGuard(pageId, targetPage){
   if(wbIsPhone()) return true;            // 手机端不锁
   if(!isLifeProtected(pageId)) return true;
   if(_lifeUnlocked) return true;
@@ -12706,7 +12710,7 @@ async function lpGuard(pageId){
   }
   if(_lifeHasPass){
     openLifePass(); // 电脑端显示状态面板（含验证框）
-    document.getElementById('lpInput').dataset.target = pageId; // 验证成功后跳转
+    document.getElementById('lpInput').dataset.target = targetPage || pageId; // v212：验证成功后跳回原页面（含归档子页）
     return false;
   }
   toast('请先在手机端设置生活密码');
