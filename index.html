@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
 <!-- v210-cachebust: 新增「设备管理」(退出菜单→📋管理所有设备)——列出全部在线设备(类型/名称/上次在线/当前标记)，可逐台踢出；Realtime广播带deviceId精准踢单台(不误伤同类型)，踢出后自动退出且需重新输账号密码 -->
@@ -8577,13 +8578,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 212;                         // v212：生活密码新增「倒数日」勾选——勾选后电脑端打开倒数日(含归档与隐藏子页)需输生活密码
+const WB_VERSION = 213;                         // v213：跨设备云同步重做——mtime逐键字段级合并(Storage拦截记录修改时间)，修复新设备老数据整包覆盖云端新数据、多平台数据不一致
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 130;                 // v212 发版：129→130
+const WB_DISPLAY_VERSION = 131;                 // v213 发版：130→131
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12740,14 +12741,55 @@ function _wbHash(s){
   return h.toString(16) + '-' + s.length;
 }
 
+/* v213：跨设备字段级合并 —— 拦截 wb_ 业务键写入，记录每个键的修改时间(mtime)。
+   上传时把 {key:{v,t}} 结构存进 store（后端原样存取，零改动），
+   拉取时按 mtime 逐键合并：云端新→覆盖本地，本地新→保留并上传，删除→同步删除标记。
+   彻底解决「同一账号不同平台数据不一致/老数据覆盖新数据」。 */
+var _wbMerging = false;               // 合并写回开关：true 时不更新 mtime（避免把云端覆盖误记为本地改动）
+function _wbMTKey(){ return 'wb_sync_mt_' + (WB_SESSION || 'anon'); }
+function _wbMTLoad(){ try{ return JSON.parse(localStorage.getItem(_wbMTKey()) || '{}'); }catch(e){ return {}; } }
+function _wbMTSave(mt){ try{ localStorage.setItem(_wbMTKey(), JSON.stringify(mt)); }catch(e){} }
+(function(){
+  var _orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = function(k, v){
+    var r = _orig.apply(this, arguments);
+    try{
+      if(_wbMerging) return r;
+      if(typeof k !== 'string' || k.indexOf('wb_') !== 0) return r;
+      if(/^(wb_user_|wb_meta_|wb_token|wb_session|wb_tts_|wb_tmp_|wb_sync_mt_|wb_sync_s_|wb_device_id|wb_invite_code|wb_backup_enabled|wb_api_base)/.test(k)) return r;
+      var mt = _wbMTLoad(); mt[k] = Date.now(); _wbMTSave(mt);
+    }catch(e){}
+    return r;
+  };
+  var _origDel = Storage.prototype.removeItem;
+  Storage.prototype.removeItem = function(k){
+    var r = _origDel.apply(this, arguments);
+    try{
+      if(_wbMerging) return r;
+      if(typeof k !== 'string' || k.indexOf('wb_') !== 0) return r;
+      var mt = _wbMTLoad(); mt[k] = { t: -1, d: Date.now() }; _wbMTSave(mt);   // 删除标记 + 删除时间（同步到其他设备）
+    }catch(e){}
+    return r;
+  };
+})();
+
 function _wbCollectStore(){
   var store = {};
+  var mt = _wbMTLoad();
   for(var i=0;i<localStorage.length;i++){
     var k = localStorage.key(i);
     if(!k || k.indexOf('wb_') !== 0) continue;
     if(WB_NO_SYNC.test(k)) continue;
-    store[k] = localStorage.getItem(k);
+    store[k] = { v: localStorage.getItem(k), t: mt[k] || 0 };
   }
+  // 本地已删除但可能云端还有的键 → 带删除标记上传（兼容旧数字标记 -1 → d=0）
+  Object.keys(mt).forEach(function(k){
+    var m = mt[k];
+    var isDel = (m === -1) || (m && typeof m === 'object' && m.t === -1);
+    if(isDel && k.indexOf('wb_') === 0 && !WB_NO_SYNC.test(k) && store[k] === undefined){
+      store[k] = { v: null, t: -1, d: (m && typeof m === 'object' && typeof m.d === 'number') ? m.d : 0 };
+    }
+  });
   return store;
 }
 
@@ -12811,46 +12853,82 @@ function wbStartSyncLoop(){
 }
 async function wbPullAndApply(){
   if(!WB_SESSION || !API_TOKEN) return;
-  // 安全合并（v193）：本地有未上传改动 → 先推本地（本地优先，防云端旧数据覆盖本地新笔记）；
-  // 否则云端 updatedAt 比本地基线新 → 才以云端覆盖本地；云端不比本地新则保持本地。
+  // v213：跨设备字段级合并（mtime 逐键）——彻底解决「不同平台数据不一致」。
+  // 根因（旧实现）：整包快照 + 本地hash判断dirty，新设备/清缓存设备 _syncLastHash 为空 →
+  // 误判 dirty 把老数据整包推上云，覆盖另一台设备刚上传的新数据；且合并为整包覆盖无冲突处理。
   try {
+    // 1) 拉取云端（兼容旧格式：纯字符串值视为 t=0）
+    var data = await api('/api/sync/download', 'GET');
+    if(!data || !data.store || typeof data.store !== 'object') return;
+    var cloud = data.store;
+    var cloudAt = (+data.updatedAt) || 0;
+
+    // 2) 逐键按 mtime 合并：云端新 → 覆盖本地；本地新 → 保留
+    var mt = _wbMTLoad();
+    var changed = false;
+    Object.keys(cloud).forEach(function(key){
+      if(key.indexOf('wb_') !== 0) return;
+      if(WB_NO_SYNC.test(key)) return;
+      var c = cloud[key];
+      var cv = (c && typeof c === 'object' && ('v' in c)) ? c.v : c;   // 兼容旧纯字符串格式
+      var ct = (c && typeof c === 'object' && typeof c.t === 'number') ? c.t : 0;
+      if(cv === null && ct === -1){
+        // 云端删除标记 → 本地删除
+        if(localStorage.getItem(key) !== null){
+          _wbMerging = true; try{ localStorage.removeItem(key); }catch(e){} finally{ _wbMerging = false; }
+          changed = true;
+        }
+        delete mt[key];
+        return;
+      }
+      var lm = mt[key];
+      var localT = (typeof lm === 'number') ? lm : (lm && typeof lm === 'object' && typeof lm.t === 'number') ? lm.t : 0;
+      var localDelAt = (lm && typeof lm === 'object' && lm.t === -1 && typeof lm.d === 'number') ? lm.d : 0;
+      if(localDelAt > 0){
+        // 本地已删除：云端写入时间晚于删除时间才恢复（否则保持删除并同步标记）
+        if(ct > 0 && ct > localDelAt){
+          _wbMerging = true; try{ localStorage.setItem(key, cv); }catch(e){} finally{ _wbMerging = false; }
+          mt[key] = ct; changed = true;
+        }
+        return;
+      }
+      if(ct > localT && localStorage.getItem(key) !== cv){
+        // 云端比本地新 → 覆盖本地（合并写回不污染 mtime，mtime 对齐到云端时间）
+        _wbMerging = true; try{ localStorage.setItem(key, cv); }catch(e){} finally{ _wbMerging = false; }
+        mt[key] = ct; changed = true;
+      }
+    });
+    if(changed) _wbMTSave(mt);
+
+    // 3) 合并后若本地仍有比云端新的改动（含云端没有的新键 / 本地删除标记）→ 上传合并结果
+    //    （本地已包含云端全部键，此时上传是安全并集，不会覆盖别人数据）
     var localStore = _wbCollectStore();
     var localHash = _wbHash(JSON.stringify(localStore));
-    var dirty = (localHash !== _syncLastHash); // 本地存在未成功上传的改动
-    if(dirty){
-      // 本地优先：把本地数据推上云（可能云端过期，本地为准）
+    var hasNewLocal = false;
+    Object.keys(localStore).forEach(function(key){
+      if(hasNewLocal) return;
+      var lt = localStore[key].t;
+      var c = cloud[key];
+      var ct = (c && typeof c === 'object' && typeof c.t === 'number') ? c.t : 0;
+      if(lt === -1){ hasNewLocal = true; return; }                      // 本地删除标记 → 需同步删除
+      if(lt > ct) hasNewLocal = true;                                  // 本地新（含云端无此键：ct=0, lt>0）
+    });
+    if(hasNewLocal || localHash !== _syncLastHash){
       try {
         await api('/api/sync/upload', 'POST', { store: localStore, version: WB_VERSION });
-        _syncLastHash = localHash; _syncLastAt = Date.now(); _syncPersistSave();
-        console.log('[sync] 本地有未上传改动，已本地优先推上云');
-      } catch(e){ console.warn('本地优先上传失败:', e && e.message); }
+        _syncLastHash = localHash; _syncLastAt = Math.max(cloudAt, Date.now()); _syncPersistSave();
+        console.log('[sync] 已上传合并后的本地改动');
+      } catch(e){ console.warn('同步上传失败:', e && e.message); }
     }
-    // 拉取云端（后端返回 updatedAt = 该用户云端最后更新时间）
-    var data = await api('/api/sync/download', 'GET');
-    if(data && data.store && typeof data.store === 'object'){
-      var cloudAt = (+data.updatedAt) || 0;
-      if(cloudAt > _syncLastAt){
-        // 云端比本地新 → 以云端为准覆盖本地
-        var changed = false;
-        Object.keys(data.store).forEach(function(key){
-          var v = data.store[key];
-          if(v == null) return;
-          try {
-            var nv = (typeof v === 'string') ? v : JSON.stringify(v);
-            if(localStorage.getItem(key) !== nv){ localStorage.setItem(key, nv); changed = true; }
-          } catch(e){}
-        });
-        _syncLastAt = cloudAt;
-        if(changed){
-          try { _syncLastHash = _wbHash(JSON.stringify(_wbCollectStore())); } catch(e){}
-          _syncPersistSave();
-          // 用最新数据重新渲染当前界面
-          try { wbRestore(WB_SESSION); } catch(e){}
-          try { wbApplyProfile(WB_SESSION); } catch(e){}
-          try { wbApplyAdminUI(); } catch(e){}
-        }
-      }
-      // 云端不比本地新：保持本地（若本地刚推过，两端已一致）
+
+    // 4) 基线更新 + 界面刷新
+    if(cloudAt > _syncLastAt){ _syncLastAt = cloudAt; _syncPersistSave(); }
+    if(changed){
+      try { _syncLastHash = _wbHash(JSON.stringify(_wbCollectStore())); } catch(e){}
+      _syncPersistSave();
+      try { wbRestore(WB_SESSION); } catch(e){}
+      try { wbApplyProfile(WB_SESSION); } catch(e){}
+      try { wbApplyAdminUI(); } catch(e){}
     }
   } catch(e){ console.warn('同步拉取失败:', e && e.message); }
 }
