@@ -25,6 +25,7 @@
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
+<!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -5297,6 +5298,7 @@ async function switchPage(pageId) {
   if(pageId === 'daysmatter-archive'){ try{ if(typeof dmRenderArchive==='function') dmRenderArchive(); }catch(e){ console.error('dmRenderArchive:', e); } }
   renderPerformance();   // 切页时刷新业绩统计（待办数等可能变化）
   window.scrollTo(0, 0);
+  wbSyncBadgeVisibility(); // v216：同步徽标仅首页显示，切页时刷新可见性
 }
 
 // ===== 手机端返回键导航栈（v197：首页→功能页→弹窗 一层层回退，回到首页再按才退出；电脑端不启用） =====
@@ -8594,13 +8596,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 216;                         // v216：账号管理新增「后端切换」——按账号设置优先后端(自动双写/优先SCF/优先Supabase)，仅改变读写优先级，双写永远开启，不影响功能与跨平台同步；同步徽标固定在首页首行居中
+const WB_VERSION = 217;                         // v217：同步徽标改为「仅首页显示」——固定在首页首行居中(top:8px)，切到其他页面自动隐藏(wbSyncBadgeVisibility 按 wbCurrentPage()==='home' 控制)；账号管理后端切换沿用 v216
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 133;                 // v216 发版：132→133
+const WB_DISPLAY_VERSION = 134;                 // v217 发版：133→134
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12832,7 +12834,16 @@ function wbEnsureSyncBadge(){
     el.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:99999;';
     document.body.appendChild(el);
     _wbSyncSet('init','');
+    wbSyncBadgeVisibility();
   }catch(e){}
+}
+// v216：同步徽标只在「首页」显示——固定在首页首行中间；切到其他页面自动隐藏
+function wbSyncBadgeVisibility(){
+  try {
+    var b = document.getElementById('wbSyncBadge');
+    if(!b) return;
+    b.style.display = (wbCurrentPage() === 'home') ? '' : 'none';
+  } catch(e){}
 }
 async function wbManualSync(){
   if(!WB_SESSION || !API_TOKEN){ toast('请先用「邮箱登录」云端账号，才能跨设备同步'); return; }
