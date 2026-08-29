@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v221-cachebust: 作息表环形钟交互升级——①可拨动表针：svg 绑定 pointerdown/move/up 拖动，角度→分钟实时更新(rtSchedHandMins/rtSchedBindHand)；②表针命中区域自动放大：命中弧段外扩5px+白色描边+其余降透明度，中心显示指针时间+命中日程名+色点，时间轴同步高亮；③弧上文字由大类(生活/工作)改为具体日程 label(吃早餐/晨练/午休)，每日程按 label 哈希从 RT_SLOT_PALETTE(12深色)取稳定色，白字可读；④图例改列具体日程(色点+label+开始时间) -->
+<!-- v222-cachebust: 作息表唤醒表盘——①空闲(未拖动)时表针始终指向当前时间，新增 30s 自动走时定时器(_rtSchedAutoTicker，仅表盘可见且未拖动时刷新)，表针随时间自动变换位置；②拖动表针时临时锁定位置，松手 3s 后自动恢复(null → 回当前时间)；③移除表盘中心覆盖(rtSchedCount/rtSchedCountSub 及 .rt-sched-clock-center 全部删除)，表盘干净只剩表针轴心；④图例从表盘右上角 absolute 覆盖改为表盘外横向 wrap 条(色点+label+开始时间) -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -665,18 +665,11 @@ body.sb-collapsed .sidebar-item:hover::after {
   position: relative; width: 240px; height: 240px;
 }
 .rt-sched-clock svg { width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; }
-.rt-sched-clock-center {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; pointer-events: none;
-}
-.rt-sched-clock-num { font-size: 56px; font-weight: 800; color: #222; line-height: 1; }
-.rt-sched-clock-label { font-size: 12px; color: #999; margin-top: 4px; }
 .rt-sched-legend {
-  position: absolute; top: 6px; right: -6px;
-  background: #fff; border-radius: 10px; padding: 4px 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  display: flex; flex-direction: column; gap: 3px;
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  justify-content: center; margin: 2px 0 10px;
   font-size: 10px; color: #555;
+  background: #f7f8fa; border-radius: 10px; padding: 6px 10px;
 }
 .rt-sched-legend .leg-item { display: flex; align-items: center; gap: 4px; }
 .rt-sched-legend .leg-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -3055,14 +3048,12 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <div class="rt-sched-clock-wrap">
       <div class="rt-sched-clock">
         <svg id="rtSchedClock" viewBox="0 0 240 240"></svg>
-        <div class="rt-sched-clock-center">
-          <div class="rt-sched-clock-num" id="rtSchedCount">0</div>
-          <div class="rt-sched-clock-label" id="rtSchedCountSub">拨动表针查看日程</div>
-        </div>
-        <div class="rt-sched-legend" id="rtSchedLegend"></div>
         <div class="rt-sched-now-tag" id="rtSchedNowTag" style="display:none">--:--</div>
       </div>
     </div>
+
+    <!-- 图例（表盘外，横向条） -->
+    <div class="rt-sched-legend" id="rtSchedLegend"></div>
 
     <!-- 时间轴列表 -->
     <div class="rt-sched-timeline" id="rtSchedTimeline"></div>
@@ -9388,13 +9379,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 221;                         // v221：作息表环形钟交互升级——可拨动表针(拖动svg指针实时换算时间) + 表针命中区域自动放大(弧段外扩5/加白描边/其余降透明度) + 弧上显示具体日程(吃早餐/晨练/午休等label而非大类) + 每日程按label哈希取12深色稳定配色 + 中心显示指针时间/命中日程 + 图例改具体日程 + 时间轴命中高亮
+const WB_VERSION = 222;                         // v222：作息表唤醒表盘——空闲时表针指向当前时间并每30s自动走动(定时器)；拖动临时控制表针、松手3s后自动回当前时间；移除表盘中心文字与图例覆盖(图例移表盘外横向条)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 138;                 // v221 发版：137→138
+const WB_DISPLAY_VERSION = 139;                 // v222 发版：138→139
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12297,7 +12288,6 @@ function rtSchedRenderList(){
   var strip = document.getElementById('rtSchedStrip');
   var clock = document.getElementById('rtSchedClock');
   var tl = document.getElementById('rtSchedTimeline');
-  var countEl = document.getElementById('rtSchedCount');
   var titleEl = document.getElementById('rtSchedDayTitle');
   var legendEl = document.getElementById('rtSchedLegend');
   var nowTag = document.getElementById('rtSchedNowTag');
@@ -12352,12 +12342,10 @@ function rtSchedRenderList(){
     for(var i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
     return RT_SLOT_PALETTE[h % RT_SLOT_PALETTE.length];
   }
-  // 指针分钟（默认：今日=当前时间，其他日期=08:00）
-  if(rtSchedHandMins === null){
-    rtSchedHandMins = (rtSchedViewDate === todayStr)
-      ? (new Date().getHours()*60 + new Date().getMinutes())
-      : 8*60;
-  }
+  // v222：表针分钟——空闲(未拖动)时始终 = 当前时间，拖动时 = 用户拨动值
+  var handMins = (rtSchedHandMins === null)
+    ? (new Date().getHours()*60 + new Date().getMinutes())
+    : rtSchedHandMins;
   // 指针命中的日程索引（跨天兼容）
   var handSlotIdx = -1;
   function minsHitSlot(mins, sl){
@@ -12369,7 +12357,7 @@ function rtSchedRenderList(){
     return m >= p && m < q;
   }
   for(var hi=0; hi<daySlots.length; hi++){
-    if(minsHitSlot(rtSchedHandMins, daySlots[hi])){ handSlotIdx = hi; break; }
+    if(minsHitSlot(handMins, daySlots[hi])){ handSlotIdx = hi; break; }
   }
 
   // 底圈（外环薄圈+内圆薄圈）
@@ -12433,8 +12421,8 @@ function rtSchedRenderList(){
     }
   });
 
-  // 可拨动表针（深蓝，从内圆到刻度外）
-  var hA = rtSchedHandMins/(24*60)*Math.PI*2 - Math.PI/2;
+  // 可拨动表针（深蓝，从内圆到刻度外）——空闲时指向当前时间
+  var hA = handMins/(24*60)*Math.PI*2 - Math.PI/2;
   var hx1 = cx + (rIn-2)*Math.cos(hA);
   var hy1 = cy + (rIn-2)*Math.sin(hA);
   var hx2 = cx + (rLabel+6)*Math.cos(hA);
@@ -12447,11 +12435,11 @@ function rtSchedRenderList(){
 
   clock.innerHTML = svgParts.join('');
 
-  // 4) 指针时间 pill + 中心显示（始终跟随指针）
+  // 4) 指针时间 pill（跟随表针：空闲=当前时间，拖动=拨动时间）
   if(nowTag){
     nowTag.style.display = 'block';
-    var hm = String(Math.floor(rtSchedHandMins/60)).padStart(2,'0');
-    var mm = String(rtSchedHandMins%60).padStart(2,'0');
+    var hm = String(Math.floor(handMins/60)).padStart(2,'0');
+    var mm = String(handMins%60).padStart(2,'0');
     nowTag.textContent = '◀ ' + hm + ':' + mm;
     var px = cx + 138*Math.cos(hA);
     var py = cy + 138*Math.sin(hA);
@@ -12459,22 +12447,7 @@ function rtSchedRenderList(){
     nowTag.style.top  = (py - 13) + 'px';
   }
 
-  // 5) 中间数字：指针时间 + 命中日程名
-  if(countEl){
-    var hm = String(Math.floor(rtSchedHandMins/60)).padStart(2,'0');
-    var mm = String(rtSchedHandMins%60).padStart(2,'0');
-    countEl.textContent = hm + ':' + mm;
-  }
-  var countSubEl = document.getElementById('rtSchedCountSub');
-  if(countSubEl){
-    if(handSlotIdx >= 0){
-      var hS = daySlots[handSlotIdx];
-      var hC = rtSchedSlotColor(hS.label);
-      countSubEl.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+hC+';margin-right:5px;vertical-align:middle"></span><b style="color:'+hC+'">'+esc(hS.label||'日程')+'</b> <span style="color:#bbb">· '+hS.start+'~'+hS.end+'</span>';
-    } else {
-      countSubEl.innerHTML = '<span style="color:#bbb">空闲时段</span>';
-    }
-  }
+  // 5) 标题（表盘中心不再显示文字，避免覆盖）
   if(titleEl){
     var isToday2 = rtSchedViewDate === todayStr;
     titleEl.textContent = (isToday2?'今日':view.getMonth()+1+'月'+view.getDate()+'日')+' · '+(daySlots.length)+' 个日程';
@@ -12543,8 +12516,10 @@ var rtSchedViewDate = null;
 
 // v221：日程弧段稳定多色板（12 深色，白字可读）+ 可拨动表针状态
 var RT_SLOT_PALETTE = ['#E85D04','#C1121F','#3A0CA3','#023E8A','#0077B6','#136F63','#2D6A4F','#5F0F40','#7F5539','#3D405B','#4F772D','#9C6644'];
-var rtSchedHandMins = null;   // 表针分钟 0-1439
+var rtSchedHandMins = null;   // 表针分钟 0-1439；null = 自动走时（跟随当前时间）
 var _rtSchedHandBound = false;
+var _rtSchedAutoTicker = null;  // 自动走时定时器
+var _rtSchedHandResetT = null;  // 拖动松手后恢复自动的定时器
 function rtSchedBindHand(){
   var svg = document.getElementById('rtSchedClock');
   if(!svg || _rtSchedHandBound) return;
@@ -12564,6 +12539,7 @@ function rtSchedBindHand(){
   }
   svg.addEventListener('pointerdown', function(e){
     dragging = true;
+    if(_rtSchedHandResetT){ clearTimeout(_rtSchedHandResetT); _rtSchedHandResetT = null; }
     try{ svg.setPointerCapture(e.pointerId); }catch(err){}
     handFromEvent(e);
     e.preventDefault();
@@ -12571,8 +12547,27 @@ function rtSchedBindHand(){
   svg.addEventListener('pointermove', function(e){
     if(dragging){ handFromEvent(e); e.preventDefault(); }
   });
-  svg.addEventListener('pointerup', function(e){ dragging = false; });
-  svg.addEventListener('pointercancel', function(e){ dragging = false; });
+  function release(){
+    dragging = false;
+    // 松手 3 秒后恢复自动走时（表针回到当前时间）
+    if(_rtSchedHandResetT) clearTimeout(_rtSchedHandResetT);
+    _rtSchedHandResetT = setTimeout(function(){
+      rtSchedHandMins = null;
+      _rtSchedHandResetT = null;
+      rtSchedRenderList();
+    }, 3000);
+  }
+  svg.addEventListener('pointerup', release);
+  svg.addEventListener('pointercancel', release);
+  // 自动走时：每 30 秒刷新一次（仅当表盘可见且未在拖动）
+  if(!_rtSchedAutoTicker){
+    _rtSchedAutoTicker = setInterval(function(){
+      var sch = document.getElementById('rt-schedule');
+      if(sch && sch.style.display !== 'none' && rtSchedHandMins === null){
+        rtSchedRenderList();
+      }
+    }, 30000);
+  }
 }
 
 /* --------- 编辑弹窗 --------- */
