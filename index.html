@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v226-cachebust: 待办「📅 预约回访」新增日期范围点选条(#apptRangeRow 六个 tab：今日及逾期[默认]/3日内/7日内/15日内/30日内/全部)，_apptRange 全局状态 + setApptRange() 切换并重渲；N日内 cutoff = 今天+N(本地时区)，apptDate<=cutoff 均显示(含逾期)；排序 今天>逾期>明天>日期升序、徽章(粉今天/橙明天/深红逾期) 均保留 -->
+<!-- v227-cachebust: 运动旅行——①统计卡片(本周/累计km/累计分/本月)强制一行：fit-sport 的 .study-stats 加 inline grid-template-columns:repeat(4,1fr)，覆盖手机端/平板 3 列媒体查询；②运动类型区固定渲染全部 6 张卡片(跑步🏃/徒步🚶/羽毛球🏸/乒乓球🏓/跳操🕺/运动器材🏋️)，计数=该类型累计次数(无记录显示0)，点击 pickFitType() 自动填充「记录运动」表单类型+日期(空则今日)+高亮卡片+聚焦输入框；此前只显示有记录的类型 -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -3815,7 +3815,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
   </div>
 
-  <div class="study-stats" style="gap:4px;margin-bottom:8px">
+  <div class="study-stats" style="grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px">
     <div class="ss-item" style="padding:8px 4px"><div class="ss-num orange" id="fitWeek">0</div><div class="ss-label">本周(次)</div></div>
     <div class="ss-item" style="padding:8px 4px"><div class="ss-num blue" id="fitDist">0</div><div class="ss-label">累计(km)</div></div>
     <div class="ss-item" style="padding:8px 4px"><div class="ss-num green" id="fitMin">0</div><div class="ss-label">累计(分)</div></div>
@@ -9429,13 +9429,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 226;                         // v226：待办「预约回访」新增日期范围点选——今日及逾期(默认)/3日内/7日内/15日内/30日内/全部；_apptRange 状态 + setApptRange()；N日内=含逾期到未来第N天(apptDate<=cutoff)；排序/徽章保留
+const WB_VERSION = 227;                         // v227：运动旅行——①本周/累计km/累计分/本月四个统计卡片固定一行(inline grid-template-columns:repeat(4,1fr) 覆盖手机3列媒体查询)；②运动类型固定显示全部6张卡片(跑步/徒步/羽毛球/乒乓球/跳操/运动器材，计数=累计次数)，点击卡片自动填充记录表单类型+高亮+聚焦
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 143;                 // v226 发版：142→143
+const WB_DISPLAY_VERSION = 144;                 // v227 发版：143→144
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12865,12 +12865,35 @@ function renderFitness(){
   setText('fitWeek', thisWeek); setText('fitDist', cumDist.toFixed(1)); setText('fitMin', cumMin); setText('fitMonth', monthN);
   var tbox=document.getElementById('fitTypes');
   if(tbox){
-    var icons={跑步:'🏃',徒步:'🚶',羽毛球:'🏸',乒乓球:'🏓',跳操:'🕺',运动器材:'🏋️'};
-    var ks=Object.keys(types);
-    tbox.innerHTML = ks.length? ks.map(function(t){ return '<div class="gt-item"><div class="gt-icon">'+(icons[t]||'🏃')+'</div><div class="gt-name">'+esc(t)+'</div><div class="gt-count">'+types[t]+'</div></div>'; }).join('') : '<div class="empty-state"><div class="icon">🏃</div><p>还没有运动记录</p></div>';
+    // v227：固定显示全部运动类型卡片（含羽毛球/跳操），计数=该类型累计次数，点击填充记录表单
+    var fitAllTypes=[{t:'跑步',i:'🏃'},{t:'徒步',i:'🚶'},{t:'羽毛球',i:'🏸'},{t:'乒乓球',i:'🏓'},{t:'跳操',i:'🕺'},{t:'运动器材',i:'🏋️'}];
+    tbox.innerHTML = fitAllTypes.map(function(tp){
+      var n=types[tp.t]||0;
+      return '<div class="gt-item" onclick="pickFitType(\''+tp.t+'\')"><div class="gt-icon">'+tp.i+'</div><div class="gt-name">'+tp.t+'</div><div class="gt-count">'+n+'</div></div>';
+    }).join('');
   }
   paintCal('fitCal','fitness', new Set(Object.keys(f.log)));
   renderFitRecords();
+}
+// v227：点击运动类型卡片 → 填充记录表单并聚焦
+function pickFitType(t){
+  var sel=document.getElementById('fitType');
+  if(sel){
+    sel.value=t;
+    try{ fitTypeChange(); }catch(e){}
+  }
+  var d=document.getElementById('fitDate');
+  if(d && !d.value) d.value=tdCalLocalToday();
+  var focus=document.getElementById('fitDistIn')||document.getElementById('fitDur');
+  if(focus) try{ focus.focus(); }catch(e){}
+  var tbox=document.getElementById('fitTypes');
+  if(tbox){
+    var gs=tbox.querySelectorAll('.gt-item');
+    for(var i=0;i<gs.length;i++){
+      var nameEl=gs[i].querySelector('.gt-name');
+      gs[i].classList.toggle('active', nameEl && nameEl.textContent===t);
+    }
+  }
 }
 var FIT_TYPE_ICONS = {跑步:'🏃',徒步:'🚶',羽毛球:'🏸',乒乓球:'🏓',跳操:'🕺',运动器材:'🏋️'};
 function renderFitRecords(){
