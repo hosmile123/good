@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v208-cachebust: 月经新增「分析」子页(page-period-analysis)——经期预测(月历预览/±2天可能范围)、周期变化(最近1个+近期柱状对比+深度分析)、经期变化(本次+历次)；数据复用 r.period.log，零迁移 -->
 <!-- v207-cachebust: 模块改名「作息」→「生活习惯」——19处显示文案(侧边栏/底部导航/首页快捷/首页简介/页面标题/生活密码说明/受保护页面/分区说明/注释)；page-routine/id/变量不变，数据兼容 -->
 <!-- v206-cachebust: 倒数日修3处——①置顶真正置顶(pinned排最前，主列表+归档页一致) ②选择图标改上下滑选取(11分类纵向区块滚动，去掉横滑tab) ③编辑弹窗补回「归档/隐藏」操作行(可取消归档/隐藏恢复主页) -->
 <!-- v205-cachebust: 倒数日进阶设置4项全开放(显示精确时间/高亮突出/事件颜色12色/选择图标11分类132个，去掉Pro标记) + 内置农历引擎(1900-2100 lunarInfo表，公历农历自动换算，e.date恒存公历保证计算正确) -->
@@ -2558,6 +2559,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
           <button class="btn-primary" style="background:#999;white-space:nowrap" onclick="clearPeriodMonthFilter()">全部</button>
         </div>
         <div id="periodRecordList" style="margin-top:10px"></div>
+        <button class="btn-primary" style="width:100%;margin-top:14px" onclick="prOpenAnalysis()">📊 查看经期分析（预测/周期/天数变化）</button>
       </div>
     </div>
 
@@ -2654,7 +2656,338 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   </div>
 </div>
 
-  <!-- 习惯目标设置 -->
+  <!-- ========== 月经：分析子页（v208） ========== -->
+<div class="page" id="page-period-analysis">
+  <div class="page-header" style="background:#fff;border-bottom:1px solid #f0f0f0">
+    <button class="page-back" onclick="switchPage('routine')">‹</button>
+    <div class="page-title" style="font-weight:600">分析</div>
+    <div style="width:32px"></div>
+  </div>
+  <div style="padding:14px 12px 80px;max-width:720px;margin:0 auto" id="pr-content"></div>
+</div>
+
+<style>
+  .pr-card { background:#fff; border-radius:14px; padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .pr-head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
+  .pr-head:active { opacity:.7; }
+  .pr-title { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:600; color:#333; }
+  .pr-title .ic { width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .pr-arrow { color:#bbb; font-size:20px; transition:transform .2s; }
+  .pr-arrow.open { transform:rotate(90deg); }
+  .pr-body { margin-top:12px; }
+  .pr-body.collapse { display:none; }
+  .pr-sub { font-size:13px; color:#666; margin-bottom:10px; }
+  .pr-monthbar { display:flex; align-items:center; justify-content:space-between; margin:8px 0 6px; color:#999; font-size:13px; }
+  .pr-days { display:flex; gap:6px; align-items:flex-end; justify-content:space-between; flex-wrap:nowrap; }
+  .pr-day { flex:1 1 0; min-width:0; text-align:center; }
+  .pr-day .num { font-size:14px; font-weight:600; color:#333; margin-bottom:6px; }
+  .pr-day .box { border-radius:10px; padding:14px 0; font-size:12px; }
+  .pr-day.possible .box { background:#FFE4EC; color:#E91E63; }
+  .pr-day.predicted .box { background:#E91E63; color:#fff; border:2px solid #C2185B; }
+  .pr-day.normal .box { background:#fff; color:#333; border:1px solid #eee; }
+  .pr-legend { display:flex; gap:14px; font-size:12px; color:#666; margin-top:10px; padding:0 4px; }
+  .pr-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:-1px; margin-right:4px; }
+  .pr-stat-row { display:flex; background:#fff; border:1px solid #f0f0f0; border-radius:10px; padding:12px 14px; margin-top:10px; }
+  .pr-stat-row .col { flex:1; text-align:center; }
+  .pr-stat-row .col + .col { border-left:1px solid #f0f0f0; }
+  .pr-stat-row .label { font-size:12px; color:#999; margin-bottom:6px; }
+  .pr-stat-row .val { font-size:18px; font-weight:700; color:#333; }
+  .pr-stat-row .val small { font-size:12px; font-weight:400; color:#999; margin-left:2px; }
+  .pr-stat-row .delta { font-size:12px; margin-top:4px; }
+  .pr-stat-row .delta.pos { color:#E91E63; }
+  .pr-stat-row .delta.neg { color:#43A047; }
+  .pr-stat-row .delta.none { color:#999; }
+  .pr-bar-row { display:flex; align-items:center; padding:10px 0; font-size:13px; }
+  .pr-bar-row .date { width:64px; flex:0 0 64px; color:#999; }
+  .pr-bar-row .tag { width:62px; flex:0 0 62px; }
+  .pr-bar-row .tag b { color:#E91E63; }
+  .pr-bar-row .tag b.neg { color:#43A047; }
+  .pr-bar-row .bar { flex:1; height:18px; border-radius:9px; background:linear-gradient(90deg,#FFCDD2,#F8BBD0); position:relative; min-width:60px; overflow:hidden; }
+  .pr-bar-row .bar .lbl { position:absolute; right:8px; top:0; line-height:18px; color:#fff; font-size:12px; font-weight:600; }
+  .pr-section-title { font-size:14px; color:#999; margin:14px 0 6px; padding-left:4px; }
+  .pr-deep { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#FFF8E1; border-radius:10px; margin-top:10px; cursor:pointer; }
+  .pr-deep:active { opacity:.7; }
+  .pr-deep .lt { font-size:13px; color:#8D6E63; }
+  .pr-deep .lt b { color:#5D4037; }
+  .pr-tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:4px; background:#43A047; color:#fff; margin-left:4px; vertical-align:2px; }
+  .pr-tag.long { background:#FB8C00; }
+  .pr-tag.short { background:#1976D2; }
+  .pr-empty { text-align:center; color:#999; padding:40px 20px; }
+  .pr-back-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; font-size:24px; cursor:pointer; user-select:none; }
+</style>
+
+<script>
+(function(){
+  /* ====== 工具 ====== */
+  function prGetRecords(){
+    var r=(typeof getRoutine==='function')? getRoutine(): {period:{cycleLen:28,log:{}}};
+    if(!r.period) r.period={cycleLen:28,log:{}};
+    var keys=Object.keys(r.period.log).sort();
+    return keys.map(function(k){ return {start:k, days:r.period.log[k].days}; });
+  }
+  function prDiff(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+  function prAdd(d, n){ var x=new Date(d+'T00:00:00'); x.setDate(x.getDate()+n); return _ymd(x.getFullYear(),x.getMonth(),x.getDate()); }
+  function prLabel(d){ var p=d.split('-'); return parseInt(p[1],10)+'月'+parseInt(p[2],10)+'日'; }
+  function prLabelMd(d){ var p=d.split('-'); return p[0]+'.'+parseInt(p[1],10)+'.'+parseInt(p[2],10); }
+
+  /* ====== 1. 经期预测 ====== */
+  function prRenderPredict(recs, cycleLen){
+    if(!recs.length) return '';
+    var last=recs[recs.length-1];
+    var nextStart=prAdd(last.start, cycleLen);
+    var variance=2;  // ±2 天为「可能」
+    var days=[];
+    // 月份边界处理：取预测所在月（左右各扩 2 天，月跨月时也展示）
+    var cursor=prAdd(nextStart, -variance);
+    for(var i=0;i<2*variance+1;i++) days.push(prAdd(cursor, i));
+
+    // 标记每个月
+    var curMonth='';
+    var html='';
+    html+='<div class="pr-card">';
+    html+='<div class="pr-head" onclick="prToggle(this)">';
+    html+='<div class="pr-title"><div class="ic" style="background:#FCE4EC;color:#C2185B">🎯</div>经期预测</div>';
+    html+='<span class="pr-arrow open">›</span></div>';
+    html+='<div class="pr-body">';
+    // 副标题：相对今天
+    var today=_today();
+    var diffToNext=prDiff(today, nextStart);
+    var sub;
+    if(diffToNext===0) sub='预测经期将于 <b>今日</b> 开始';
+    else if(diffToNext>0) sub='预测经期将于 <b>'+diffToNext+' 天后</b> 开始（'+prLabelMd(nextStart)+'）';
+    else sub='预测经期已于 <b>'+Math.abs(diffToNext)+' 天前</b> 开始（'+prLabelMd(nextStart)+'），请注意是否已来临';
+    html+='<div class="pr-sub">'+sub+'</div>';
+
+    // 月份条：自动按预测日所在月开始
+    var np=nextStart.split('-');
+    var monthStr=parseInt(np[1],10)+'月';
+    var nextMonth=parseInt(np[1],10)===12?1:parseInt(np[1],10)+1;
+    var nextMonthStr=nextMonth+'月';
+    html+='<div class="pr-monthbar"><span>'+monthStr+'</span><span>'+nextMonthStr+'</span></div>';
+
+    html+='<div class="pr-days">';
+    for(var i=0;i<days.length;i++){
+      var d=days[i];
+      var isPred=(d===nextStart);
+      var isPoss=!isPred;
+      var isToday=(d===today);
+      var cls=isPred?'predicted':(isPoss?'possible':'normal');
+      var sty='';
+      if(isToday && !isPred) sty='box-shadow:0 0 0 2px #1976D2;';
+      html+='<div class="pr-day '+cls+'"><div class="num">'+parseInt(d.split('-')[2],10)+'</div><div class="box" style="'+sty+'">'+(isPred?'预测':(isToday?'今天':''))+'</div></div>';
+    }
+    html+='</div>';
+
+    html+='<div class="pr-legend">';
+    html+='<span><span class="dot" style="background:#E91E63"></span>预测经期开始日</span>';
+    html+='<span><span class="dot" style="background:#FFE4EC"></span>可能的经期开始日</span>';
+    html+='</div>';
+
+    html+='</div></div>';
+    return html;
+  }
+
+  /* ====== 2. 周期变化 ====== */
+  function prRenderCycles(recs){
+    if(recs.length<2) return '<div class="pr-card"><div class="pr-title"><div class="ic" style="background:#E3F2FD;color:#1976D2">📅</div>周期变化</div><div class="pr-body"><div class="pr-empty">至少需要 2 条月经记录才能分析周期</div></div></div>';
+    // 周期列表
+    var cycles=[];
+    for(var i=1;i<recs.length;i++){
+      cycles.push({ prev:recs[i-1].start, curr:recs[i].start, days:prDiff(recs[i-1].start, recs[i].start) });
+    }
+    // 最近 1 个周期 vs 前 1 个
+    var last=cycles[cycles.length-1];
+    var prev=cycles.length>=2?cycles[cycles.length-2]:null;
+    var avg=Math.round(cycles.reduce(function(a,c){return a+c.days;},0)/cycles.length);
+
+    var html='';
+    html+='<div class="pr-card">';
+    html+='<div class="pr-head" onclick="prToggle(this)">';
+    html+='<div class="pr-title"><div class="ic" style="background:#E3F2FD;color:#1976D2">📅</div>周期变化</div>';
+    html+='<span class="pr-arrow">›</span></div>';
+    html+='<div class="pr-body collapse">';
+
+    // 最近 1 个周期
+    html+='<div class="pr-section-title">● 最近 1 个周期</div>';
+    html+='<div class="pr-stat-row">';
+    html+='<div class="col"><div class="label">周期天数</div><div class="val">'+last.days+'<small>天</small></div></div>';
+    if(prev){
+      var dDelta=last.days-prev.days;
+      var dCls=dDelta>0?'pos':(dDelta<0?'neg':'none');
+      var dTxt=dDelta>0?('比前 1 个周期 +'+dDelta+' 天'):(dDelta<0?('比前 1 个周期 '+dDelta+' 天'):'与前 1 个周期相同');
+      html+='<div class="col"><div class="label">比前 1 个周期</div><div class="val">'+Math.abs(dDelta)+'<small>天</small></div><div class="delta '+dCls+'">'+(dDelta>0?'↑ 推后':(dDelta<0?'↓ 提前':'— 相同'))+'</div></div>';
+    } else {
+      html+='<div class="col"><div class="label">比前 1 个周期</div><div class="val">--<small>天</small></div></div>';
+    }
+    html+='</div>';
+
+    // 近期周期天数
+    html+='<div class="pr-section-title">● 近期周期天数</div>';
+    // 倒序：最近在上
+    var showList=cycles.slice().reverse().slice(0,6);
+    // 找到 max 用于 bar 宽度
+    var maxD=Math.max.apply(null, showList.map(function(c){return c.days;}));
+    showList.forEach(function(c, idx){
+      var prevC=idx<showList.length-1?showList[idx+1]:null;
+      var dDelta=prevC?(c.days-prevC.days):0;
+      var tagTxt='', tagCls='';
+      if(prevC){
+        if(dDelta>0){ tagTxt='推后 '+dDelta+' 天'; tagCls='<b>'+dDelta+'</b>'; }
+        else if(dDelta<0){ tagTxt='提前 '+Math.abs(dDelta)+' 天'; tagCls='<b class="neg">'+Math.abs(dDelta)+'</b>'; }
+        else { tagTxt='准时'; tagCls='<b class="neg">✓</b>'; }
+      } else { tagTxt='当前周期 '+c.days+' 天'; tagCls='<span class="pr-tag" style="background:#E91E63">进行中</span>'; }
+      var wPct=Math.max(20, Math.round(c.days/maxD*100));
+      html+='<div class="pr-bar-row">';
+      html+='<div class="date">'+prLabelMd(c.curr).split('.').slice(1).join('.')+'</div>';
+      html+='<div class="tag">'+tagTxt.replace(/\d+/, function(m){ return tagCls.replace(/\d+/, m); })+'</div>';
+      html+='<div class="bar" style="background:linear-gradient(90deg,#FFCDD2 '+wPct+'%,#FFE4EC '+wPct+'%);width:100%"><span class="lbl">'+c.days+'天</span></div>';
+      html+='</div>';
+    });
+
+    // 深度分析入口
+    html+='<div class="pr-deep" onclick="prOpenDeep(\'cycle\')">';
+    html+='<div class="lt">💎 <b>深度分析已更新！</b>查看异常和建议</div>';
+    html+='<span style="color:#999;font-size:18px">›</span>';
+    html+='</div>';
+
+    html+='</div></div>';
+    return html;
+  }
+
+  /* ====== 3. 经期变化 ====== */
+  function prRenderPeriodDays(recs){
+    if(!recs.length) return '';
+    // 当前这次 vs 上次
+    var cur=recs[recs.length-1];
+    var prev=recs.length>=2?recs[recs.length-2]:null;
+    var avg=Math.round(recs.reduce(function(a,r){return a+r.days;},0)/recs.length);
+
+    var html='';
+    html+='<div class="pr-card">';
+    html+='<div class="pr-head" onclick="prToggle(this)">';
+    html+='<div class="pr-title"><div class="ic" style="background:#FCE4EC;color:#C2185B">💧</div>经期变化</div>';
+    html+='<span class="pr-arrow">›</span></div>';
+    html+='<div class="pr-body collapse">';
+
+    // 本次经期
+    html+='<div class="pr-section-title">● 本次经期</div>';
+    html+='<div class="pr-stat-row">';
+    html+='<div class="col"><div class="label">经期天数</div><div class="val">'+cur.days+'<small>天</small>'+(cur.days>=3&&cur.days<=7?'<span class="pr-tag">正常</span>':(cur.days<3?'<span class="pr-tag short">偏短</span>':'<span class="pr-tag long">偏长</span>'))+'</div></div>';
+    if(prev){
+      var dDelta=cur.days-prev.days;
+      var dCls=dDelta>0?'pos':(dDelta<0?'neg':'none');
+      html+='<div class="col"><div class="label">比上个周期</div><div class="val">'+Math.abs(dDelta)+'<small>天</small></div><div class="delta '+dCls+'">'+(dDelta>0?'↑ +'+dDelta+' 天':(dDelta<0?'↓ '+dDelta+' 天':'— 相同'))+'</div></div>';
+    } else {
+      html+='<div class="col"><div class="label">比上个周期</div><div class="val">--<small>天</small></div></div>';
+    }
+    html+='</div>';
+
+    // 历史经期天数（最近 6 次）
+    if(recs.length>=2){
+      html+='<div class="pr-section-title">● 历次经期天数</div>';
+      var showList=recs.slice().reverse().slice(0,6);
+      var maxD=Math.max.apply(null, showList.map(function(r){return r.days;}));
+      showList.forEach(function(r){
+        var wPct=Math.max(20, Math.round(r.days/maxD*100));
+        var tag=r.days>=3&&r.days<=7?'<span class="pr-tag">正常</span>':(r.days<3?'<span class="pr-tag short">偏短</span>':'<span class="pr-tag long">偏长</span>');
+        html+='<div class="pr-bar-row">';
+        html+='<div class="date">'+prLabelMd(r.start).split('.').slice(1).join('.')+'</div>';
+        html+='<div class="tag">'+tag+'</div>';
+        html+='<div class="bar" style="background:linear-gradient(90deg,#FFCDD2 '+wPct+'%,#FFE4EC '+wPct+'%);width:100%"><span class="lbl">'+r.days+'天</span></div>';
+        html+='</div>';
+      });
+    }
+
+    html+='</div></div>';
+    return html;
+  }
+
+  /* ====== 深度分析（轻量） ====== */
+  window.prOpenDeep=function(kind){
+    var recs=prGetRecords();
+    if(recs.length<2){ toast('记录不足，无法深度分析'); return; }
+    var lines=[];
+    var cycles=[];
+    for(var i=1;i<recs.length;i++) cycles.push({ days:prDiff(recs[i-1].start, recs[i].start) });
+    var avg=cycles.reduce(function(a,c){return a+c.days;},0)/cycles.length;
+    var minD=Math.min.apply(null, cycles.map(function(c){return c.days;}));
+    var maxD=Math.max.apply(null, cycles.map(function(c){return c.days;}));
+    var variance=maxD-minD;
+
+    lines.push('📊 <b>基于 '+cycles.length+' 个周期的深度分析</b>');
+    lines.push('· 平均周期：<b>'+avg.toFixed(1)+'</b> 天（范围 '+minD+'~'+maxD+' 天）');
+    lines.push('· 周期波动：<b>'+variance+'</b> 天（越小越规律）');
+    if(variance<=4) lines.push('✅ 周期规律性：<b>优</b>（波动 ≤4 天）');
+    else if(variance<=7) lines.push('⚠️ 周期规律性：<b>良</b>（波动 5-7 天）');
+    else lines.push('❌ 周期规律性：<b>差</b>（波动 >7 天，建议就医）');
+
+    var daysList=recs.map(function(r){return r.days;});
+    var dAvg=daysList.reduce(function(a,d){return a+d;},0)/daysList.length;
+    var dMin=Math.min.apply(null, daysList), dMax=Math.max.apply(null, daysList);
+    lines.push('· 平均经期：<b>'+dAvg.toFixed(1)+'</b> 天（范围 '+dMin+'~'+dMax+' 天）');
+    if(dAvg>=3 && dAvg<=7) lines.push('✅ 经期时长：<b>正常</b>');
+    else if(dAvg<3) lines.push('⚠️ 经期时长：<b>偏短</b>（<3 天）');
+    else lines.push('⚠️ 经期时长：<b>偏长</b>（>7 天）');
+
+    // 趋势（最近 3 个）
+    if(cycles.length>=3){
+      var recent3=cycles.slice(-3);
+      var up=recent3.every(function(c,i){ return i===0 || c.days>=recent3[i-1].days; });
+      var down=recent3.every(function(c,i){ return i===0 || c.days<=recent3[i-1].days; });
+      if(up) lines.push('📈 最近 3 个周期 <b>持续延长</b>');
+      else if(down) lines.push('📉 最近 3 个周期 <b>持续缩短</b>');
+    }
+
+    // 异常值
+    var outliers=cycles.filter(function(c){ return Math.abs(c.days-avg)>=5; });
+    if(outliers.length){
+      lines.push('· 异常周期 '+outliers.length+' 个（与平均差 ≥5 天）');
+    }
+    lines.push('');
+    lines.push('💡 <b>建议</b>：保持规律作息、避免过度节食与压力；如异常持续 3 个月以上，建议妇科就诊。');
+
+    if(typeof wbModal==='function'){
+      wbModal({ title:'深度分析', body: lines.join('<br>'), okText:'知道了', showCancel:false });
+    } else {
+      alert(lines.join('\n'));
+    }
+  };
+
+  /* ====== 折叠切换 ====== */
+  window.prToggle=function(headEl){
+    var body=headEl.parentElement.querySelector('.pr-body');
+    var arr=headEl.querySelector('.pr-arrow');
+    if(!body) return;
+    var open=!body.classList.contains('collapse');
+    if(open){ body.classList.add('collapse'); if(arr) arr.classList.remove('open'); }
+    else    { body.classList.remove('collapse'); if(arr) arr.classList.add('open'); }
+  };
+
+  /* ====== 入口 ====== */
+  window.prOpenAnalysis=function(){
+    switchPage('period-analysis');
+  };
+
+  window.prRenderAnalysis=function(){
+    var box=document.getElementById('pr-content'); if(!box) return;
+    var recs=prGetRecords();
+    if(!recs.length){
+      box.innerHTML='<div class="pr-empty"><div style="font-size:48px;margin-bottom:10px">🩸</div>还没有月经记录，<br>先去月经记录区添加一条吧</div>';
+      return;
+    }
+    var r=(typeof getRoutine==='function')? getRoutine(): {period:{cycleLen:28}};
+    var cycleLen=(r.period && r.period.cycleLen) || 28;
+    var html='';
+    html+=prRenderPredict(recs, cycleLen);
+    html+=prRenderCycles(recs);
+    html+=prRenderPeriodDays(recs);
+    box.innerHTML=html;
+  };
+})();
+</script>
+
+
+<!-- 习惯目标设置 -->
   <div class="wb-modal" id="routineModal">
     <div class="modal-card" style="text-align:left">
       <div class="modal-title" style="text-align:center">⚙️ 习惯目标设置</div>
@@ -4746,6 +5079,7 @@ const PAGE_PARTITION = {
   routine: ['life'],       // 生活习惯
   fitness: ['life'],       // 运动旅行
   money: ['life'],         // 记账
+  'period-analysis': ['life'],   // 月经分析（v208：属于 routine 子页）
   daysmatter: ['life'],    // 倒数日（v200：生活分类倒计时）
   'daysmatter-archive': ['life'] // 倒数日·归档与隐藏（v203：子页，随生活分区）
 };
@@ -8237,13 +8571,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 207;                         // v207：模块改名「作息」→「生活习惯」(侧边栏/底部导航/首页快捷/页面标题/受保护页面/分区说明等19处显示文案，id/变量不变)
+const WB_VERSION = 208;                         // v208：月经新增「分析」子页——经期预测(月历预览+±2天可能)/周期变化(柱状对比+深度分析)/经期变化(本次+历史)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 125;                 // v207 发版：124→125
+const WB_DISPLAY_VERSION = 126;                 // v208 发版：125→126
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
