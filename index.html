@@ -23,7 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
-<!-- v214-cachebust: 修复v213致命bug——wb_sync_mt_(mtime表)与wb_sync_s_(同步基线)未加入WB_NO_SYNC，被上传云端并在下载时互相覆盖→合并算法瘫痪。现同步元数据彻底排除上传/合并/判定(3处+正则) -->
+<!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -8579,7 +8579,7 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 214;                         // v214：修复v213致命bug——mtime表(wb_sync_mt_)/同步基线(wb_sync_s_)被误上传并在下载时互覆盖导致合并瘫痪；同步元数据彻底排除上传/合并
+const WB_VERSION = 215;                         // v215：同步可见化+大体积数据 gzip 压缩上传(storeGz)+放宽 1MB 上限——根治"静默不同步/完全没变化"（413 上限/离线回退看不见原因）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
@@ -12078,6 +12078,7 @@ function renderJournal(){
 
 async function wbLoginOK(user, fromCloud){
   stopScanLogin();
+  if(!API_TOKEN){ _wbSyncSet('offline','本地模式（未连接云端，数据仅存本机）'); }
   WB_SESSION = user;
   localStorage.setItem('wb_session', user);
   // 会话有效期：区分设备。手机 → 持久登录 180 天；电脑 / 平板 → 仅当天有效，次日 0 点强制退出重登。
@@ -12742,6 +12743,76 @@ function _wbHash(s){
   return h.toString(16) + '-' + s.length;
 }
 
+// ===== v215：同步可视化 + 大体积数据 gzip 压缩上传（根治"静默不同步 / 完全没变化"） =====
+// 历史坑：上传被后端 1MB 上限静默拒绝(413) 或 两端都连不上后端(离线回退 API_TOKEN 为空)，
+// 同步静默失败、用户完全看不到原因 → 表现为"数据并没有同步，没有任何变化"。
+// 现：① 上传前 gzip 压缩(体积压到 1/3~1/5，绕开 1MB 上限)；② 全量同步状态可见 + 失败原因吐司；③ 手动同步按钮。
+
+function _wbCanGzip(){ return (typeof CompressionStream !== 'undefined') && (typeof DecompressionStream !== 'undefined') && (typeof Response !== 'undefined') && (typeof btoa !== 'undefined'); }
+async function _wbGzipStr(str){
+  if(!_wbCanGzip()) return null;
+  try{
+    const cs = new CompressionStream('gzip');
+    const w = cs.writable.getWriter();
+    w.write(new TextEncoder().encode(str)); w.close();
+    const buf = await new Response(cs.readable).arrayBuffer();
+    const u8 = new Uint8Array(buf); let bin='';
+    for(let i=0;i<u8.length;i++) bin += String.fromCharCode(u8[i]);
+    return btoa(bin);
+  }catch(e){ return null; }
+}
+async function _wbGunzipB64(b64){
+  if(!_wbCanGzip()) return null;
+  try{
+    const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+    const ds = new DecompressionStream('gzip');
+    const w = ds.writable.getWriter(); w.write(u8); w.close();
+    const buf = await new Response(ds.readable).arrayBuffer();
+    return new TextDecoder().decode(buf);
+  }catch(e){ return null; }
+}
+
+// 同步状态徽标（让用户看得见同步到底成没成）
+var _wbSyncState = 'init';
+var _wbSyncDetail = '';
+var _wbSyncLastOk = 0;
+function _wbSyncMap(){
+  return {
+    init:    { t:'⚪ 同步未启动', c:'#999' },
+    syncing: { t:'🔄 同步中…',     c:'#1677ff' },
+    ok:      { t:'🟢 已同步',       c:'#52C41A' },
+    error:   { t:'🔴 同步异常',     c:'#FF4D4F' },
+    offline: { t:'⚪ 离线（未同步）', c:'#999' }
+  };
+}
+function _wbSyncSet(state, detail){
+  _wbSyncState = state; _wbSyncDetail = detail || '';
+  var el = document.getElementById('wbSyncBadge');
+  if(!el) return;
+  var m = (_wbSyncMap()[state] || _wbSyncMap().init);
+  el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:'+m.c+';background:#fff;border:1px solid #eee;border-radius:14px;padding:4px 11px;box-shadow:0 1px 5px rgba(0,0,0,.1);cursor:pointer;white-space:nowrap" onclick="wbManualSync()">'+m.t+'</span>';
+  el.title = (_wbSyncDetail ? ('详情：'+_wbSyncDetail+'\n') : '') + '点击立即同步 / 手动拉取云端数据';
+  if(state === 'ok') _wbSyncLastOk = Date.now();
+}
+function wbEnsureSyncBadge(){
+  if(document.getElementById('wbSyncBadge')) return;
+  try{
+    var el = document.createElement('div');
+    el.id = 'wbSyncBadge';
+    el.style.cssText = 'position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:99999;';
+    document.body.appendChild(el);
+    _wbSyncSet('init','');
+  }catch(e){}
+}
+async function wbManualSync(){
+  if(!WB_SESSION || !API_TOKEN){ toast('请先用「邮箱登录」云端账号，才能跨设备同步'); return; }
+  _wbSyncSet('syncing','手动同步中');
+  try{ await wbPullAndApply(); }catch(e){}
+  try{ await cloudSync(true); }catch(e){}
+  toast('☁️ 已尝试同步');
+}
+
 /* v213：跨设备字段级合并 —— 拦截 wb_ 业务键写入，记录每个键的修改时间(mtime)。
    上传时把 {key:{v,t}} 结构存进 store（后端原样存取，零改动），
    拉取时按 mtime 逐键合并：云端新→覆盖本地，本地新→保留并上传，删除→同步删除标记。
@@ -12796,15 +12867,15 @@ function _wbCollectStore(){
 }
 
 async function cloudSync(force){
-  if(!WB_SESSION || !API_TOKEN) return;
+  if(!WB_SESSION || !API_TOKEN){ _wbSyncSet('offline','未登录云端账号'); return; }
   if(_syncInflight) return;
 
   var store = _wbCollectStore();
-  var body  = JSON.stringify(store);
-  var h     = _wbHash(body);
+  var rawStr = JSON.stringify(store);
+  var h     = _wbHash(rawStr);
 
   // 内容没变 → 一个请求都不发（这是省钱的大头：同一份数据以前会被反复上传）
-  if(!force && h === _syncLastHash) return;
+  if(!force && h === _syncLastHash){ return; }
 
   // 连续操作时合并成一次上传
   var gap = Date.now() - _syncLastAt;
@@ -12815,11 +12886,28 @@ async function cloudSync(force){
   }
 
   _syncInflight = true;
+  _wbSyncSet('syncing','上传中');
   try {
-    await api('/api/sync/upload', 'POST', { store: store, version: WB_VERSION });
+    // v215：优先 gzip 压缩上传（storeGz），体积压到 1/3~1/5，绕开后端 1MB 上限；旧后端不识别 storeGz 时回退明文字段
+    var gz = await _wbGzipStr(rawStr);
+    var bodyObj = gz ? { storeGz: gz, store: store, version: WB_VERSION, gz: 1 }
+                    : { store: store, version: WB_VERSION };
+    await api('/api/sync/upload', 'POST', bodyObj);
     _syncLastHash = h; _syncLastAt = Date.now(); _syncPersistSave();
+    _wbSyncSet('ok','上传成功');
   } catch(e) {
-    console.warn('云端同步失败:', e.message);
+    var msg = (e && e.message) || '未知错误';
+    if(/过大|413/.test(msg)){
+      _wbSyncSet('error','数据过大，请清理历史记录');
+      toast('☁️ 同步失败：本地数据超过云端上限，请清理部分历史数据后重试');
+    } else if(/未登录|401|token|JWT/i.test(msg)){
+      _wbSyncSet('error','登录已失效，请重新登录');
+      toast('☁️ 同步失败：登录已失效，请退出后重新邮箱登录');
+    } else {
+      _wbSyncSet('error','无法连接服务器');
+      toast('☁️ 云端同步失败：' + msg);
+    }
+    console.warn('云端同步失败:', msg);
   } finally {
     _syncInflight = false;
   }
@@ -12854,15 +12942,23 @@ function wbStartSyncLoop(){
   setTimeout(function(){ wbPullAndApply(); }, 3000);
 }
 async function wbPullAndApply(){
-  if(!WB_SESSION || !API_TOKEN) return;
+  if(!WB_SESSION || !API_TOKEN){ _wbSyncSet('offline','未登录云端账号'); return; }
   // v213：跨设备字段级合并（mtime 逐键）——彻底解决「不同平台数据不一致」。
   // 根因（旧实现）：整包快照 + 本地hash判断dirty，新设备/清缓存设备 _syncLastHash 为空 →
   // 误判 dirty 把老数据整包推上云，覆盖另一台设备刚上传的新数据；且合并为整包覆盖无冲突处理。
   try {
-    // 1) 拉取云端（兼容旧格式：纯字符串值视为 t=0）
+    // 1) 拉取云端（兼容旧格式：纯字符串值视为 t=0；v215 支持 gzip 压缩响应 storeGz）
+    _wbSyncSet('syncing','拉取中');
     var data = await api('/api/sync/download', 'GET');
-    if(!data || !data.store || typeof data.store !== 'object') return;
-    var cloud = data.store;
+    if(!data) return;
+    var cloud;
+    if(data.storeGz){
+      var s = await _wbGunzipB64(data.storeGz);
+      cloud = s ? JSON.parse(s) : (data.store || {});
+    } else {
+      cloud = data.store || {};
+    }
+    if(typeof cloud !== 'object') return;
     var cloudAt = (+data.updatedAt) || 0;
 
     // 2) 逐键按 mtime 合并：云端新 → 覆盖本地；本地新 → 保留
@@ -12919,10 +13015,18 @@ async function wbPullAndApply(){
     });
     if(hasNewLocal || localHash !== _syncLastHash){
       try {
-        await api('/api/sync/upload', 'POST', { store: localStore, version: WB_VERSION });
+        var gz2 = await _wbGzipStr(JSON.stringify(localStore));
+        var upBody = gz2 ? { storeGz: gz2, store: localStore, version: WB_VERSION, gz: 1 }
+                         : { store: localStore, version: WB_VERSION };
+        await api('/api/sync/upload', 'POST', upBody);
         _syncLastHash = localHash; _syncLastAt = Math.max(cloudAt, Date.now()); _syncPersistSave();
         console.log('[sync] 已上传合并后的本地改动');
-      } catch(e){ console.warn('同步上传失败:', e && e.message); }
+      } catch(e){
+        var um = (e && e.message) || '';
+        if(/过大|413/.test(um)){ _wbSyncSet('error','数据过大，请清理历史记录'); toast('☁️ 同步失败：本地数据超过云端上限，请清理部分历史数据后重试'); }
+        else { _wbSyncSet('error','上传失败：' + um); }
+        console.warn('同步上传失败:', um);
+      }
     }
 
     // 4) 基线更新 + 界面刷新
@@ -12934,7 +13038,13 @@ async function wbPullAndApply(){
       try { wbApplyProfile(WB_SESSION); } catch(e){}
       try { wbApplyAdminUI(); } catch(e){}
     }
-  } catch(e){ console.warn('同步拉取失败:', e && e.message); }
+    if(_wbSyncState !== 'error') _wbSyncSet('ok','已同步');
+  } catch(e){
+    var em = (e && e.message) || '未知错误';
+    if(/未登录|401|token|JWT/i.test(em)){ _wbSyncSet('error','登录已失效，请重新登录'); }
+    else { _wbSyncSet('error','同步异常：' + em); }
+    console.warn('同步拉取失败:', em);
+  }
 }
 
 async function doLogin(){
@@ -13643,6 +13753,8 @@ function boot(){
   API_TOKEN = localStorage.getItem('wb_token') || '';
   // 恢复同步基线（按账号）：避免把未上传改动误判为已同步
   _syncPersistLoad();
+  // v215：同步状态徽标（让用户看得见同步到底成没成）
+  try { wbEnsureSyncBadge(); } catch(e){}
   // 扫码授权入口：URL 携带 ?sl=<ticket> 时，进入「手机端授权电脑端」流程
   var slTicket = null;
   try {
