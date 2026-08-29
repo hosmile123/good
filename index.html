@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v220-cachebust: 作息表环形钟美版——仿参考图：24主刻度(每小时)+96次刻度(每15min)+12个2h数字标签(00/02/.../22)+slot弧内嵌分类文字(旋转贴合弧线)+按当前时间角动态定位红线/红圈/红pill -->
+<!-- v221-cachebust: 作息表环形钟交互升级——①可拨动表针：svg 绑定 pointerdown/move/up 拖动，角度→分钟实时更新(rtSchedHandMins/rtSchedBindHand)；②表针命中区域自动放大：命中弧段外扩5px+白色描边+其余降透明度，中心显示指针时间+命中日程名+色点，时间轴同步高亮；③弧上文字由大类(生活/工作)改为具体日程 label(吃早餐/晨练/午休)，每日程按 label 哈希从 RT_SLOT_PALETTE(12深色)取稳定色，白字可读；④图例改列具体日程(色点+label+开始时间) -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -664,7 +664,7 @@ body.sb-collapsed .sidebar-item:hover::after {
 .rt-sched-clock {
   position: relative; width: 240px; height: 240px;
 }
-.rt-sched-clock svg { width: 100%; height: 100%; }
+.rt-sched-clock svg { width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; }
 .rt-sched-clock-center {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; pointer-events: none;
@@ -725,6 +725,13 @@ body.sb-collapsed .sidebar-item:hover::after {
 .rt-sched-event .rt-ev-title { font-size: 14px; font-weight: 600; color: #222; }
 .rt-sched-event .rt-ev-meta { font-size: 11px; color: #999; margin-top: 2px; }
 .rt-sched-event .rt-ev-arrow { color: #ccc; font-size: 14px; }
+.rt-sched-event.active .rt-ev-card {
+  border-color: #1677ff; box-shadow: 0 2px 10px rgba(22,119,255,.15);
+}
+.rt-sched-event.active .rt-ev-card:before {
+  content: '◀'; position: absolute; right: -16px; top: 50%; transform: translateY(-50%);
+  color: #1677ff; font-size: 13px;
+}
 .rt-sched-empty {
   text-align: center; padding: 24px 0; color: #bbb; font-size: 13px;
 }
@@ -3050,7 +3057,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         <svg id="rtSchedClock" viewBox="0 0 240 240"></svg>
         <div class="rt-sched-clock-center">
           <div class="rt-sched-clock-num" id="rtSchedCount">0</div>
-          <div class="rt-sched-clock-label">个日程</div>
+          <div class="rt-sched-clock-label" id="rtSchedCountSub">拨动表针查看日程</div>
         </div>
         <div class="rt-sched-legend" id="rtSchedLegend"></div>
         <div class="rt-sched-now-tag" id="rtSchedNowTag" style="display:none">--:--</div>
@@ -9381,13 +9388,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 220;                         // v220：作息表环形钟美版（密刻度+每2h标签+弧内分类文字+显著当前时间红线/红点/红pill，按当前时间角动态定位）
+const WB_VERSION = 221;                         // v221：作息表环形钟交互升级——可拨动表针(拖动svg指针实时换算时间) + 表针命中区域自动放大(弧段外扩5/加白描边/其余降透明度) + 弧上显示具体日程(吃早餐/晨练/午休等label而非大类) + 每日程按label哈希取12深色稳定配色 + 中心显示指针时间/命中日程 + 图例改具体日程 + 时间轴命中高亮
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 137;                 // v220 发版：136→137
+const WB_DISPLAY_VERSION = 138;                 // v221 发版：137→138
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12328,7 +12335,7 @@ function rtSchedRenderList(){
   // 排序
   daySlots.sort(function(a,b){ return (a.start||'').localeCompare(b.start||''); });
 
-  // 3) 渲染环形钟 SVG — v220 仿参考图（密刻度+2小时标签+弧内分类标签+显著当前时间）
+  // 3) 渲染环形钟 SVG — v221：每个日程独立弧段(具体label+稳定多色)，可拨动表针，命中区域自动放大
   var W = 240, cx = 120, cy = 120;
   var rLabel = 120;        // hour labels
   var rTickOut = 116;      // major tick outer
@@ -12337,24 +12344,33 @@ function rtSchedRenderList(){
   var rMinorIn = 110;      // minor tick inner
   var rOut = 104;          // color band outer
   var rIn = 82;            // color band inner
-  var rMid = 93;           // category text position
-  var catColor = { life:'#F5C24A', work:'#FF8C42', sleep:'#5B9CF6', study:'#9B7BD8', exercise:'#4EBE6B', other:'#A0A0A0' };
-  var catIcon  = { life:'🏠', work:'💼', sleep:'😴', study:'📚', exercise:'🏃', other:'🎯' };
-  var catName  = { life:'生活', work:'工作', sleep:'睡眠', study:'学习', exercise:'健康', other:'其他' };
+  var rMid = 93;           // label text position
   var svgParts = [];
-
-  // 合并相邻同 cat 的 slot
-  var merged = [];
-  daySlots.forEach(function(sl){
+  // v221：每个日程按 label 哈希取稳定色（12 深色，白字可读）
+  function rtSchedSlotColor(label){
+    var h = 0, s = String(label||'');
+    for(var i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
+    return RT_SLOT_PALETTE[h % RT_SLOT_PALETTE.length];
+  }
+  // 指针分钟（默认：今日=当前时间，其他日期=08:00）
+  if(rtSchedHandMins === null){
+    rtSchedHandMins = (rtSchedViewDate === todayStr)
+      ? (new Date().getHours()*60 + new Date().getMinutes())
+      : 8*60;
+  }
+  // 指针命中的日程索引（跨天兼容）
+  var handSlotIdx = -1;
+  function minsHitSlot(mins, sl){
     var p = rtSchedParseTime(sl.start), q = rtSchedParseTime(sl.end);
-    if(p===null || q===null) return;
-    if(q<=p) q += 24;
-    if(merged.length && merged[merged.length-1].cat===sl.cat && merged[merged.length-1].end===p){
-      merged[merged.length-1].end = q;
-    } else {
-      merged.push({ start:p, end:q, cat:sl.cat });
-    }
-  });
+    if(p===null || q===null) return false;
+    if(q<=p) q += 1440;
+    var m = mins;
+    if(m < p && q > 1440) m += 1440;
+    return m >= p && m < q;
+  }
+  for(var hi=0; hi<daySlots.length; hi++){
+    if(minsHitSlot(rtSchedHandMins, daySlots[hi])){ handSlotIdx = hi; break; }
+  }
 
   // 底圈（外环薄圈+内圆薄圈）
   svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+rLabel+'" fill="#fafbfc"/>');
@@ -12387,82 +12403,92 @@ function rtSchedRenderList(){
     svgParts.push('<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" font-size="10" fill="#888" text-anchor="middle" dominant-baseline="middle" font-weight="600" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">'+String(hh).padStart(2,'0')+'</text>');
   }
 
-  // slot 彩色弧段
-  merged.forEach(function(sl){
-    var a1 = sl.start/(24*60)*Math.PI*2 - Math.PI/2;
-    var a2 = sl.end/(24*60)*Math.PI*2 - Math.PI/2;
+  // slot 彩色弧段——每个日程独立一段，颜色按 label 分配；命中的放大（外扩+描边），其余降透明度
+  daySlots.forEach(function(sl, idx){
+    var p = rtSchedParseTime(sl.start), q = rtSchedParseTime(sl.end);
+    if(p===null || q===null) return;
+    if(q<=p) q += 1440;
+    var active = (idx === handSlotIdx);
+    var a1 = p/(24*60)*Math.PI*2 - Math.PI/2;
+    var a2 = q/(24*60)*Math.PI*2 - Math.PI/2;
     var large = (a2-a1) > Math.PI ? 1 : 0;
-    var col = catColor[sl.cat] || catColor.life;
+    var col = rtSchedSlotColor(sl.label);
+    var oR = active ? rOut+5 : rOut;   // 命中：外扩 5
+    var iR = active ? rIn-5  : rIn;    // 命中：内收 5（弧更宽）
     function pt(r,a){ return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
-    var p1 = pt(rOut,a1), p2 = pt(rOut,a2), p3 = pt(rIn,a2), p4 = pt(rIn,a1);
-    svgParts.push('<path d="M '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' A '+rOut+' '+rOut+' 0 '+large+' 1 '+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' L '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' A '+rIn+' '+rIn+' 0 '+large+' 0 '+p4[0].toFixed(1)+' '+p4[1].toFixed(1)+' Z" fill="'+col+'" opacity="0.95"/>');
+    var p1 = pt(oR,a1), p2 = pt(oR,a2), p3 = pt(iR,a2), p4 = pt(iR,a1);
+    svgParts.push('<path d="M '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' A '+oR+' '+oR+' 0 '+large+' 1 '+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' L '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' A '+iR+' '+iR+' 0 '+large+' 0 '+p4[0].toFixed(1)+' '+p4[1].toFixed(1)+' Z" fill="'+col+'"'+(active?' stroke="#fff" stroke-width="2.5"':'')+' opacity="'+(active?1:0.9)+'"/>');
+    // 弧内具体日程文字（图标+label），字号随弧长自适应
+    var arcLen = (q - p)/(24*60)*Math.PI*2;
+    if(arcLen >= 0.16){
+      var fs = arcLen > 1.0 ? 13 : (arcLen > 0.5 ? 11 : 9.5);
+      var aM = (p+q)/2/(24*60)*Math.PI*2 - Math.PI/2;
+      var tx = cx + rMid*Math.cos(aM);
+      var ty = cy + rMid*Math.sin(aM);
+      var deg = (aM + Math.PI/2) * 180/Math.PI;
+      if(deg > 90 && deg < 270) deg -= 180;
+      var txt = sl.label || '日程';
+      if(txt.length > 6) txt = txt.slice(0,6);
+      svgParts.push('<text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" font-size="'+fs+'" font-weight="'+(active?800:700)+'" fill="#fff" text-anchor="middle" dominant-baseline="middle" transform="rotate('+deg.toFixed(0)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">'+esc(txt)+'</text>');
+    }
   });
 
-  // 弧内分类文字（图标+名称）—— 弧太短的不画
-  merged.forEach(function(sl){
-    var arcLen = (sl.end - sl.start)/(24*60)*Math.PI*2;
-    if(arcLen < 0.18) return;   // < 10° 跳过
-    var aM = ((sl.start+sl.end)/2)/(24*60)*Math.PI*2 - Math.PI/2;
-    var tx = cx + rMid*Math.cos(aM);
-    var ty = cy + rMid*Math.sin(aM);
-    // 旋转：让文字沿弧线方向（切线）；下半圈反转避免倒立
-    var deg = (aM + Math.PI/2) * 180/Math.PI;
-    if(deg > 90 && deg < 270) deg -= 180;
-    svgParts.push('<text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" font-size="12" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle" transform="rotate('+deg.toFixed(0)+' '+tx.toFixed(1)+' '+ty.toFixed(1)+')" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif">'+catIcon[sl.cat]+' '+catName[sl.cat]+'</text>');
-  });
+  // 可拨动表针（深蓝，从内圆到刻度外）
+  var hA = rtSchedHandMins/(24*60)*Math.PI*2 - Math.PI/2;
+  var hx1 = cx + (rIn-2)*Math.cos(hA);
+  var hy1 = cy + (rIn-2)*Math.sin(hA);
+  var hx2 = cx + (rLabel+6)*Math.cos(hA);
+  var hy2 = cy + (rLabel+6)*Math.sin(hA);
+  svgParts.push('<line x1="'+hx1.toFixed(1)+'" y1="'+hy1.toFixed(1)+'" x2="'+hx2.toFixed(1)+'" y2="'+hy2.toFixed(1)+'" stroke="#1677ff" stroke-width="3" stroke-linecap="round" opacity="0.95"/>');
+  var hdx = cx + (rOut+6)*Math.cos(hA);
+  var hdy = cy + (rOut+6)*Math.sin(hA);
+  svgParts.push('<circle cx="'+hdx.toFixed(1)+'" cy="'+hdy.toFixed(1)+'" r="5.5" fill="#fff" stroke="#1677ff" stroke-width="2.6"/>');
+  svgParts.push('<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#1677ff"/>');
 
   clock.innerHTML = svgParts.join('');
 
-  // 4) 当前时间（仅今日）—— 红线 + 圆点 + 红色 pill
-  if(rtSchedViewDate === todayStr){
-    var now = new Date();
-    var mins = now.getHours()*60 + now.getMinutes();
-    var aN = mins/(24*60)*Math.PI*2 - Math.PI/2;
-    // 红线从 rIn 延伸到 rLabel+2
-    var nx1 = cx + (rIn-2)*Math.cos(aN);
-    var ny1 = cy + (rIn-2)*Math.sin(aN);
-    var nx2 = cx + (rLabel+4)*Math.cos(aN);
-    var ny2 = cy + (rLabel+4)*Math.sin(aN);
-    clock.insertAdjacentHTML('beforeend','<line x1="'+nx1.toFixed(1)+'" y1="'+ny1.toFixed(1)+'" x2="'+nx2.toFixed(1)+'" y2="'+ny2.toFixed(1)+'" stroke="#ff4d4f" stroke-width="2.2" stroke-linecap="round"/>');
-    // 红圆点（落在彩色环外缘上）
-    var dx = cx + rOut*Math.cos(aN);
-    var dy = cy + rOut*Math.sin(aN);
-    clock.insertAdjacentHTML('beforeend','<circle cx="'+dx.toFixed(1)+'" cy="'+dy.toFixed(1)+'" r="4" fill="#fff" stroke="#ff4d4f" stroke-width="2.2"/>');
-    // 中心小红点
-    clock.insertAdjacentHTML('beforeend','<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#ff4d4f"/>');
-    // HTML pill 定位
-    if(nowTag){
-      nowTag.style.display = 'block';
-      nowTag.textContent = '◀ ' + String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-      // 计算 pill 在容器中的位置（容器 240x240，svg 居中 240x240）
-      // 红色 pill 中心放在弧外侧 r ~ 138，映射回容器 0-240 坐标
-      var px = cx + 138*Math.cos(aN);
-      var py = cy + 138*Math.sin(aN);
-      nowTag.style.left = (px - 38) + 'px';   // 估算 pill 宽 76
-      nowTag.style.top  = (py - 13) + 'px';   // 高 26
-      // 转 18 点方向（左侧）时箭头朝右；其他位置时调箭头方向
-      // 简化：固定左指
-    }
-  } else {
-    if(nowTag) nowTag.style.display = 'none';
+  // 4) 指针时间 pill + 中心显示（始终跟随指针）
+  if(nowTag){
+    nowTag.style.display = 'block';
+    var hm = String(Math.floor(rtSchedHandMins/60)).padStart(2,'0');
+    var mm = String(rtSchedHandMins%60).padStart(2,'0');
+    nowTag.textContent = '◀ ' + hm + ':' + mm;
+    var px = cx + 138*Math.cos(hA);
+    var py = cy + 138*Math.sin(hA);
+    nowTag.style.left = (px - 38) + 'px';
+    nowTag.style.top  = (py - 13) + 'px';
   }
 
-  // 5) 中间数字 + 标题
-  if(countEl) countEl.textContent = daySlots.length;
+  // 5) 中间数字：指针时间 + 命中日程名
+  if(countEl){
+    var hm = String(Math.floor(rtSchedHandMins/60)).padStart(2,'0');
+    var mm = String(rtSchedHandMins%60).padStart(2,'0');
+    countEl.textContent = hm + ':' + mm;
+  }
+  var countSubEl = document.getElementById('rtSchedCountSub');
+  if(countSubEl){
+    if(handSlotIdx >= 0){
+      var hS = daySlots[handSlotIdx];
+      var hC = rtSchedSlotColor(hS.label);
+      countSubEl.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+hC+';margin-right:5px;vertical-align:middle"></span><b style="color:'+hC+'">'+esc(hS.label||'日程')+'</b> <span style="color:#bbb">· '+hS.start+'~'+hS.end+'</span>';
+    } else {
+      countSubEl.innerHTML = '<span style="color:#bbb">空闲时段</span>';
+    }
+  }
   if(titleEl){
     var isToday2 = rtSchedViewDate === todayStr;
     titleEl.textContent = (isToday2?'今日':view.getMonth()+1+'月'+view.getDate()+'日')+' · '+(daySlots.length)+' 个日程';
   }
 
-  // 6) 图例
+  // 6) 图例——具体日程（色点+label+时间）
   if(legendEl){
-    var usedCats = {};
-    daySlots.forEach(function(s){ usedCats[s.cat] = (usedCats[s.cat]||0)+1; });
-    var catNames = { life:'生活', work:'工作', sleep:'睡眠', study:'学习', exercise:'运动', other:'其他' };
-    var items = Object.keys(usedCats).map(function(c){
-      return '<div class="leg-item"><span class="leg-dot" style="background:'+(catColor[c]||'#999')+'"></span>'+catNames[c]+' '+usedCats[c]+'</div>';
+    var legItems = daySlots.map(function(sl){
+      return '<div class="leg-item"><span class="leg-dot" style="background:'+rtSchedSlotColor(sl.label)+'"></span>'+esc(sl.label||'日程')+' <span style="color:#bbb">'+sl.start+'</span></div>';
     });
-    legendEl.innerHTML = items.join('') || '';
+    // 图例最多显示 6 条，其余折叠
+    var show = legItems.slice(0,6).join('');
+    var more = legItems.length > 6 ? '<div style="color:#aaa;text-align:center">+ '+(legItems.length-6)+' 项</div>' : '';
+    legendEl.innerHTML = show + more;
   }
 
   // 7) 时间轴列表
@@ -12475,10 +12501,10 @@ function rtSchedRenderList(){
       var dur = q-p;
       var hh = Math.floor(dur/60), mm = dur%60;
       var durStr = (hh>0?hh+'时':'')+(mm>0?mm+'分':'');
-      var col = catColor[sl.cat] || catColor.life;
+      var col = rtSchedSlotColor(sl.label);
       var iconMap = { life:'🍱', work:'💼', sleep:'🌙', study:'📚', exercise:'🏃', other:'🎯' };
       var tagMap = { life:'生活', work:'通用', sleep:'休息', study:'学习', exercise:'健身', other:'其他' };
-      return '<div class="rt-sched-event" onclick="openRtScheduleEdit(\''+sl.templateId+'\')">'
+      return '<div class="rt-sched-event'+(handSlotIdx===daySlots.indexOf(sl)?' active':'')+'" onclick="openRtScheduleEdit(\''+sl.templateId+'\')">'
         + '<div class="rt-ev-dot" style="background:'+col+'"></div>'
         + '<div class="rt-ev-time">'+sl.start+' ~ '+sl.end+(durStr?' · <span class="rt-ev-dur">'+durStr+'</span>':'')+'</div>'
         + '<div class="rt-ev-card">'
@@ -12492,6 +12518,7 @@ function rtSchedRenderList(){
         + '</div>';
     }).join('');
   }
+  rtSchedBindHand();
 }
 
 function rtSchedParseTime(t){
@@ -12513,6 +12540,40 @@ function rtSchedWeek(delta){
 }
 function rtSchedGoToday(){ rtSchedViewDate = tdCalLocalToday(); rtSchedRenderList(); }
 var rtSchedViewDate = null;
+
+// v221：日程弧段稳定多色板（12 深色，白字可读）+ 可拨动表针状态
+var RT_SLOT_PALETTE = ['#E85D04','#C1121F','#3A0CA3','#023E8A','#0077B6','#136F63','#2D6A4F','#5F0F40','#7F5539','#3D405B','#4F772D','#9C6644'];
+var rtSchedHandMins = null;   // 表针分钟 0-1439
+var _rtSchedHandBound = false;
+function rtSchedBindHand(){
+  var svg = document.getElementById('rtSchedClock');
+  if(!svg || _rtSchedHandBound) return;
+  _rtSchedHandBound = true;
+  svg.style.cursor = 'grab';
+  var dragging = false;
+  function handFromEvent(e){
+    var rect = svg.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    var dx = e.clientX - (rect.left + rect.width/2);
+    var dy = e.clientY - (rect.top + rect.height/2);
+    var ang = Math.atan2(dy, dx) + Math.PI/2;   // 0 点方向 = 顶部
+    if(ang < 0) ang += Math.PI*2;
+    var mins = Math.round(ang/(Math.PI*2)*1440) % 1440;
+    rtSchedHandMins = mins;
+    rtSchedRenderList();
+  }
+  svg.addEventListener('pointerdown', function(e){
+    dragging = true;
+    try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+    handFromEvent(e);
+    e.preventDefault();
+  });
+  svg.addEventListener('pointermove', function(e){
+    if(dragging){ handFromEvent(e); e.preventDefault(); }
+  });
+  svg.addEventListener('pointerup', function(e){ dragging = false; });
+  svg.addEventListener('pointercancel', function(e){ dragging = false; });
+}
 
 /* --------- 编辑弹窗 --------- */
 var _rtSchedEditId = null;        // null = 新增
