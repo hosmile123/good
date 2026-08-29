@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
 <!-- v210-cachebust: 新增「设备管理」(退出菜单→📋管理所有设备)——列出全部在线设备(类型/名称/上次在线/当前标记)，可逐台踢出；Realtime广播带deviceId精准踢单台(不误伤同类型)，踢出后自动退出且需重新输账号密码 -->
 <!-- v209-cachebust: 修复手机端「退出电脑端」——①确认框失效(wbConfirm回调空且revoke抢先执行,点取消也踢)改用await wbConfirmAsync ②只find第一台→filter踢同类型全部 ③轮询15s→3s ④新增Supabase Realtime广播(Phoenix v2)秒级踢出,失败回退轮询 -->
 <!-- v208-cachebust: 月经新增「分析」子页(page-period-analysis)——经期预测(月历预览/±2天可能范围)、周期变化(最近1个+近期柱状对比+深度分析)、经期变化(本次+历次)；数据复用 r.period.log，零迁移 -->
@@ -8573,13 +8574,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 210;                         // v210：新增「设备管理」——查看所有在线设备(手机+电脑,含名称/上次在线/当前标记)，可逐台踢出；广播带deviceId精准踢不误伤同类型
+const WB_VERSION = 211;                         // v211：设备管理完善——已踢出变灰(禁用)；列表含全部缓存设备(离线也显示可踢)；boot自动恢复先check后register(被踢的离线设备下次打开自动失效需重登)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 128;                 // v210 发版：127→128
+const WB_DISPLAY_VERSION = 129;                 // v211 发版：128→129
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12131,9 +12132,12 @@ async function wbRegisterDevice(){
 let _deviceWatchTimer = 0;
 function wbStartDeviceWatch(){
   if(_deviceWatchTimer) return; // 只启一次
+  var _lastReg = 0;
   var tick = async function(){
     if(!WB_SESSION || !API_TOKEN) return;
     try {
+      // v211：心跳——每 60 秒刷新一次 lastSeen，设备管理列表才能看到「在线」状态（关掉页面则 5 分钟后显示离线）
+      if(Date.now() - _lastReg > 60000){ _lastReg = Date.now(); wbRegisterDevice(); }
       var r = await api('/api/auth/device/check', 'POST', { deviceId: wbGetDeviceId() });
       if(r && r.ok && r.revoked){
         wbForceLogoutByRevoke();
@@ -13016,20 +13020,32 @@ async function showDeviceManager(){
     try { curId = wbGetDeviceId(); } catch(e){}
     var box = document.getElementById('dmDevList');
     if(!devs || !devs.length){ if(box) box.innerHTML='<span style="color:#999">暂无在线设备</span>'; return; }
-    var html = '<div style="text-align:right;font-size:12px;color:#999;padding:0 2px 6px">共 '+devs.length+' 台在线</div>';
+    var html = '<div style="text-align:right;font-size:12px;color:#999;padding:0 2px 6px">共 '+devs.length+' 台设备</div>';
     html += devs.map(function(d){
       var isCur = d.deviceId === curId;
+      var isRevoked = !!(d.revoked);
       var icon = d.type === 'phone' ? '📱' : '💻';
       var label = d.type === 'phone' ? '手机' : '电脑';
       var nm = esc(d.name || label).slice(0, 44);
       var rel = wbRelTime(d.lastSeen);
-      var btn = isCur
-        ? '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#999;flex:0 0 auto" onclick="doLogout()">退出本机</button>'
-        : '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#e64340;flex:0 0 auto" onclick="kickDevice(\''+d.deviceId+'\',\''+d.type+'\')">踢出</button>';
-      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:left">'+
-        '<div style="width:38px;height:38px;border-radius:10px;background:#eef3fb;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 38px">'+icon+'</div>'+
-        '<div style="flex:1;min-width:0"><div style="font-size:14px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+(isCur?' <span style="color:#1677ff;font-size:11px">● 当前</span>':'')+'</div>'+
-        '<div style="font-size:12px;color:#999">'+label+' · '+rel+'</div></div>'+btn+'</div>';
+      // v211：在线判定——lastSeen 在 5 分钟内视为在线（关掉页面则显示离线，但缓存还在、仍可踢出）
+      var online = d.lastSeen && (Date.now() - d.lastSeen) < 5 * 60000;
+      var status = isRevoked
+        ? '<span style="color:#bbb">已踢出</span>'
+        : (online ? '<span style="color:#52c41a">🟢 在线</span>' : '<span style="color:#bbb">⚪ 离线</span>');
+      var btn;
+      if(isCur){
+        btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#999;flex:0 0 auto" onclick="doLogout()">退出本机</button>';
+      } else if(isRevoked){
+        btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#ddd;color:#999;flex:0 0 auto" disabled>已踢出</button>';
+      } else {
+        btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#e64340;flex:0 0 auto" onclick="kickDevice(\''+d.deviceId+'\',\''+d.type+'\')">踢出</button>';
+      }
+      // v211：已踢出的设备整行变灰 + 图标去色
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:left'+(isRevoked?';opacity:.55':'')+'">'+
+        '<div style="width:38px;height:38px;border-radius:10px;background:#eef3fb;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 38px'+(isRevoked?';filter:grayscale(1)':'')+'">'+icon+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:14px;color:'+(isRevoked?'#bbb':'#333')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+(isCur?' <span style="color:#1677ff;font-size:11px">● 当前</span>':'')+'</div>'+
+        '<div style="font-size:12px;color:#999">'+label+' · '+rel+' · '+status+'</div></div>'+btn+'</div>';
     }).join('');
     if(box) box.innerHTML = html;
   } catch(e){
@@ -13570,6 +13586,16 @@ function boot(){
     if(API_TOKEN){
       wbStartSyncLoop();
       setTimeout(function(){ try{ wbPullAndApply(); }catch(e){ console.warn('auto cloud sync failed:',e); } }, 2000);
+      // v211：自动恢复登录也要走设备校验——先 check（若已被远程吊销则立即退出并清缓存，必须重新输账号密码），
+      //        未被吊销才 register（刷新 lastSeen）+ 启动轮询/Realtime（顺序不能反：register 会重置 revoked）
+      api('/api/auth/device/check', 'POST', { deviceId: wbGetDeviceId() }).then(function(r){
+        if(r && r.ok && r.revoked){ wbForceLogoutByRevoke(); return; }
+        try{ wbRegisterDevice(); }catch(e){}
+        try{ wbStartDeviceWatch(); }catch(e){}
+      }).catch(function(){
+        try{ wbRegisterDevice(); }catch(e){}
+        try{ wbStartDeviceWatch(); }catch(e){}
+      });
     }
     // 已登录 → 直接提示授权电脑端扫码登录
     if(slTicket){ doScanApprove(slTicket); }
