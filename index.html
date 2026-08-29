@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v209-cachebust: 修复手机端「退出电脑端」——①确认框失效(wbConfirm回调空且revoke抢先执行,点取消也踢)改用await wbConfirmAsync ②只find第一台→filter踢同类型全部 ③轮询15s→3s ④新增Supabase Realtime广播(Phoenix v2)秒级踢出,失败回退轮询 -->
 <!-- v208-cachebust: 月经新增「分析」子页(page-period-analysis)——经期预测(月历预览/±2天可能范围)、周期变化(最近1个+近期柱状对比+深度分析)、经期变化(本次+历次)；数据复用 r.period.log，零迁移 -->
 <!-- v207-cachebust: 模块改名「作息」→「生活习惯」——19处显示文案(侧边栏/底部导航/首页快捷/首页简介/页面标题/生活密码说明/受保护页面/分区说明/注释)；page-routine/id/变量不变，数据兼容 -->
 <!-- v206-cachebust: 倒数日修3处——①置顶真正置顶(pinned排最前，主列表+归档页一致) ②选择图标改上下滑选取(11分类纵向区块滚动，去掉横滑tab) ③编辑弹窗补回「归档/隐藏」操作行(可取消归档/隐藏恢复主页) -->
@@ -8571,13 +8572,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 208;                         // v208：月经新增「分析」子页——经期预测(月历预览+±2天可能)/周期变化(柱状对比+深度分析)/经期变化(本次+历史)
+const WB_VERSION = 209;                         // v209：修复「手机端退出电脑端」——确认框真正生效(改用await)、踢掉同类型全部设备、轮询15s→3s、新增Realtime秒级广播
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 126;                 // v208 发版：125→126
+const WB_DISPLAY_VERSION = 127;                 // v209 发版：126→127
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12138,14 +12139,70 @@ function wbStartDeviceWatch(){
       }
     } catch(e){ /* 忽略轮询异常 */ }
   };
-  _deviceWatchTimer = setInterval(tick, 15000);
+  _deviceWatchTimer = setInterval(tick, 3000);   // v209：15s → 3s（配合 Realtime，实现「立马」退出）
+  try{ wbRTConnect(); }catch(e){}            // v209：连接 Realtime，实现秒级踢出（失败则回退轮询）
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) tick();
   });
 }
+/* v209：跨设备退出 —— Supabase Realtime 实时广播（手写 Phoenix v2 协议，零依赖）
+   手机端 revoke 成功后广播 wb-kick，电脑端秒级收到并立即退出。
+   Realtime 连不上时自动回退到 3 秒轮询，功能不受影响。 */
+var WB_RT_ANON = 'sb_publishable_8JXj3Z4K8_YrQ0m_jSiHrg_Wtx4VryG';
+var _wbRT = { ws:null, ref:0, hb:0 };
+function wbRTTopic(){
+  var em = String(WB_SESSION || 'anon').trim().toLowerCase();
+  return 'realtime:wb-kick-' + em.replace(/[^a-z0-9]/gi, '_');
+}
+function wbRTConnect(){
+  if(!WB_SESSION) return;
+  if(_wbRT.ws && (_wbRT.ws.readyState === 0 || _wbRT.ws.readyState === 1)) return;
+  try{
+    var ws = new WebSocket('wss://rjkxcdhikrfpjmqqosvs.supabase.co/realtime/v1/websocket?apikey=' + WB_RT_ANON + '&vsn=2.0.0');
+    _wbRT.ws = ws;
+    var topic = wbRTTopic();
+    ws.onopen = function(){
+      _wbRT.ref++;
+      ws.send(JSON.stringify([String(_wbRT.ref), String(_wbRT.ref), topic, 'phx_join', {
+        config: { broadcast: { ack:false, self:false }, presence: { key:'', enabled:false }, postgres_changes: [], private:false }
+      }]));
+    };
+    ws.onmessage = function(ev){
+      var m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
+      if(!Array.isArray(m)) return;
+      var pl = m[4] || {};
+      // 只响应针对本设备类型的踢出指令（或 all）
+      if(m[3] === 'broadcast' && pl.type === 'broadcast' && pl.event === 'wb-kick'){
+        var d = pl.payload || {};
+        if(d.dev === wbGetDeviceType() || d.dev === 'all'){ wbForceLogoutByRevoke(); }
+      }
+    };
+    ws.onclose = function(){ _wbRT.ws = null; clearInterval(_wbRT.hb); _wbRT.hb = 0; };
+    _wbRT.hb = setInterval(function(){
+      try{ if(ws.readyState === 1){ _wbRT.ref++; ws.send(JSON.stringify([String(_wbRT.ref), String(_wbRT.ref), 'phoenix', 'heartbeat', {}])); } }catch(e){}
+    }, 25000);
+  }catch(e){ /* Realtime 不可用：静默回退轮询 */ }
+}
+function wbRTBroadcast(devType){
+  var ws = _wbRT.ws;
+  if(!ws || ws.readyState !== 1) return false;
+  try{
+    _wbRT.ref++;
+    ws.send(JSON.stringify([String(_wbRT.ref), String(_wbRT.ref), wbRTTopic(), 'broadcast', {
+      type:'broadcast', event:'wb-kick', payload:{ dev: devType, at: Date.now() }
+    }]));
+    return true;
+  }catch(e){ return false; }
+}
+function wbRTStop(){
+  clearInterval(_wbRT.hb); _wbRT.hb = 0;
+  if(_wbRT.ws){ try{ _wbRT.ws.close(); }catch(e){} _wbRT.ws = null; }
+}
+
 // 被远程踢出：强制退出并提示
 function wbForceLogoutByRevoke(){
   if(_deviceWatchTimer){ clearInterval(_deviceWatchTimer); _deviceWatchTimer = 0; }
+  try{ wbRTStop(); }catch(e){}
   doLogout();
   setTimeout(function(){ toast('🔒 您的账号已在其他设备上被退出登录'); }, 300);
 }
@@ -12962,32 +13019,48 @@ async function confirmLogout(target){
     return;
   }
 
-  // 远程退出另一设备：拉取设备列表，找到对应类型的设备后吊销
+  // 远程退出另一设备：拉取设备列表，吊销该类型下的所有设备
   try {
-    if(!API_TOKEN){ toast('远程退出需联网并已上传最新函数代码'); return; }
+    if(!API_TOKEN){ toast('远程退出需联网登录后才可用'); return; }
     var listRes = await api('/api/auth/device/list', 'GET');
     if(!listRes || !listRes.ok){ toast('获取设备列表失败'); return; }
     var wantType = (target === 'phone') ? 'phone' : 'desktop';
-    var targetDev = (listRes.devices || []).find(function(d){ return d.type === wantType; });
-    if(!targetDev){
+    // v209：原实现用 find 只取第一台，多设备时会漏踢 → 改为 filter，踢掉该类型下所有未吊销设备
+    var targetDevs = (listRes.devices || []).filter(function(d){ return d.type === wantType && !d.revoked; });
+    if(!targetDevs.length){
       toast('未找到可退出的' + targetLabel + '设备');
       closeModal('clientModal');
       return;
     }
-    wbConfirm('确定远程退出该' + targetLabel + '吗？\n被退出的设备将立即需要重新登录（你的数据不会丢失）。', function(ok){ if(!ok){ closeModal('clientModal'); return; } /* 后续由调用方处理 */ });
-    var rev = await api('/api/auth/device/revoke', 'POST', { deviceId: targetDev.deviceId });
-    if(rev && rev.ok){
-      toast('✅ 已远程退出' + targetLabel);
+    // v209：原实现 wbConfirm 回调为空且 revoke 抢先执行 → 点「取消」也会被踢。改用 await 确认框，确认后才执行
+    var confirmed = true;
+    if(typeof wbConfirmAsync === 'function'){
+      confirmed = await wbConfirmAsync('确定远程退出该' + targetLabel + '吗？\n共 ' + targetDevs.length + ' 台设备需要重新登录（你的数据不会丢失）。');
+    }
+    if(!confirmed){ closeModal('clientModal'); return; }
+    var okCount = 0, failMsg = '';
+    for(var ti = 0; ti < targetDevs.length; ti++){
+      try {
+        var rev = await api('/api/auth/device/revoke', 'POST', { deviceId: targetDevs[ti].deviceId });
+        if(rev && rev.ok) okCount++;
+        else failMsg = (rev && rev.error) || '未知错误';
+      } catch(e2){ failMsg = (e2 && e2.message) || String(e2); }
+    }
+    if(okCount){
+      // v209：revoke 成功后立即 Realtime 广播，电脑端秒级退出（Realtime 不可用时回退 3 秒轮询）
+      wbRTBroadcast(wantType);
+      toast('✅ 已远程退出' + targetLabel + '（' + okCount + ' 台）');
     } else {
-      toast('远程退出失败：' + ((rev && rev.error) || '未知错误'));
+      toast('远程退出失败：' + (failMsg || '未知错误'));
     }
   } catch(e){
-    toast('远程退出需要上传最新函数代码（v9 后端）');
+    toast('远程退出失败：' + ((e && e.message) || '网络异常'));
   }
   closeModal('clientModal');
 }
 
 async function doLogout(){
+  try{ wbRTStop(); }catch(e){}   // v209：登出时断开 Realtime
   wbSave();
   if(API_TOKEN){
     try { await api('/api/auth/logout', 'POST'); } catch(e) {}
