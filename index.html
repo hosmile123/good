@@ -23,7 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
-<!-- v201-cachebust: 倒数日移动端悬浮+按钮上移避开底部导航栏(calc(env(safe-area-inset-bottom)+74px)) -->
+<!-- v202-cachebust: 手机端(<768px) sidebar.open 扩宽到 200px+横排图标/名字——修复 481-768px 设备名字不显示/字号过小；电脑端不受影响 -->
 <!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
@@ -1095,7 +1095,21 @@ body.sb-collapsed .sidebar-item:hover::after {
   body { padding-top: 0 !important; margin-top: 0 !important; }
   .app-container { margin-top: 0 !important; border-radius: 0 !important; max-width: 100% !important; }
   .sidebar { display: none !important; }
-  .sidebar.open { display: flex !important; }
+  .sidebar.open { display: flex !important; width: 200px; align-items: stretch; }
+  .sidebar.open .sb-close { display: flex !important; align-self: flex-end; padding: 8px 12px; }
+  .sidebar.open .sidebar-item {
+    width: auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 10px 16px;
+    gap: 10px;
+    border-radius: 12px;
+    height: auto;
+  }
+  .sidebar.open .sidebar-item .icon { font-size: 20px; }
+  .sidebar.open .sidebar-item .label { font-size: 13px; display: block; }
+  .sidebar.open .sidebar-group-label { font-size: 11px; padding: 12px 22px 4px; width: 100%; text-align: left; }
+  .sidebar.open .sidebar-divider { width: calc(100% - 24px); }
   .sb-toggle-btn { display: none !important; }
   .main-content { margin-left: 0 !important; padding-top: 0 !important; min-height: 100vh !important; }
   /* 手机端：隐藏顶部标题栏，内容直接贴顶 */
@@ -7749,13 +7763,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 201;                         // v201：倒数日移动端悬浮+按钮避开底部导航栏（v200 新增倒数日生活功能）
+const WB_VERSION = 202;                         // v202：手机端(<768px) sidebar 打开扩到 200px 横排图标+名字——修复 481-768px label 不显示/过小（v201 倒数日+底部导航适配保留）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 119;                 // v201 发版：118→119
+const WB_DISPLAY_VERSION = 120;                 // v202 发版：119→120
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
