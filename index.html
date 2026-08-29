@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
+<!-- v210-cachebust: 新增「设备管理」(退出菜单→📋管理所有设备)——列出全部在线设备(类型/名称/上次在线/当前标记)，可逐台踢出；Realtime广播带deviceId精准踢单台(不误伤同类型)，踢出后自动退出且需重新输账号密码 -->
 <!-- v209-cachebust: 修复手机端「退出电脑端」——①确认框失效(wbConfirm回调空且revoke抢先执行,点取消也踢)改用await wbConfirmAsync ②只find第一台→filter踢同类型全部 ③轮询15s→3s ④新增Supabase Realtime广播(Phoenix v2)秒级踢出,失败回退轮询 -->
 <!-- v208-cachebust: 月经新增「分析」子页(page-period-analysis)——经期预测(月历预览/±2天可能范围)、周期变化(最近1个+近期柱状对比+深度分析)、经期变化(本次+历次)；数据复用 r.period.log，零迁移 -->
 <!-- v207-cachebust: 模块改名「作息」→「生活习惯」——19处显示文案(侧边栏/底部导航/首页快捷/首页简介/页面标题/生活密码说明/受保护页面/分区说明/注释)；page-routine/id/变量不变，数据兼容 -->
@@ -8572,13 +8573,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 209;                         // v209：修复「手机端退出电脑端」——确认框真正生效(改用await)、踢掉同类型全部设备、轮询15s→3s、新增Realtime秒级广播
+const WB_VERSION = 210;                         // v210：新增「设备管理」——查看所有在线设备(手机+电脑,含名称/上次在线/当前标记)，可逐台踢出；广播带deviceId精准踢不误伤同类型
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 127;                 // v209 发版：126→127
+const WB_DISPLAY_VERSION = 128;                 // v210 发版：127→128
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12171,10 +12172,14 @@ function wbRTConnect(){
       var m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
       if(!Array.isArray(m)) return;
       var pl = m[4] || {};
-      // 只响应针对本设备类型的踢出指令（或 all）
+      // v210：优先按 deviceId 精准匹配（踢单台时不误伤同类型其他设备）；
+      //        无 deviceId（v209 兼容：踢同类型全部 / all）时按类型匹配
       if(m[3] === 'broadcast' && pl.type === 'broadcast' && pl.event === 'wb-kick'){
         var d = pl.payload || {};
-        if(d.dev === wbGetDeviceType() || d.dev === 'all'){ wbForceLogoutByRevoke(); }
+        var myId = '';
+        try{ myId = wbGetDeviceId(); }catch(e){}
+        if(d.deviceId){ if(d.deviceId === myId) wbForceLogoutByRevoke(); }
+        else if(d.dev === wbGetDeviceType() || d.dev === 'all'){ wbForceLogoutByRevoke(); }
       }
     };
     ws.onclose = function(){ _wbRT.ws = null; clearInterval(_wbRT.hb); _wbRT.hb = 0; };
@@ -12183,13 +12188,14 @@ function wbRTConnect(){
     }, 25000);
   }catch(e){ /* Realtime 不可用：静默回退轮询 */ }
 }
-function wbRTBroadcast(devType){
+function wbRTBroadcast(devType, devId){
   var ws = _wbRT.ws;
   if(!ws || ws.readyState !== 1) return false;
   try{
     _wbRT.ref++;
+    // v210：带 deviceId 时精准踢单台；不带时按类型踢（兼容 v209 的 confirmLogout 全类型踢）
     ws.send(JSON.stringify([String(_wbRT.ref), String(_wbRT.ref), wbRTTopic(), 'broadcast', {
-      type:'broadcast', event:'wb-kick', payload:{ dev: devType, at: Date.now() }
+      type:'broadcast', event:'wb-kick', payload:{ dev: devType, deviceId: devId || '', at: Date.now() }
     }]));
     return true;
   }catch(e){ return false; }
@@ -12982,6 +12988,76 @@ function wbIsPhone(){
   return _phone;
 }
 
+// v210：设备管理——查看当前账号所有在线设备（手机/电脑），可逐个远程踢出
+function wbRelTime(ts){
+  if(!ts) return '未知';
+  var diff = Date.now() - ts;
+  if(diff < 60000) return '刚刚';
+  if(diff < 3600000) return Math.floor(diff/60000) + ' 分钟前';
+  if(diff < 86400000) return Math.floor(diff/3600000) + ' 小时前';
+  return Math.floor(diff/86400000) + ' 天前';
+}
+async function showDeviceManager(){
+  var m = document.getElementById('clientModal');
+  if(!m){ toast('无法打开设备管理'); return; }
+  m.innerHTML = '<div class="modal-card" style="max-width:360px">'+
+    '<div class="modal-title">📋 设备管理</div>'+
+    '<div style="font-size:12px;color:#888;margin:8px 0 4px;line-height:1.6">当前账号正在登录的设备。踢出后该设备自动退出，需重新输入账号密码登录。</div>'+
+    '<div id="dmDevList" style="font-size:13px;color:#666;padding:24px 0;text-align:center">加载中…</div>'+
+    '<button class="btn-primary" style="width:100%;background:#999" onclick="closeModal(\'clientModal\')">关闭</button>'+
+    '</div>';
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeModal('clientModal'); };
+  try {
+    if(!API_TOKEN){ var b1=document.getElementById('dmDevList'); if(b1) b1.innerHTML='<span style="color:#999">未登录，无法查看设备</span>'; return; }
+    var res = await api('/api/auth/device/list', 'GET');
+    var devs = (res && res.devices) || [];
+    var curId = '';
+    try { curId = wbGetDeviceId(); } catch(e){}
+    var box = document.getElementById('dmDevList');
+    if(!devs || !devs.length){ if(box) box.innerHTML='<span style="color:#999">暂无在线设备</span>'; return; }
+    var html = '<div style="text-align:right;font-size:12px;color:#999;padding:0 2px 6px">共 '+devs.length+' 台在线</div>';
+    html += devs.map(function(d){
+      var isCur = d.deviceId === curId;
+      var icon = d.type === 'phone' ? '📱' : '💻';
+      var label = d.type === 'phone' ? '手机' : '电脑';
+      var nm = esc(d.name || label).slice(0, 44);
+      var rel = wbRelTime(d.lastSeen);
+      var btn = isCur
+        ? '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#999;flex:0 0 auto" onclick="doLogout()">退出本机</button>'
+        : '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#e64340;flex:0 0 auto" onclick="kickDevice(\''+d.deviceId+'\',\''+d.type+'\')">踢出</button>';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;text-align:left">'+
+        '<div style="width:38px;height:38px;border-radius:10px;background:#eef3fb;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 38px">'+icon+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:14px;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+(isCur?' <span style="color:#1677ff;font-size:11px">● 当前</span>':'')+'</div>'+
+        '<div style="font-size:12px;color:#999">'+label+' · '+rel+'</div></div>'+btn+'</div>';
+    }).join('');
+    if(box) box.innerHTML = html;
+  } catch(e){
+    var b2 = document.getElementById('dmDevList');
+    if(b2) b2.innerHTML='<span style="color:#999">获取设备列表失败</span>';
+  }
+}
+// v210：踢出指定设备（带二次确认；踢出后广播让该设备秒级退出，轮询兜底）
+async function kickDevice(deviceId, devType){
+  if(!API_TOKEN){ toast('未登录'); return; }
+  var label = devType === 'phone' ? '手机' : '电脑';
+  var confirmed = true;
+  if(typeof wbConfirmAsync === 'function'){
+    confirmed = await wbConfirmAsync('确定踢出这台' + label + '设备吗？\n该设备将立即退出登录，需要重新输入账号密码。');
+  }
+  if(!confirmed) return;
+  try {
+    var rev = await api('/api/auth/device/revoke', 'POST', { deviceId: deviceId });
+    if(rev && rev.ok){
+      wbRTBroadcast(devType, deviceId);   // 精准广播：只有目标设备立即退出
+      toast('✅ 已踢出该' + label + '设备');
+      setTimeout(function(){ try{ showDeviceManager(); }catch(e){} }, 600);  // 刷新列表
+    } else {
+      toast('踢出失败：' + ((rev && rev.error) || '未知错误'));
+    }
+  } catch(e){ toast('踢出失败：' + ((e && e.message) || '网络异常')); }
+}
+
 // 退出菜单：可选择「退出手机」或「退出电脑端」，均需二次确认（防误触，保障数据安全）
 function showLogoutMenu(){
   var phone = wbIsPhone();
@@ -12997,6 +13073,7 @@ function showLogoutMenu(){
     '<div style="font-size:12px;color:#888;margin:8px 0 14px;line-height:1.6">当前在 <b>'+curLabel+'</b> 上登录。选另一项可<b>远程退出</b>其他设备（数据已云端保存，不会丢失）。</div>'+
     '<button class="btn-primary" style="width:100%;margin-bottom:8px;background:#FF6B00" onclick="confirmLogout(\'phone\')">📱 退出手机</button>'+
     '<button class="btn-primary" style="width:100%;margin-bottom:8px;background:#1677ff" onclick="confirmLogout(\'pc\')">💻 退出电脑端</button>'+
+    '<button class="btn-primary" style="width:100%;margin-bottom:8px;background:#7c4dff" onclick="showDeviceManager()">📋 管理所有设备</button>'+
     '<button class="btn-primary" style="width:100%;background:#999" onclick="closeModal(\'clientModal\')">取消</button>'+
     '</div>';
   m.style.display = 'flex';
