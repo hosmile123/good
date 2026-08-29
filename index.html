@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v225-cachebust: 待办「📅 预约回访」列表只显示三档客户——逾期(早于今天)/今天/明天(本地时区 tdCalLocalToday+1)，更久之后的预约不再显示；新增橙色「明天」徽章；排序 今天>逾期>明天>日期升序；此前显示所有有 apptDate 的客户 -->
+<!-- v226-cachebust: 待办「📅 预约回访」新增日期范围点选条(#apptRangeRow 六个 tab：今日及逾期[默认]/3日内/7日内/15日内/30日内/全部)，_apptRange 全局状态 + setApptRange() 切换并重渲；N日内 cutoff = 今天+N(本地时区)，apptDate<=cutoff 均显示(含逾期)；排序 今天>逾期>明天>日期升序、徽章(粉今天/橙明天/深红逾期) 均保留 -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -2764,6 +2764,15 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button class="filter-tab active" onclick="filterStatus(this,'all')">全部</button>
       <button class="filter-tab" onclick="filterStatus(this,'pending')">未完成</button>
       <button class="filter-tab" onclick="filterStatus(this,'done')">已完成</button>
+    </div>
+    <!-- v226：预约回访日期范围点选 -->
+    <div class="filter-row" id="apptRangeRow" style="margin-top:6px;flex-wrap:wrap">
+      <button class="filter-tab active" data-range="today" onclick="setApptRange(this,'today')">今日及逾期</button>
+      <button class="filter-tab" data-range="3" onclick="setApptRange(this,'3')">3日内</button>
+      <button class="filter-tab" data-range="7" onclick="setApptRange(this,'7')">7日内</button>
+      <button class="filter-tab" data-range="15" onclick="setApptRange(this,'15')">15日内</button>
+      <button class="filter-tab" data-range="30" onclick="setApptRange(this,'30')">30日内</button>
+      <button class="filter-tab" data-range="all" onclick="setApptRange(this,'all')">全部</button>
     </div>
     <div id="apptTodoBox"></div>
     <div class="card todo-list" id="todoList">
@@ -6262,22 +6271,43 @@ function toggleTodo(el) {
 }
 // 预约客户 → 待办展示（客户设置了「下次需要联系的日期」后，自动出现在待办里）
 // v225：只显示「逾期 / 今天 / 明天」的客户，更久之后的预约不打扰日常
+// v226：新增日期范围点选（今日及逾期/3日内/7日内/15日内/30日内/全部），默认「今日及逾期」
+var _apptRange = 'today';   // today | 3 | 7 | 15 | 30 | all
+function setApptRange(btn, range){
+  _apptRange = range;
+  var row = document.getElementById('apptRangeRow');
+  if(row){
+    var bs = row.querySelectorAll('.filter-tab');
+    for(var i=0;i<bs.length;i++) bs[i].classList.remove('active');
+    if(btn) btn.classList.add('active');
+  }
+  renderAppointmentsTodos();
+}
 function renderAppointmentsTodos(){
   var box = document.getElementById('apptTodoBox'); if(!box) return;
   var list = getClients();
   var today = tdCalLocalToday();
-  // 明天（本地时区）
-  var t = new Date(); t.setDate(t.getDate()+1);
-  var p2 = function(n){ return (n<10?'0':'')+n; };
-  var tomorrow = t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate());
+  // 范围截止日期（本地时区）：逾期和今天都算「今日及逾期」；N 日内 = 含逾期到未来第 N 天
+  var cutoff = today;
+  if(_apptRange === 'all'){
+    cutoff = '9999-12-31';
+  } else if(_apptRange !== 'today'){
+    var n = parseInt(_apptRange, 10) || 3;
+    var d = new Date(); d.setDate(d.getDate() + n);
+    var p2 = function(x){ return (x<10?'0':'')+x; };
+    cutoff = d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+  }
   var appts = list.filter(function(c){
     if(!c.apptDate) return false;
-    // 仅保留：逾期(早于今天) / 今天 / 明天
-    return c.apptDate < today || c.apptDate === today || c.apptDate === tomorrow;
+    return c.apptDate <= cutoff;   // 逾期 + 截止日（含）之前
   }).map(function(c){
     var overdue = c.apptDate < today;
     var isToday = c.apptDate === today;
-    var isTmrw = c.apptDate === tomorrow;
+    var isTmrw = c.apptDate === (function(){
+      var t = new Date(); t.setDate(t.getDate()+1);
+      var q = function(n){ return (n<10?'0':'')+n; };
+      return t.getFullYear()+'-'+q(t.getMonth()+1)+'-'+q(t.getDate());
+    })();
     return { c:c, overdue:overdue, isToday:isToday, isTmrw:isTmrw };
   });
   // 排序：今天的优先，其次逾期未处理，再次明天，再按日期升序
@@ -9399,13 +9429,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 225;                         // v225：待办「预约回访」只显示逾期/今天/明天三档客户（本地时区 tdCalLocalToday），更久之后的不再打扰；明天新增橙色「明天」徽章；排序 今天>逾期>明天>日期升序
+const WB_VERSION = 226;                         // v226：待办「预约回访」新增日期范围点选——今日及逾期(默认)/3日内/7日内/15日内/30日内/全部；_apptRange 状态 + setApptRange()；N日内=含逾期到未来第N天(apptDate<=cutoff)；排序/徽章保留
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 142;                 // v225 发版：141→142
+const WB_DISPLAY_VERSION = 143;                 // v226 发版：142→143
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
