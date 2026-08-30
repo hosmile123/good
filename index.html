@@ -22,6 +22,7 @@
 <!-- v195-cachebust: 账号管理列表邮箱完整显示——去掉ellipsis截断(去掉overflow:hidden+text-overflow:ellipsis)，改用word-break:break-all允许长邮箱换行，align-items:flex-start+gap调整，操作按钮区flex-shrink:0不被挤压 -->
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
+<!-- v242-cachebust: 专注时刻任务卡 ⋮ 菜单——修正 items 字段名 text→label（wbRowMenu 实际读 label 不读 text，修正前两行都 fallback 显示成「操作」） -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9690,13 +9691,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 241;                         // v241：修复 v240 「专注时刻」✓/✕/编辑无反应——14 处误用未定义函数 _setText + 补 escHtml 别名
+const WB_VERSION = 242;                         // v242：专注时刻任务卡 ⋮ 菜单字段名修正（text→label，原 v241 两行 fallback 显示成「操作」）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 158;                 // v241 发版：157→158
+const WB_DISPLAY_VERSION = 159;                 // v242 发版：158→159
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13336,8 +13337,8 @@ function focusRender(){
 function focusMenu(id, btn, e){
   if(e) e.stopPropagation();
   var items = [
-    { text:'✏️ 编辑', fn:function(){ focusEditTask(id); } },
-    { text:'🗑 删除', danger:true, fn:function(){
+    { label:'✏️ 编辑', icon:'✏️', fn:function(){ focusEditTask(id); } },
+    { label:'🗑 删除', icon:'🗑', danger:true, fn:function(){
         wbConfirm('确定删除这个专注任务？历史专注记录会保留。', function(ok){
           if(!ok) return;
           _focus.tasks = _focus.tasks.filter(function(t){ return t.id!==id; });
