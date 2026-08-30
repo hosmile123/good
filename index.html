@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v234-cachebust: 运动热量自动核算——①表单新增 身高(cm)/体重(kg) 输入(oninput=fitBodySave，存 wb_fit_body_<账号>) + 基础代谢参考提示(#fitBmrTip，Mifflin-St Jeor)；②fitAutoKcal()：距离类(跑步/徒步) = 体重×距离×系数(跑步1.036/徒步0.45 kcal/kg/km)；时长类 = MET×3.5×体重/200×分钟(FIT_MET: 跑步9.8/徒步4.3/羽毛球5.5/乒乓球4.0/跳操6.0/运动器材5.0)；③fitTypeChange/距离/时长输入/renderFitness 均联动自动核算；手动改过热量(data-manual=1)不再覆盖，保存后复位；BMR 静息代谢≈男/女参考 -->
+<!-- v235-cachebust: 运动旅行优化——①删除 v234 运动页身高体重输入(fitBodyH/W/BmrTip/_fitBodyKey/_fitBodyLoad/fitBodySave/fitShowBmr 全部移除)，热量核算改读「生活习惯→体重」(routine.weight.height=身高 + 最新体重记录 kg)；②统计卡片上方新增时间筛选条(#fitRangeRow：本周/本月/年月[fitYmPicker month 选择器]，_fitRange 状态，fitSetRange/fitSetYm)，四卡片改为 次数/距离km/时长分/能量kcal 均按当前范围统计(_fitInRange 过滤)；③运动类型卡片计数也按筛选范围；表单底部体重来源提示 #fitBodyFromTip -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -3806,11 +3806,18 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
   </div>
 
+  <!-- v235：时间筛选（本周/本月/年月） -->
+  <div class="filter-row" id="fitRangeRow" style="margin-bottom:8px;flex-wrap:wrap">
+    <button class="filter-tab active" data-range="week" onclick="fitSetRange(this,'week')">本周</button>
+    <button class="filter-tab" data-range="month" onclick="fitSetRange(this,'month')">本月</button>
+    <button class="filter-tab" data-range="ym" onclick="fitSetRange(this,'ym')">年月</button>
+    <input type="month" id="fitYmPicker" style="display:none;font-size:12px;padding:3px 8px;border:1px solid var(--border);border-radius:8px" onchange="fitSetYm(this.value)">
+  </div>
   <div class="study-stats" style="grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px">
-    <div class="ss-item" style="padding:8px 4px"><div class="ss-num orange" id="fitWeek">0</div><div class="ss-label">本周(次)</div></div>
-    <div class="ss-item" style="padding:8px 4px"><div class="ss-num blue" id="fitDist">0</div><div class="ss-label">累计(km)</div></div>
-    <div class="ss-item" style="padding:8px 4px"><div class="ss-num green" id="fitMin">0</div><div class="ss-label">累计(分)</div></div>
-    <div class="ss-item" style="padding:8px 4px"><div class="ss-num purple" id="fitMonth">0</div><div class="ss-label">本月(次)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num orange" id="fitCount">0</div><div class="ss-label" id="fitCountLabel">本周(次)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num blue" id="fitDist">0</div><div class="ss-label">距离(km)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num green" id="fitMin">0</div><div class="ss-label">时长(分)</div></div>
+    <div class="ss-item" style="padding:8px 4px"><div class="ss-num purple" id="fitKcalStat">0</div><div class="ss-label">能量(kcal)</div></div>
   </div>
 
   <div class="section-label">运动类型</div>
@@ -3821,12 +3828,6 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
   <div class="section-label">✏️ 记录运动</div>
   <div class="card visit-form">
-    <!-- v234：身高体重（保存到 localStorage，供热量自动核算） -->
-    <div class="form-row">
-      <div class="form-group"><label>身高(cm)</label><input type="number" id="fitBodyH" placeholder="如 170" oninput="fitBodySave()"></div>
-      <div class="form-group"><label>体重(kg)</label><input type="number" id="fitBodyW" placeholder="如 60" oninput="fitBodySave()"></div>
-      <div class="form-group"><label>我的基础代谢参考</label><div id="fitBmrTip" style="font-size:11px;color:#999;line-height:1.5;padding-top:6px">填身高体重后自动显示</div></div>
-    </div>
     <div class="form-row">
       <div class="form-group"><label>运动类型</label><select id="fitType" onchange="fitTypeChange()"><option value="跑步">🏃 跑步</option><option value="徒步">🚶 徒步</option><option value="羽毛球">🏸 羽毛球</option><option value="乒乓球">🏓 乒乓球</option><option value="跳操">🕺 跳操</option><option value="运动器材">🏋️ 运动器材</option></select></div>
       <div class="form-group" id="fitDistGrp"><label>距离(km)</label><input type="number" id="fitDistIn" placeholder="如 5.2" step="0.1" oninput="fitAutoKcal()"></div>
@@ -3838,6 +3839,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
     <div class="form-group"><label>备注（选填）</label><textarea id="fitNote" placeholder="运动感受..." rows="2" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;resize:none"></textarea></div>
     <button class="btn-primary" style="width:100%" onclick="saveFitness()">保存打卡</button>
+    <div style="font-size:11px;color:var(--text-light);margin-top:8px;text-align:center" id="fitBodyFromTip"></div>
   </div>
 
   <div class="section-label">📋 打卡记录</div>
@@ -9426,13 +9428,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 234;                         // v234：运动热量自动核算——记录运动表单新增身高体重(自动保存 wb_fit_body_<账号>)；热量按运动类型自动算：距离类(跑步1.036/徒步0.45 kcal/kg/km)×体重×距离；时长类 MET×3.5×体重/200×分钟(MET:跑步9.8/徒步4.3/羽毛球5.5/乒乓球4.0/跳操6.0/运动器材5.0)；BMR 参考提示(Mifflin-St Jeor)；手动改过热量不再覆盖
+const WB_VERSION = 235;                         // v235：运动旅行——①删除运动页身高体重输入，热量核算改读「生活习惯→体重」(routine.weight.height+最近体重记录)；②统计卡片加时间筛选(本周/本月/年月 fitSetRange/fitSetYm)，卡片改 次数/距离/时长/能量(kcal) 按范围统计；③运动类型卡片计数也按筛选范围
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 151;                 // v234 发版：150→151
+const WB_DISPLAY_VERSION = 152;                 // v235 发版：151→152
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12860,13 +12862,8 @@ function rtSchedApplyPreset(idx){
 
 /* ---------- 运动旅行渲染 ---------- */
 var FIT_DIST_TYPES = ['跑步','徒步'];
-// v234：各运动 MET 值（代谢当量，来自通用运动能量消耗表；用于时长类项目自动核算热量）
+// v235：各运动 MET 值（代谢当量，来自通用运动能量消耗表；用于时长类项目自动核算热量）
 var FIT_MET = { 跑步:9.8, 徒步:4.3, 羽毛球:5.5, 乒乓球:4.0, 跳操:6.0, 运动器材:5.0 };
-// 身高体重存储键（自动保存，供热量核算与 BMR 参考）
-function _fitBodyKey(){ return 'wb_fit_body_' + (WB_SESSION||'guest'); }
-function _fitBodyLoad(){
-  try{ return JSON.parse(localStorage.getItem(_fitBodyKey()) || 'null') || {}; }catch(e){ return {}; }
-}
 function fitTypeChange(){
   var t = (document.getElementById('fitType')||{}).value||'跑步';
   var distGrp = document.getElementById('fitDistGrp');
@@ -12876,31 +12873,23 @@ function fitTypeChange(){
   if(durGrp) durGrp.style.display = isDist ? 'none' : '';
   fitAutoKcal();
 }
-// v234：保存身高体重并刷新 BMR 提示 + 自动核算热量
-function fitBodySave(){
-  var h = parseFloat((document.getElementById('fitBodyH')||{}).value||0);
-  var w = parseFloat((document.getElementById('fitBodyW')||{}).value||0);
-  if(h>0 || w>0){ try{ localStorage.setItem(_fitBodyKey(), JSON.stringify({h:h, w:w})); }catch(e){} }
-  fitShowBmr();
-  fitAutoKcal();
+// v235：身高体重改从「生活习惯」读取（routine.weight.height / 最近体重记录），删除运动页自身的身高体重输入
+function _fitBodyFromRoutine(){
+  try{
+    var r = getRoutine();
+    var h = +r.weight.height || 0;
+    var wkeys = Object.keys(r.weight.log || {}).sort();
+    var w = wkeys.length ? (+(r.weight.log[wkeys[wkeys.length-1]].kg) || 0) : 0;
+    return { h:h, w:w };
+  }catch(e){ return { h:0, w:0 }; }
 }
-// 基础代谢参考（Mifflin-St Jeor 简化，性别取 60/70 中间档说明）
-function fitShowBmr(){
-  var tip = document.getElementById('fitBmrTip'); if(!tip) return;
-  var b = _fitBodyLoad();
-  var h = +b.h||0, w = +b.w||0;
-  if(!h || !w){ tip.textContent = '填身高体重后自动显示'; return; }
-  var male = 10*w + 6.25*h - 5*30 + 5;      // 30岁男性参考
-  var female = 10*w + 6.25*h - 5*30 - 161;  // 30岁女性参考
-  tip.textContent = '静息代谢 ≈ ' + Math.round(male) + '（男）/ ' + Math.round(female) + '（女）kcal/天';
-}
-// v234：根据 运动类型+时长/距离+体重 自动核算热量（kcal）；用户手动改过(kcalIn[data-manual])则不再覆盖
+// v235：根据 运动类型+时长/距离+体重（来自生活习惯）自动核算热量（kcal）；用户手动改过则不再覆盖
 function fitAutoKcal(){
   var kcalIn = document.getElementById('fitKcalIn'); if(!kcalIn) return;
   if(kcalIn.getAttribute('data-manual') === '1') return;   // 尊重手动输入
-  var b = _fitBodyLoad();
+  var b = _fitBodyFromRoutine();
   var w = +b.w || 0;
-  if(w <= 0){ kcalIn.placeholder = '请先填写体重，自动核算热量'; return; }
+  if(w <= 0){ kcalIn.placeholder = '请在「生活习惯→体重」记录体重后自动核算'; return; }
   kcalIn.placeholder = '根据时长/距离+体重自动算';
   var t = (document.getElementById('fitType')||{}).value||'跑步';
   var kcal = 0;
@@ -12928,38 +12917,84 @@ function fitKcalManual(){
   if(kcalIn.value === ''){ fitAutoKcal(); return; }
   kcalIn.setAttribute('data-manual','1');
 }
+// v235：运动统计时间筛选（本周/本月/年月）
+var _fitRange = { type:'week', ym:'' };
+function _fitYmStr(){ 
+  var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function fitSetRange(btn, range){
+  _fitRange.type = range;
+  var row = document.getElementById('fitRangeRow');
+  if(row){
+    var bs = row.querySelectorAll('.filter-tab');
+    for(var i=0;i<bs.length;i++) bs[i].classList.remove('active');
+    if(btn) btn.classList.add('active');
+  }
+  var picker = document.getElementById('fitYmPicker');
+  if(picker){
+    if(range==='ym'){ picker.style.display=''; if(!picker.value) picker.value=_fitYmStr(); if(!_fitRange.ym) _fitRange.ym=picker.value; }
+    else picker.style.display='none';
+  }
+  renderFitness();
+}
+function fitSetYm(v){
+  if(v){ _fitRange.ym = v; renderFitness(); }
+}
+// 判断某日期字符串是否落在当前筛选范围内
+function _fitInRange(dateStr){
+  var t = _fitRange.type;
+  if(t === 'week'){
+    var d = new Date(); var day=(d.getDay()+6)%7; var monday=new Date(d); monday.setDate(d.getDate()-day);
+    return new Date(dateStr) >= monday;
+  }
+  if(t === 'month'){
+    return _monthKey(dateStr) === _monthKey(_today());
+  }
+  // ym：年月筛选
+  return String(dateStr).slice(0,7) === _fitRange.ym;
+}
 function renderFitness(){
   var f=getFit(); var cur=_monthKey(_today());
-  var thisWeek=0, monthN=0, cumMin=0, cumDist=0; var types={};
-  var d=new Date(); var day=(d.getDay()+6)%7; var monday=new Date(d); monday.setDate(d.getDate()-day);
+  var inRange=0, sumMin=0, sumDist=0, sumKcal=0; var types={};
   Object.keys(f.log).forEach(function(k){
+    if(!_fitInRange(k)) return;   // v235：按时间筛选（本周/本月/年月）
     var arr = f.log[k];
     var entries = Array.isArray(arr) ? arr : [arr];  // 兼容旧数据（单条对象）
     entries.forEach(function(x){
-      cumMin+=(+x.dur||0); cumDist+=(+x.dist||0);
+      inRange++;
+      sumMin+=(+x.dur||0); sumDist+=(+x.dist||0); sumKcal+=(+x.kcal||0);
       types[x.type]=(types[x.type]||0)+1;
     });
-    if(_monthKey(k)===cur) monthN++;
-    if(new Date(k)>=monday) thisWeek++;
   });
-  setText('fitHeroNum', thisWeek+'/'+(thisWeek>=4?thisWeek:4));
-  setText('fitWeek', thisWeek); setText('fitDist', cumDist.toFixed(1)); setText('fitMin', cumMin); setText('fitMonth', monthN);
+  // 统计卡片（v235：次数/距离/时长/能量，均按当前筛选范围）
+  setText('fitCount', inRange);
+  setText('fitDist', sumDist.toFixed(1));
+  setText('fitMin', sumMin);
+  setText('fitKcalStat', sumKcal);
+  var rlabel = _fitRange.type==='week' ? '本周' : (_fitRange.type==='month' ? '本月' : (_fitRange.ym||'')+'月');
+  var cntLabel = document.getElementById('fitCountLabel');
+  if(cntLabel) cntLabel.textContent = rlabel+'(次)';
+  // hero：本周次数（保持原语义）
+  var d2=new Date(); var day2=(d2.getDay()+6)%7; var monday=new Date(d2); monday.setDate(d2.getDate()-day2);
+  var weekN=0;
+  Object.keys(f.log).forEach(function(k){ if(new Date(k)>=monday) weekN++; });
+  setText('fitHeroNum', weekN+'/'+(weekN>=4?weekN:4));
   var tbox=document.getElementById('fitTypes');
   if(tbox){
-    // v227：固定显示全部运动类型卡片（含羽毛球/跳操），计数=该类型累计次数，点击填充记录表单
+    // v227：固定显示全部运动类型卡片（含羽毛球/跳操），计数=该类型在筛选范围内次数，点击填充记录表单
     var fitAllTypes=[{t:'跑步',i:'🏃'},{t:'徒步',i:'🚶'},{t:'羽毛球',i:'🏸'},{t:'乒乓球',i:'🏓'},{t:'跳操',i:'🕺'},{t:'运动器材',i:'🏋️'}];
     tbox.innerHTML = fitAllTypes.map(function(tp){
       var n=types[tp.t]||0;
       return '<div class="gt-item" onclick="pickFitType(\''+tp.t+'\')"><div class="gt-icon">'+tp.i+'</div><div class="gt-name">'+tp.t+'</div><div class="gt-count">'+n+'</div></div>';
     }).join('');
   }
-  // v234：回填身高体重 + 刷新 BMR 提示 + 自动核算热量（若存在记录表单元素）
+  // v235：体重来源提示（生活习惯）+ 自动核算热量
   try{
-    var bh=document.getElementById('fitBodyH'), bw=document.getElementById('fitBodyW');
-    var fb=_fitBodyLoad();
-    if(bh && bh.value==='' && fb.h) bh.value=fb.h;
-    if(bw && bw.value==='' && fb.w) bw.value=fb.w;
-    fitShowBmr();
+    var b=_fitBodyFromRoutine();
+    var tip=document.getElementById('fitBodyFromTip');
+    if(tip) tip.textContent = (b.w>0)
+      ? '热量按「生活习惯→体重」最近记录 '+(b.w)+' kg 自动核算'+(b.h>0?(' · 身高 '+b.h+' cm'):'')
+      : '在「生活习惯→体重」记录体重后，热量将自动核算';
     fitAutoKcal();
   }catch(e){}
   paintCal('fitCal','fitness', new Set(Object.keys(f.log)));
