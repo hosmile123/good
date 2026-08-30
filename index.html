@@ -26,7 +26,7 @@
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
-<!-- v250-cachebust: 专注时刻音乐——原生流式尽快出声 + 后台 fetch 下载进度 + Cache API 持久化缓存(重复播放秒开)，音乐按钮/选曲面板显示「⬇缓存% / ✓已缓存 / ◌缓冲中」；自然音扩至12首(雨声×3 含大雨候选 + 海浪/鸟鸣/沙漠风/篝火/溪流/瀑布/雷声/夜虫/森林)，全部 Wikimedia Commons 真实录音 -->
+<!-- v251-cachebust: 专注时刻音源换成已核验可达的真实录音(GitHub remvze/moodist，jsDelivr+raw双CDN回退，逐个核验200 audio/mpeg CORS=*)；雨声8首(大雨/细雨/雨打车顶/树叶/帐篷/雨伞/窗户/雷雨)+自然音15首；删除氛围音乐tab；单曲多源依次回退+12秒超时换源；缓存进度仅在有Content-Length时显示百分比否则"下载中"；新增本地音频(可选择本机音频文件，断网可用) -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9726,13 +9726,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 250;                         // v250：专注时刻音乐——点击后原生流式尽快出声 + 后台 fetch 下载并 Cache API 持久化缓存（音乐按钮/选曲面板显示下载进度与「✓已缓存」）；自然音扩至12首(雨声×3/海浪/鸟鸣/风/篝火/溪流/瀑布/雷声/夜虫/森林)
+const WB_VERSION = 251;                         // v251：专注时刻音源换为已核验可达的 moodist 真实录音(jsDelivr/raw 双CDN回退)，雨声8首+自然音15首，删除氛围音乐tab，修复缓存下载进度不准(拿不到总大小时显示"下载中")，新增本地音频兜底
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 169;                 // v250 发版（169 不含4）
+const WB_DISPLAY_VERSION = 170;                 // v251 发版（170 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13947,10 +13947,10 @@ function focusMusicStart(){
   focusMusicBuf('idle');
   var cfg = FOCUS_MUSIC[_focusMusicIdx];
   if(!cfg) return;
-  // url 自定义模式
-  if(cfg.mode === 'url'){ focusOpenUrlInput(); return; }
-  if(!cfg.url){ focusMusicStop(); toast('🔊 该曲目没有可用音频，请换一首'); return; }
-  // 原生 HTMLAudio 流式播放（尽快出声）
+  if(cfg.mode === 'file'){ focusPickLocalAudio(); return; }     // 本地音频
+  if(cfg.mode === 'url'){ focusOpenUrlInput(); return; }        // 自定义 URL
+  var urls = focusTrackUrls(cfg);
+  if(!urls.length){ focusMusicStop(); toast('🔊 该曲目没有可用音频，请换一首'); return; }
   try{
     var audio = new Audio();
     audio.preload = 'auto';
@@ -13960,39 +13960,80 @@ function focusMusicStart(){
       stop: function(){ try{audio.pause(); audio.currentTime=0;}catch(e){} },
       mode: cfg.name, tab: cfg.tab, icon: cfg.icon, name: cfg.name, isAudio:true, failed:false
     };
-    var ok = false;
-    audio.addEventListener('playing', function(){ ok = true; _focusBuf.playing = true; focusMusicBuf('play'); });
-    audio.addEventListener('waiting', function(){ if(!ok) focusMusicBuf('buf'); });
-    audio.addEventListener('error', function(){
-      if(!ok){ _focusMusicNode.failed = true; focusMusicBuf('idle'); toast('🔊 该音频暂时无法播放，请换一首'); focusMusicStop(); }
-    });
-    // 缓存命中：直接用 blob，秒开
-    if(_focusAudioCache[cfg.url] && _focusAudioCache[cfg.url].blobUrl){
-      audio.src = _focusAudioCache[cfg.url].blobUrl;
-      var pCache = audio.play();
-      if(pCache && pCache.catch) pCache.catch(function(){});
-      focusMusicBuf('cached');
-      focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（已缓存·秒开）');
-      return;
+    var settled = false, timer = null;
+    // 依次尝试每个候选源：出错或 12 秒仍未出声就换下一个
+    function attempt(i){
+      if(settled) return;
+      if(i >= urls.length){
+        settled = true;
+        if(timer) clearTimeout(timer);
+        _focusMusicNode.failed = true;
+        focusMusicBuf('idle');
+        toast('🔊 该音频暂时无法播放，请换一首或试试「本地音频」');
+        focusMusicStop();
+        return;
+      }
+      var url = urls[i];
+      var cached = _focusAudioCache[url] && _focusAudioCache[url].blobUrl;
+      audio.src = cached ? _focusAudioCache[url].blobUrl : url;
+      if(timer) clearTimeout(timer);
+      timer = setTimeout(function(){ if(!settled) attempt(i+1); }, 12000);
+      audio.onplaying = function(){
+        if(settled) return;
+        settled = true;
+        if(timer) clearTimeout(timer);
+        _focusBuf.playing = true;
+        focusMusicBuf('play');
+        focusShowTip('🎵 '+cfg.icon+' '+cfg.name+(cached ? '（已缓存·秒开）' : '（播放中）'));
+      };
+      audio.onerror = function(){ if(!settled) attempt(i+1); };
+      focusMusicBuf(cached ? 'cached' : 'buf');
+      if(!cached) focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（加载中…）');
+      var p = audio.play();
+      if(p && p.catch) p.catch(function(){ if(!settled) attempt(i+1); });
+      // 后台下载并缓存（带进度），下次点同一首秒开
+      if(!cached) focusCacheFetch(url, function(pct, fin){
+        if(fin){ if(settled) focusMusicBuf('cached'); }
+        else if(pct >= 0) focusMusicBuf('dl', pct);
+        else focusMusicBuf('dl');            // -2：拿不到总大小，显示"下载中"不显示假百分比
+      });
     }
-    // 先流式播放，尽快出声
-    audio.src = cfg.url;
-    focusMusicBuf('buf');
-    focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（加载中…）');
-    var p = audio.play();
-    if(p && p.then) p.then(function(){ ok = true; }).catch(function(){
-      if(!ok){ _focusMusicNode.failed = true; focusMusicBuf('idle'); toast('🔊 该音频暂时无法播放，请换一首'); focusMusicStop(); }
-    });
-    // 后台下载并缓存（带进度），完成后重复播放秒开
-    focusCacheFetch(cfg.url, function(pct, done){
-      if(done){ if(ok) focusMusicBuf('cached'); }
-      else if(pct < 0){ /* 缓存失败不影响播放 */ }
-      else { focusMusicBuf('dl', pct); }
-    });
+    // 优先从已缓存的源开始
+    var startIdx = 0;
+    for(var k=0;k<urls.length;k++){ if(_focusAudioCache[urls[k]] && _focusAudioCache[urls[k]].blobUrl){ startIdx = k; break; } }
+    attempt(startIdx);
   }catch(e){
     focusMusicStop();
     toast('🔊 该曲目没有可用音频，请换一首');
   }
+}
+// 本地音频：从本机/手机选一个音频文件播放并缓存（断网也能用）
+function focusPickLocalAudio(){
+  try{
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'audio/*';
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0];
+      if(!f) return;
+      var u = URL.createObjectURL(f);
+      _focusAudioCache['local:'+f.name] = {blobUrl:u, status:'ready', progress:100};
+      if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio = null; }
+      focusMusicStop();
+      var a = new Audio(u);
+      a.loop = true; a.volume = _focusMusicVolume; a.preload = 'auto';
+      _focusUrlAudio = a;
+      a.play().then(function(){
+        _focusMusicNode = { stop:function(){ try{a.pause();}catch(e){} }, mode:'file', icon:'📁', name:f.name, tab:'custom' };
+        focusMusicBuf('cached');
+        focusShowTip('📁 正在播放：'+f.name);
+      }).catch(function(err){
+        _focusUrlAudio = null;
+        toast('播放失败：'+(err && err.message ? err.message : '未知错误'));
+      });
+    };
+    inp.click();
+  }catch(e){ toast('打开文件失败：'+e.message); }
 }
 function focusFallbackToSynth(cfg){
   // 真实音频加载失败：提示并停止（不再回退合成——用户要求只用真实音频）
@@ -14014,36 +14055,58 @@ function focusMusicStop(){
 }
 
 // ============================================================
-// 专注时刻·音乐引擎（v250）：全部真实音频（HTMLAudio 直连播放 + 后台 fetch 缓存，无合成）
-// ——自然音 12（雨声×3/海浪/鸟鸣/沙漠风/篝火/溪流/瀑布/雷声/夜虫/森林，Wikimedia 真实录音）+ 氛围白噪 5（白/粉/棕/蓝/紫噪音，Wikimedia「Colors of noise」）+ URL 自定义 + 静音
-// ——新增：点击后原生流式尽快出声 + 后台下载并缓存（Cache API 持久化），音乐按钮/选曲面板显示下载进度与「✓已缓存」
+// 专注时刻·音乐引擎（v251）：全部真实录音（jsDelivr / raw.githubusercontent 双 CDN 回退，无合成）
+// ——音源：GitHub 开源项目 remvze/moodist 的真实环境录音（已逐个核验 200 audio/mpeg，CORS=*，体积 0.1~3.9MB）
+// ——雨声 8 首（大雨/细雨/雨打车顶/雨打树叶/雨打帐篷/雨打雨伞/雨打窗户/雷雨）+ 自然音 15 首（海浪/瀑布/河流/篝火/水滴/风声/树间风/呼啸风/丛林/鸟鸣/虫鸣/蛙声/猫头鹰/海鸥/鲸鱼）
+// ——删除氛围音乐 tab（原白/粉/棕/蓝/紫噪音已移除）；单曲多源依次回退 + 12s 超时换源 + 本地音频兜底
+// ——后台 fetch 下载并 Cache API 持久化，下载进度仅在拿到 Content-Length 时显示百分比，否则显示「下载中」
 // ============================================================
+// 音频 CDN（双源，依次回退；均已核验 200 + CORS=*）
+var FOCUS_AUDIO_CDN = [
+  'https://cdn.jsdelivr.net/gh/remvze/moodist@main/public/sounds/',
+  'https://raw.githubusercontent.com/remvze/moodist/main/public/sounds/'
+];
+// 取某曲目的全部候选源（优先已缓存的源）
+function focusTrackUrls(cfg){
+  if(!cfg) return [];
+  if(cfg.urls) return cfg.urls;
+  if(!cfg.path) return [];
+  return FOCUS_AUDIO_CDN.map(function(b){ return b + cfg.path; });
+}
 var FOCUS_MUSIC = [
-  // 自然音（真实现场录音 · Wikimedia Commons · 适合睡眠/冥想）★=v246 已验证可达
-  { tab:'nature', name:'雨声',     icon:'🌧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Rain.ogg' },            // ★
-  { tab:'nature', name:'细雨',     icon:'🌦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Light_rain.ogg' },      // ★
-  { tab:'nature', name:'大雨',     icon:'🌧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Heavy_rain.ogg' },      // 候选(待实测)
-  { tab:'nature', name:'海浪',     icon:'🌊', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ocean_waves.ogg' },     // ★
-  { tab:'nature', name:'鸟鸣',     icon:'🐦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Birds_singing.ogg' },    // ★
-  { tab:'nature', name:'沙漠风声', icon:'🏜', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Wind_in_desert.ogg' },   // ★
-  { tab:'nature', name:'篝火',     icon:'🔥', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Crackling_fire.ogg' },   // ★
-  { tab:'nature', name:'溪流',     icon:'💧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Stream.ogg' },          // 候选(待实测)
-  { tab:'nature', name:'瀑布',     icon:'🌊', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Waterfall.ogg' },       // 候选(待实测)
-  { tab:'nature', name:'雷声',     icon:'⛈', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Thunder.ogg' },          // 候选(待实测)
-  { tab:'nature', name:'夜虫',     icon:'🦗', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Crickets.ogg' },         // 候选(待实测)
-  { tab:'nature', name:'森林',     icon:'🌲', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Forest.ogg' },          // 候选(待实测)
-  // 氛围白噪（真实噪音录音 · Wikimedia Commons「Colors of noise」· 适合睡眠/冥想）
-  { tab:'ambient', name:'白噪音', icon:'⚪', url:'https://commons.wikimedia.org/wiki/Special:FilePath/White_noise.ogg' },
-  { tab:'ambient', name:'粉噪音', icon:'🌸', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Pink_noise.ogg' },
-  { tab:'ambient', name:'棕噪音', icon:'🟤', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Brown_noise.ogg' },
-  { tab:'ambient', name:'蓝噪音', icon:'🔵', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Blue_noise.ogg' },
-  { tab:'ambient', name:'紫噪音', icon:'🟣', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Violet_noise.ogg' },
-  // 自定义
+  // ===== 雨声（8 首真实录音）=====
+  { tab:'rain', name:'大雨',       icon:'🌧', path:'rain/heavy-rain.mp3' },           // 0.52MB
+  { tab:'rain', name:'细雨',       icon:'🌦', path:'rain/light-rain.mp3' },           // 3.60MB
+  { tab:'rain', name:'雨打车顶',   icon:'🚗', path:'rain/rain-on-car-roof.mp3' },     // 0.23MB
+  { tab:'rain', name:'雨打树叶',   icon:'🍃', path:'rain/rain-on-leaves.mp3' },       // 0.66MB
+  { tab:'rain', name:'雨打帐篷',   icon:'⛺', path:'rain/rain-on-tent.mp3' },         // 1.42MB
+  { tab:'rain', name:'雨打雨伞',   icon:'☂', path:'rain/rain-on-umbrella.mp3' },     // 0.99MB
+  { tab:'rain', name:'雨打窗户',   icon:'🪟', path:'rain/rain-on-window.mp3' },       // 0.80MB
+  { tab:'rain', name:'雷雨',       icon:'⛈', path:'rain/thunder.mp3' },              // 2.09MB
+  // ===== 自然音（真实环境录音）=====
+  { tab:'nature', name:'海浪',     icon:'🌊', path:'nature/waves.mp3' },              // 2.24MB
+  { tab:'nature', name:'瀑布',     icon:'💧', path:'nature/waterfall.mp3' },          // 0.53MB
+  { tab:'nature', name:'河流',     icon:'🏞', path:'nature/river.mp3' },              // 3.71MB
+  { tab:'nature', name:'篝火',     icon:'🔥', path:'nature/campfire.mp3' },           // 3.10MB
+  { tab:'nature', name:'水滴',     icon:'💦', path:'nature/droplets.mp3' },           // 0.76MB
+  { tab:'nature', name:'风声',     icon:'🌬', path:'nature/wind.mp3' },               // 1.53MB
+  { tab:'nature', name:'树间风',   icon:'🍃', path:'nature/wind-in-trees.mp3' },      // 1.23MB
+  { tab:'nature', name:'呼啸风',   icon:'🏜', path:'nature/howling-wind.mp3' },       // 0.50MB
+  { tab:'nature', name:'丛林',     icon:'🌴', path:'nature/jungle.mp3' },             // 3.89MB
+  // ===== 动物音 =====
+  { tab:'nature', name:'鸟鸣',     icon:'🐦', path:'animals/birds.mp3' },             // 1.96MB
+  { tab:'nature', name:'虫鸣',     icon:'🦗', path:'animals/crickets.mp3' },          // 2.71MB
+  { tab:'nature', name:'蛙声',     icon:'🐸', path:'animals/frog.mp3' },              // 1.50MB
+  { tab:'nature', name:'猫头鹰',   icon:'🦉', path:'animals/owl.mp3' },               // 0.09MB
+  { tab:'nature', name:'海鸥',     icon:'🕊', path:'animals/seagulls.mp3' },          // 0.50MB
+  { tab:'nature', name:'鲸鱼',     icon:'🐋', path:'animals/whale.mp3' },             // 0.34MB
+  // ===== 自定义 =====
+  { tab:'custom', name:'本地音频', icon:'📁', mode:'file' },
   { tab:'custom', name:'自定义 URL', icon:'🔗', mode:'url' }
 ];
 
 
-var _focusMusicTab = 'nature';   // 当前 tab：nature/ambient/custom
+var _focusMusicTab = 'nature';   // 当前 tab：rain/nature/custom
 var _focusMusicIdx = 0;          // 当前 tab 内 idx（mute = -1）
 var _focusUrlAudio = null;       // 自定义 URL Audio 元素
 var _focusMusicVolume = 0.60;    // 主音量（v245 提升 0.20→0.60）
@@ -14059,7 +14122,7 @@ function focusCacheFetch(url, cb){
   if(_focusAudioCache[url] && _focusAudioCache[url].status==='ready'){ if(cb) cb(100,true); return Promise.resolve(_focusAudioCache[url].blobUrl); }
   function doFetch(){
     _focusAudioCache[url] = {blobUrl:null, status:'loading', progress:0};
-    if(cb) cb(0,false);
+    if(cb) cb(-2,false);
     function store(blob){ var u=URL.createObjectURL(blob); _focusAudioCache[url]={blobUrl:u,status:'ready',progress:100}; try{ caches.open(_focusCacheName).then(function(c){ c.put(url, new Response(blob)); }); }catch(e){} }
     function readerProgress(res){
       var total = +res.headers.get('Content-Length') || 0;
@@ -14068,7 +14131,7 @@ function focusCacheFetch(url, cb){
       function pump(){ return reader.read().then(function(r){
         if(r.done){ var blob=new Blob(chunks); store(blob); if(cb) cb(100,true); return URL.createObjectURL(blob); }
         chunks.push(r.value); loaded += r.value.length;
-        if(total>0 && cb) cb(Math.round(loaded/total*100), false);
+        if(cb) cb(total>0 ? Math.max(0, Math.min(99, Math.round(loaded/total*100))) : -2, false);
         return pump();
       }); }
       return pump();
@@ -14099,7 +14162,8 @@ function focusMusicRenderBuf(){
   var el = document.getElementById('focusMusicBuf'); if(!el) return;
   var b = _focusBuf;
   if(b.cached) el.textContent = '✓ 已缓存';
-  else if(b.dl>=0) el.textContent = '⬇ 缓存 '+b.dl+'%';
+  else if(b.dl >= 0) el.textContent = '⬇ 缓存 '+b.dl+'%';
+  else if(b.dl === -2) el.textContent = '⬇ 下载中';
   else if(b.playing) el.textContent = '♪ 播放中';
   else if(b.buf) el.textContent = '◌ 缓冲中';
   else el.textContent = '';
@@ -14108,9 +14172,10 @@ function focusMusicRenderPickerBuf(){
   var p = document.getElementById('focusMusicPanel'); if(!p || p.style.display!=='flex') return;
   FOCUS_MUSIC.forEach(function(c,i){
     var el = document.getElementById('fmbuf_'+i); if(!el) return;
-    var cached = _focusAudioCache[c.url] && _focusAudioCache[c.url].status==='ready';
+    var cached = focusTrackUrls(c).some(function(u){ return _focusAudioCache[u] && _focusAudioCache[u].status==='ready'; });
     var active = (_focusMusicIdx===i);
-    if(active && _focusBuf.dl>=0 && !_focusBuf.cached) el.textContent = '⬇'+_focusBuf.dl+'%';
+    if(active && !_focusBuf.cached && _focusBuf.dl >= 0) el.textContent = '⬇'+_focusBuf.dl+'%';
+    else if(active && !_focusBuf.cached && _focusBuf.dl === -2) el.textContent = '⬇';
     else if(cached) el.textContent = '✓';
     else if(active) el.textContent = '▶';
     else el.textContent = '';
@@ -14606,7 +14671,7 @@ function focusCurrentMusicCfg(){
 
 function focusNextMusic(){
   // 静音 → 当前 tab 第 1 个 → ... → 切 tab（下一个 tab 第 1 个）→ ... → 静音
-  var tabs = ['nature','ambient','custom'];
+  var tabs = ['rain','nature','custom'];
   var curTab = (_focusMusicIdx < 0) ? _focusMusicTab : FOCUS_MUSIC[_focusMusicIdx].tab;
   // 在当前 tab 内向后循环
   var sameTab = FOCUS_MUSIC.map(function(c,i){return {c:c,i:i};}).filter(function(o){return o.c.tab===curTab;});
@@ -14687,9 +14752,9 @@ function focusMusicIcon(){
 // v247: 专注时刻·自由选曲
 function focusMusicOpen(){
   var tabs = [
+    {key:'rain', label:'🌧 雨声'},
     {key:'nature', label:'🌿 自然音'},
-    {key:'ambient', label:'🌌 氛围音乐'},
-    {key:'custom', label:'🔗 自定义'}
+    {key:'custom', label:'📁 自定义'}
   ];
   var html = '';
   tabs.forEach(function(tb){
@@ -14699,7 +14764,7 @@ function focusMusicOpen(){
     html += '<div style="font-size:12px;color:#999;margin:12px 4px 6px;font-weight:600">'+tb.label+'</div>';
     items.forEach(function(o){
       var c=o.c, i=o.i, active=(_focusMusicIdx===i);
-      var badge = c.url ? '🌐 真实' : '🎛 合成';
+      var badge = c.path ? '🌐 真实' : '🎛 合成';
           html += '<div onclick="focusMusicPick('+i+')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;'+(active?'background:#eef4ff;border:1px solid #4D96FF':'background:#f7f8fa')+'">'
       + '<span style="font-size:20px">'+c.icon+'</span>'
       + '<span style="flex:1;font-size:14px;color:#222">'+escHtml(c.name)+'</span>'
