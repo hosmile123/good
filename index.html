@@ -32,7 +32,8 @@
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
-<!-- v210-cachebust: 新增「设备管理」(退出菜单→📋管理所有设备)——列出全部在线设备(类型/名称/上次在线/当前标记)，可逐台踢出；Realtime广播带deviceId精准踢单台(不误伤同类型)，踢出后自动退出且需重新输账号密码 -->
+<!-- v241-cachebust: 修复 v240「专注时刻」✓/✕ 无反应——①14 处误用未定义函数 _setText 改为 setText ②补 escHtml 别名指向 esc(否则 focusRender 抛 ReferenceError 中断 closeFocusAdd) -->
+<!-- v240-cachebust: 生活习惯新增「专注时刻」子页(任务卡 CRUD / 全屏倒计时 / 点背景换 8 套 / 点按钮换 5 档音乐 / 任务·统计切换 / 循环休息 / 饼图统计 / 铃声震动设置 / 数据持久化 localStorage[workbench_focus]) -->
 <!-- v209-cachebust: 修复手机端「退出电脑端」——①确认框失效(wbConfirm回调空且revoke抢先执行,点取消也踢)改用await wbConfirmAsync ②只find第一台→filter踢同类型全部 ③轮询15s→3s ④新增Supabase Realtime广播(Phoenix v2)秒级踢出,失败回退轮询 -->
 <!-- v208-cachebust: 月经新增「分析」子页(page-period-analysis)——经期预测(月历预览/±2天可能范围)、周期变化(最近1个+近期柱状对比+深度分析)、经期变化(本次+历次)；数据复用 r.period.log，零迁移 -->
 <!-- v207-cachebust: 模块改名「作息」→「生活习惯」——19处显示文案(侧边栏/底部导航/首页快捷/首页简介/页面标题/生活密码说明/受保护页面/分区说明/注释)；page-routine/id/变量不变，数据兼容 -->
@@ -9689,13 +9690,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 240;                         // v240：生活习惯新增「专注时刻」子页（番茄钟 + 全屏倒计时 + 切背景/切音乐 + 统计）
+const WB_VERSION = 241;                         // v241：修复 v240 「专注时刻」✓/✕/编辑无反应——14 处误用未定义函数 _setText + 补 escHtml 别名
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 157;                 // v240 发版：156→157
+const WB_DISPLAY_VERSION = 158;                 // v241 发版：157→158
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10015,6 +10016,7 @@ function _today(){ return new Date().toISOString().slice(0,10); }
 function _ymd(y,m,d){ return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
 function _monthKey(d){ return d.slice(0,7); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var escHtml = esc; // 别名：v240 专注时刻等模块使用 escHtml（与 esc 同实现）
 function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
 function setHTML(id,v){ var e=document.getElementById(id); if(e) e.innerHTML=v; }
 function catColor(cat){
@@ -13292,8 +13294,8 @@ function focusRender(){
   var todaySess = _focus.sessions.filter(function(s){ return tdCalLocalToday(new Date(s.endTs)) === today; });
   var todayCount = todaySess.length;
   var todayMin = Math.round(todaySess.reduce(function(a,s){return a+(s.duration||0);},0)/60);
-  _setText('focusTodayCount', todayCount);
-  _setText('focusTodayMin', todayMin);
+  setText('focusTodayCount', todayCount);
+  setText('focusTodayMin', todayMin);
   // 连续天数
   var days = {}, streak = 0;
   _focus.sessions.forEach(function(s){ var d = tdCalLocalToday(new Date(s.endTs)); days[d] = true; });
@@ -13303,7 +13305,7 @@ function focusRender(){
     if(days[k]) streak++;
     else if(i>0) break;
   }
-  _setText('focusStreak', streak);
+  setText('focusStreak', streak);
 
   // 任务列表
   var list = document.getElementById('focusTaskList');
@@ -13490,14 +13492,14 @@ function focusStartSession(id){
   _focusBgIdx = Math.floor(Math.random()*FOCUS_BG.length);
   var bg = document.getElementById('focusBg'); if(bg) bg.style.background = FOCUS_BG[_focusBgIdx];
   // 引用语
-  _setText('focusQuote', '"'+FOCUS_QUOTES[Math.floor(Math.random()*FOCUS_QUOTES.length)]+'"');
+  setText('focusQuote', '"'+FOCUS_QUOTES[Math.floor(Math.random()*FOCUS_QUOTES.length)]+'"');
   // 任务名
-  _setText('focusTaskName', t.title);
-  _setText('focusTaskStatus', '准备开始');
+  setText('focusTaskName', t.title);
+  setText('focusTaskStatus', '准备开始');
   // 计时显示
   focusRenderTimer();
   // 循环提示
-  if(_focus.active.loops > 1){ _setText('focusLoop', '第 1/'+_focus.active.loops+' 轮'); } else { _setText('focusLoop', ''); }
+  if(_focus.active.loops > 1){ setText('focusLoop', '第 1/'+_focus.active.loops+' 轮'); } else { setText('focusLoop', ''); }
   // 按钮
   var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
   // 进度环
@@ -13523,7 +13525,7 @@ function focusRenderTimer(){
   var m = Math.floor((show%3600)/60);
   var s = show%60;
   var txt = (h>0?h+':':'') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-  _setText('focusTimer', txt);
+  setText('focusTimer', txt);
   // 状态
   var st = document.getElementById('focusTaskStatus');
   if(st){
@@ -13597,7 +13599,7 @@ function focusCompleteOne(){
   focusSave();
   focusRender();
   // 完成弹窗
-  _setText('focusCompleteDetail', '用时 '+focusFmtTime(dur));
+  setText('focusCompleteDetail', '用时 '+focusFmtTime(dur));
   var cm = document.getElementById('focusCompleteModal');
   cm.style.display = 'flex';
   // 如果有循环 → 进入休息
@@ -13623,8 +13625,8 @@ function focusStartRest(){
   _focus.active.elapsed = 0;
   _focus.active.target = (_focus.active.rest||5)*60;
   _focus.active.mode = 'countdown';
-  _setText('focusTaskName', '☕ 休息一下');
-  _setText('focusLoop', '第 '+(_focus.active.loopIdx+1)+'/'+_focus.active.loops+' 轮 · 即将开始专注');
+  setText('focusTaskName', '☕ 休息一下');
+  setText('focusLoop', '第 '+(_focus.active.loopIdx+1)+'/'+_focus.active.loops+' 轮 · 即将开始专注');
   focusRenderTimer();
   // 自动开始
   setTimeout(function(){ focusToggleRun(); }, 800);
@@ -13880,14 +13882,14 @@ function focusRenderStats(){
   var list = focusRangeFilter(_focusRange)(_focus.sessions);
   var totalSec = list.reduce(function(a,s){return a+(s.duration||0);},0);
   var count = list.length;
-  _setText('focusStatsCount', count);
+  setText('focusStatsCount', count);
   var hh = Math.floor(totalSec/3600), mm = Math.floor((totalSec%3600)/60);
-  if(hh>0) _setText('focusStatsTime', hh+'<span style="font-size:14px">小时</span>'+mm+'<span style="font-size:14px">分</span>');
-  else _setText('focusStatsTime', mm+'<span style="font-size:14px">分</span>');
+  if(hh>0) setText('focusStatsTime', hh+'<span style="font-size:14px">小时</span>'+mm+'<span style="font-size:14px">分</span>');
+  else setText('focusStatsTime', mm+'<span style="font-size:14px">分</span>');
 
   // 日期
   var today = tdCalLocalToday();
-  _setText('focusStatsDate', today + ' · ' + (_focusRange==='today'?'今日':_focusRange==='week'?'本周':_focusRange==='month'?'本月':'全部'));
+  setText('focusStatsDate', today + ' · ' + (_focusRange==='today'?'今日':_focusRange==='week'?'本周':_focusRange==='month'?'本月':'全部'));
 
   // 按任务聚合
   var byTask = {};
