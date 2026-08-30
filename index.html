@@ -24,6 +24,7 @@
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v242-cachebust: 专注时刻任务卡 ⋮ 菜单——修正 items 字段名 text→label（wbRowMenu 实际读 label 不读 text，修正前两行都 fallback 显示成「操作」） -->
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
+<!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -3192,26 +3193,17 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button class="focus-add-btn" onclick="openFocusAdd()">＋ 添加专注任务</button>
     </div>
 
-    <!-- 统计视图 -->
+    <!-- 统计视图（v245 升级：饼图+引导线标签） -->
     <div id="focusStatsView" style="display:none">
       <div class="focus-stats-card">
         <div class="focus-stats-date" id="focusStatsDate">今日</div>
-        <div class="focus-stats-hero">
-          <div class="fsh-item">
-            <div class="fsh-num" id="focusStatsCount">0</div>
-            <div class="fsh-label">次数</div>
-          </div>
-          <div class="fsh-item">
-            <div class="fsh-num" id="focusStatsTime">0<span style="font-size:14px">分</span></div>
-            <div class="fsh-label">时长</div>
-          </div>
-        </div>
-        <div class="focus-stats-tabs">
+        <div class="focus-stats-tabs" style="justify-content:center;gap:8px">
           <button class="fsst-tab on" data-fr="today" onclick="focusSetRange(this,'today')">日</button>
           <button class="fsst-tab" data-fr="week" onclick="focusSetRange(this,'week')">周</button>
           <button class="fsst-tab" data-fr="month" onclick="focusSetRange(this,'month')">月</button>
           <button class="fsst-tab" data-fr="all" onclick="focusSetRange(this,'all')">全部</button>
         </div>
+        <div style="text-align:center;font-size:13px;color:rgba(255,255,255,.85);margin:6px 0">专注时长分布</div>
         <div class="focus-pie" id="focusPie"></div>
         <div class="focus-legend" id="focusLegend"></div>
       </div>
@@ -3335,7 +3327,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:2;color:#fff">
     <div id="focusTaskName" style="font-size:14px;letter-spacing:2px;opacity:.8;margin-bottom:4px">学习时间</div>
     <div id="focusTaskStatus" style="font-size:12px;opacity:.6;margin-bottom:24px">准备开始</div>
-    <div id="focusTimer" style="font-size:88px;font-weight:200;letter-spacing:4px;font-family:'Helvetica Neue',Arial,sans-serif;text-shadow:0 4px 20px rgba(0,0,0,.15);line-height:1">25:00</div>
+    <div id="focusTimer" style="font-size:74px;font-weight:200;letter-spacing:3px;font-family:'Helvetica Neue',Arial,sans-serif;text-shadow:0 4px 20px rgba(0,0,0,.18);line-height:1">25:00</div>
     <div id="focusLoop" style="font-size:12px;opacity:.55;margin-top:16px"></div>
   </div>
   <!-- 底部控件 -->
@@ -3349,7 +3341,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   <!-- 音乐切换提示 -->
   <div id="focusMusicTip" style="position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:3"></div>
   <!-- 进度环 -->
-  <svg id="focusRing" viewBox="0 0 200 200" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;height:300px;z-index:1;pointer-events:none">
+  <svg id="focusRing" viewBox="0 0 200 200" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;height:360px;z-index:1;pointer-events:none">
     <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3"/>
     <circle id="focusRingProg" cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-dasharray="578" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 100 100)"/>
   </svg>
@@ -3368,6 +3360,20 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   </div>
 </div>
 
+<!-- ========== v245: 强制冷却弹窗（点结束/暂停时弹出 60 秒倒计时） ========== -->
+<div id="focusCooldownModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:9993;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:30px 24px;text-align:center;width:80vw;max-width:340px">
+    <div id="focusCooldownTime" style="font-size:64px;font-weight:200;color:var(--text-primary);letter-spacing:4px;line-height:1">01:00</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin:14px 0 6px">以上是暂停的限制时间</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">避免过长打断专注流程</div>
+    <div style="font-size:11px;color:var(--text-light);margin-bottom:22px">可在 我的-专注计时核心设置-自定义暂停上限时间</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="focusCooldownGiveUp()" style="flex:1;padding:12px;background:#fff0f0;color:#ff4d4f;border:1px solid #ffccc7;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600">放弃聚焦</button>
+      <button onclick="focusCooldownResume()" style="flex:1;padding:12px;background:linear-gradient(135deg,#36d1dc 0%,#5b86e5 100%);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-weight:600">▶ 继续专注</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== v240: 专注设置弹窗 ========== -->
 <div id="focusSettingModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9992;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;width:86vw;max-width:380px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
@@ -3380,12 +3386,26 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         <div style="font-size:14px">🔔 计时结束后提示音</div>
         <label class="focus-switch"><input type="checkbox" id="focusSetRing" onchange="focusSetSave()"><span class="focus-switch-slider"></span></label>
       </div>
-      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">提示音音量跟随铃声（和铃声相同音量）</div>
+      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">提示音音量跟随音乐音量</div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5">
         <div style="font-size:14px">📳 计时结束后震动</div>
         <label class="focus-switch"><input type="checkbox" id="focusSetVib" onchange="focusSetSave()"><span class="focus-switch-slider"></span></label>
       </div>
-      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">*如需自定义铃声、震动长度等高级选项，可在计时结束后点击我的-更多设置</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5">
+        <div style="font-size:14px">🎵 音乐音量 <span id="focusVolNum" style="color:var(--accent-color);font-weight:600">60</span>%</div>
+        <input type="range" id="focusSetVol" min="10" max="100" step="5" value="60" style="width:140px" oninput="focusVolChange(this.value)">
+      </div>
+      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">*音量调整立即生效，下次开启音乐时使用</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5">
+        <div style="font-size:14px">🛑 结束前强制 1 分钟冷却</div>
+        <label class="focus-switch"><input type="checkbox" id="focusSetCooldown" onchange="focusSetSave()"><span class="focus-switch-slider"></span></label>
+      </div>
+      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">点结束或暂停时弹出 60 秒倒计时，硬逼再坚持 1 分钟才允许停止；可在这里关闭</div>
+      <div style="padding:14px 0 6px;font-size:14px;font-weight:600">🖼 背景图</div>
+      <div style="font-size:11px;color:var(--text-light);padding:0 0 10px">上传图片作为专注会话背景；点击全屏背景可循环切换</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="focusBgList"></div>
+      <button onclick="focusBgUploadClick()" style="margin-top:10px;padding:10px 14px;background:#f5f5f5;color:var(--text-primary);border:none;border-radius:8px;cursor:pointer;font-size:13px;width:100%">＋ 上传图片（自动压缩到 1280px）</button>
+      <input type="file" id="focusBgFile" accept="image/*" multiple style="display:none" onchange="focusBgUploadFiles(this.files)">
     </div>
   </div>
 </div>
@@ -9692,13 +9712,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 243;                         // v243：专注时刻音乐引擎重构——5 档→23 档 × 3 tab（自然音 13 + 氛围 5 + 轻音乐 4 + URL 自定义），全部程序化 WebAudio 合成
+const WB_VERSION = 245;                         // v245：专注时刻 4 升级——真实音频 / 1 分钟冷却 / 自定义背景图 / 饼图引导线
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 160;                 // v243 发版：159→160
+const WB_DISPLAY_VERSION = 162;                 // v245 发版：160→162
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13269,7 +13289,7 @@ var _focus = null;      // 状态
 var _focusTick = null;   // 计时器 handle
 var _focusAudio = null;  // WebAudio 上下文
 var _focusMusicNode = null; // 当前音乐节点（{stop, mode, master, icon, name, tab}）
-var _focusBgIdx = 0;
+var _focusBgIdx = 0;  // 已废弃：保留 0 占位；实际用 _focus.bgIdx（持久化）
 var _focusRun = false;   // 是否在跑
 var _focusRest = false;  // 当前是不是休息段
 var _focusLoopIdx = 0;   // 当前循环下标
@@ -13277,12 +13297,16 @@ var _focusRange = 'today';
 var _focusAddEdit = null;  // 编辑模式
 
 function focusLoad(){
-  try{ _focus = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null') || { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true} }; }
-  catch(e){ _focus = { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true} }; }
+  try{ _focus = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null') || { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0, customBgs:[] }; }
+  catch(e){ _focus = { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0, customBgs:[] }; }
   if(!_focus.tasks) _focus.tasks = [];
   if(!_focus.sessions) _focus.sessions = [];
-  if(!_focus.settings) _focus.settings = {ringtone:true,vibrate:true};
+  if(!_focus.settings) _focus.settings = {ringtone:true,vibrate:true,cooldown:true,volume:60};
+  if(_focus.settings.cooldown===undefined) _focus.settings.cooldown = true;
+  if(_focus.settings.volume===undefined) _focus.settings.volume = 60;
+  if(_focus.customBgs===undefined) _focus.customBgs = [];
   if(_focus.bgIdx===undefined) _focus.bgIdx = 0;
+  _focusMusicVolume = Math.max(0.1, Math.min(1, (_focus.settings.volume||60)/100));
 }
 
 function focusSave(){
@@ -13489,9 +13513,20 @@ function focusStartSession(id){
   else if(_focus.active.mode === 'forward'){ _focus.active.target = 0; _focus.active.elapsed = 0; }
   else { _focus.active.target = 0; _focus.active.elapsed = 0; }
   _focusLoopIdx = 0; _focusRest = false; _focusRun = false;
-  // 背景
-  _focusBgIdx = Math.floor(Math.random()*FOCUS_BG.length);
-  var bg = document.getElementById('focusBg'); if(bg) bg.style.background = FOCUS_BG[_focusBgIdx];
+  // 背景：先用用户上次选过的 _focus.bgIdx（兼容自定义图）
+  if(_focus.bgIdx===undefined || _focus.bgIdx===null) _focus.bgIdx = Math.floor(Math.random()*FOCUS_BG.length);
+  // 如果索引指向已删除的自定义图，回退到内置
+  if(_focus.bgIdx >= FOCUS_BG.length + (_focus.customBgs?_focus.customBgs.length:0)) _focus.bgIdx = 0;
+  var bg = document.getElementById('focusBg');
+  if(bg){
+    if(_focus.bgIdx < FOCUS_BG.length){
+      bg.style.background = FOCUS_BG[_focus.bgIdx];
+    } else {
+      var i = _focus.bgIdx - FOCUS_BG.length;
+      var data = (_focus.customBgs||[])[i];
+      if(data) bg.style.background = 'url("'+data+'") center/cover no-repeat';
+    }
+  }
   // 引用语
   setText('focusQuote', '"'+FOCUS_QUOTES[Math.floor(Math.random()*FOCUS_QUOTES.length)]+'"');
   // 任务名
@@ -13547,11 +13582,23 @@ function focusRenderTimer(){
 
 function focusToggleRun(){
   if(_focusRun){
-    // 暂停
+    // 暂停：v245 走 1 分钟强制冷却
+    if(_focus.settings.cooldown === false){
+      _focusRun = false;
+      if(_focusTick){ clearInterval(_focusTick); _focusTick = null; }
+      var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
+      focusRenderTimer();
+      return;
+    }
+    if(!_focus.active) return;
+    _focusCooldownMode = 'pause';
+    // 如果已经从「强制冷却」弹窗点「继续」过来，_focusRun 仍是 false，不要再开一次
+    var m = document.getElementById('focusCooldownModal');
+    if(m && m.style.display==='flex') return;
     _focusRun = false;
     if(_focusTick){ clearInterval(_focusTick); _focusTick = null; }
-    var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
-    focusRenderTimer();
+    focusCooldownBegin();
+    return;
   } else {
     // 开始
     _focusRun = true;
@@ -13633,8 +13680,20 @@ function focusStartRest(){
   setTimeout(function(){ focusToggleRun(); }, 800);
 }
 
+var _focusCooldownInterval = null;
+var _focusCooldownMode = null;  // 'pause' or 'stop'
+
 function focusStop(){
+  // v245：用户点「结束」先弹 1 分钟强制冷却，除非设置里关掉了 cooldown
+  if(_focus.settings.cooldown === false){ focusStopReal(); return; }
+  if(!_focus.active){ return; }
+  _focusCooldownMode = 'stop';
+  focusCooldownBegin();
+}
+
+function focusStopReal(){
   if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+  if(_focusCooldownInterval){ clearInterval(_focusCooldownInterval); _focusCooldownInterval=null; }
   // 记录一次未完成的 session（如果跑了超过 5 秒）
   if(_focus.active && _focus.active.elapsed > 5){
     var a = _focus.active;
@@ -13646,6 +13705,50 @@ function focusStop(){
     focusSave();
   }
   focusExit();
+}
+
+// 冷却弹窗倒计时
+function focusCooldownBegin(){
+  // 临时暂停引擎，避免 _focusTick 干扰
+  if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+  _focusRun = false;
+  var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
+  var remain = 60;
+  var render = function(){
+    var mm = Math.floor(remain/60), ss = remain%60;
+    var txt = (mm<10?'0':'')+mm+':'+(ss<10?'0':'')+ss;
+    var el = document.getElementById('focusCooldownTime');
+    if(el) el.textContent = txt;
+  };
+  render();
+  var m = document.getElementById('focusCooldownModal');
+  if(m) m.style.display = 'flex';
+  // 提示音 + 震动
+  if(_focus.settings.ringtone !== false){ try{ focusBeep(); }catch(e){} }
+  if(_focus.settings.vibrate !== false && navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} }
+  _focusCooldownInterval = setInterval(function(){
+    remain--;
+    render();
+    if(remain<=0){
+      clearInterval(_focusCooldownInterval); _focusCooldownInterval=null;
+      // 到 0 自动继续专注
+      var mEl = document.getElementById('focusCooldownModal'); if(mEl) mEl.style.display = 'none';
+      focusToggleRun();
+    }
+  }, 1000);
+}
+
+function focusCooldownResume(){
+  // 用户主动点「继续专注」立即关掉冷却弹窗，恢复计时
+  if(_focusCooldownInterval){ clearInterval(_focusCooldownInterval); _focusCooldownInterval=null; }
+  var m = document.getElementById('focusCooldownModal'); if(m) m.style.display = 'none';
+  if(!_focusRun) focusToggleRun();
+}
+function focusCooldownGiveUp(){
+  // 用户放弃：直接走真正结束
+  if(_focusCooldownInterval){ clearInterval(_focusCooldownInterval); _focusCooldownInterval=null; }
+  var m = document.getElementById('focusCooldownModal'); if(m) m.style.display = 'none';
+  focusStopReal();
 }
 
 function focusExit(){
@@ -13679,13 +13782,111 @@ function focusSkip(){
 }
 
 function focusNextBg(){
-  _focusBgIdx = (_focusBgIdx + 1) % FOCUS_BG.length;
+  // 切背景：内置渐变（8 套）+ 用户上传（customBgs）循环
+  var total = FOCUS_BG.length + (_focus.customBgs?_focus.customBgs.length:0);
+  if(total<=0) return;
+  // 用 _focus.bgIdx 作统一索引
+  _focus.bgIdx = (_focus.bgIdx + 1) % total;
   var bg = document.getElementById('focusBg');
-  if(bg){
-    bg.style.background = FOCUS_BG[_focusBgIdx];
-    bg.style.transition = 'background 0.6s ease';
+  if(!bg) return;
+  if(_focus.bgIdx < FOCUS_BG.length){
+    bg.style.background = FOCUS_BG[_focus.bgIdx];
+    bg.style.backgroundSize = 'cover';
+    bg.style.backgroundPosition = 'center';
+    focusShowTip('🎨 切换到内置背景 ' + (_focus.bgIdx+1) + '/' + FOCUS_BG.length);
+  } else {
+    var i = _focus.bgIdx - FOCUS_BG.length;
+    var data = _focus.customBgs[i];
+    if(data){
+      bg.style.background = 'url("' + data + '") center/cover no-repeat';
+      focusShowTip('🖼 已切到自定义背景 ' + (i+1));
+    }
   }
-  focusShowTip('背景已切换');
+  focusSave();
+}
+
+function focusPickBg(idx){
+  _focus.bgIdx = idx;
+  var bg = document.getElementById('focusBg');
+  if(!bg) return;
+  if(idx < FOCUS_BG.length){
+    bg.style.background = FOCUS_BG[idx];
+    bg.style.backgroundSize = 'cover';
+    bg.style.backgroundPosition = 'center';
+  } else {
+    var i = idx - FOCUS_BG.length;
+    var data = _focus.customBgs[i];
+    if(data) bg.style.background = 'url("'+data+'") center/cover no-repeat';
+  }
+  focusSave();
+}
+
+function focusBgUploadClick(){
+  document.getElementById('focusBgFile').click();
+}
+function focusBgUploadFiles(files){
+  if(!files || !files.length) return;
+  Array.from(files).forEach(function(file){
+    if(!file.type.startsWith('image/')) return;
+    // 读为 dataURL 后压缩到 ≤1280px、JPEG q80
+    var fr = new FileReader();
+    fr.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        var max = 1280;
+        var scale = 1;
+        if(Math.max(w,h) > max) scale = max / Math.max(w,h);
+        var nw = Math.round(w*scale), nh = Math.round(h*scale);
+        var c = document.createElement('canvas');
+        c.width = nw; c.height = nh;
+        c.getContext('2d').drawImage(img, 0, 0, nw, nh);
+        var data = c.toDataURL('image/jpeg', 0.8);
+        if(!_focus.customBgs) _focus.customBgs = [];
+        if(_focus.customBgs.length >= 12){
+          toast('最多 12 张，自定义背景已满');
+          return;
+        }
+        _focus.customBgs.push(data);
+        focusSave();
+        focusRenderBgList();
+        toast('已上传 1 张背景');
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function focusRenderBgList(){
+  var c = document.getElementById('focusBgList');
+  if(!c) return;
+  var html = '';
+  // 内置 8 套缩略图（用 CSS 渐变做小预览）
+  FOCUS_BG.forEach(function(bg, i){
+    var on = (i === _focus.bgIdx) ? 'border:2px solid var(--accent-color);' : 'border:2px solid transparent;';
+    html += '<div onclick="focusPickBg('+i+')" style="width:64px;height:48px;border-radius:6px;cursor:pointer;background:'+bg+';'+on+'background-size:cover" title="内置背景 '+(i+1)+'"></div>';
+  });
+  // 用户上传
+  (_focus.customBgs||[]).forEach(function(data, j){
+    var idx = FOCUS_BG.length + j;
+    var on = (idx === _focus.bgIdx) ? 'border:2px solid var(--accent-color);' : 'border:2px solid transparent;';
+    html += '<div style="position:relative"><div onclick="focusPickBg('+idx+')" style="width:64px;height:48px;border-radius:6px;cursor:pointer;background:url('+data+') center/cover;'+on+'"></div>'
+          + '<button onclick="focusBgDel('+j+')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:#ff4d4f;color:#fff;font-size:12px;cursor:pointer;line-height:1;padding:0">×</button></div>';
+  });
+  c.innerHTML = html;
+}
+function focusBgDel(j){
+  if(j<0 || j>=_focus.customBgs.length) return;
+  _focus.customBgs.splice(j, 1);
+  // 修正 bgIdx：如果删的是当前正显示，可能落到下一张
+  if(_focus.bgIdx >= FOCUS_BG.length + _focus.customBgs.length){
+    _focus.bgIdx = 0;
+  } else if(_focus.bgIdx > FOCUS_BG.length + j){
+    _focus.bgIdx--;
+  }
+  focusSave();
+  focusRenderBgList();
+  toast('已删除');
 }
 
 function focusShowTip(txt){
@@ -13719,18 +13920,75 @@ function focusEnsureAudio(){
 function focusMusicStart(){
   if(_focusMusicIdx < 0) return;
   focusMusicStop();
-  var ctx = focusEnsureAudio();
-  if(!ctx) return;
-  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
   var cfg = FOCUS_MUSIC[_focusMusicIdx];
   if(!cfg) return;
-  // url 模式
+  // url 自定义模式
   if(cfg.mode === 'url'){
     focusOpenUrlInput();
     return;
   }
+  // 优先尝试真实音频 URL
+  if(cfg.url){
+    try{
+      var audio = new Audio();
+      audio.preload = 'auto';
+      audio.loop = true;
+      audio.volume = _focusMusicVolume;
+      audio.crossOrigin = 'anonymous';
+      audio.src = cfg.url;
+      _focusMusicNode = {
+        stop: function(){ try{audio.pause(); audio.currentTime=0;}catch(e){} },
+        mode: cfg.name, tab: cfg.tab, icon: cfg.icon, name: cfg.name, isAudio:true,
+        failed: false
+      };
+      var ok = false;
+      audio.addEventListener('playing', function(){
+        ok = true;
+      });
+      audio.addEventListener('error', function(){
+        if(!ok){ _focusMusicNode.failed = true; focusFallbackToSynth(cfg); }
+      });
+      // 用户手势下 audio.play() 应可用
+      var p = audio.play();
+      if(p && p.then){
+        p.then(function(){ ok = true; }).catch(function(){
+          if(!ok){ _focusMusicNode.failed = true; focusFallbackToSynth(cfg); }
+        });
+      }
+      // 8 秒仍未 playing，认为失败（很多 Wikimedia 405/网络问题）
+      setTimeout(function(){
+        if(!ok && _focusMusicNode && !_focusMusicNode.failed){
+          _focusMusicNode.failed = true;
+          focusFallbackToSynth(cfg);
+        }
+      }, 8000);
+      return;
+    }catch(e){
+      // 走到 synth 兜底
+    }
+  }
+  // 走 WebAudio 合成（synth 字段或 mode 字段）
+  var ctx = focusEnsureAudio();
+  if(!ctx) return;
+  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
   var node = focusBuildMusic(ctx, _focusMusicIdx);
   _focusMusicNode = node;
+}
+
+function focusFallbackToSynth(cfg){
+  // 真实音频失败时，用 WebAudio 合成兜底并 toast 提示
+  try{
+    if(_focusMusicNode && _focusMusicNode.isAudio){
+      try{_focusMusicNode.stop();}catch(e){}
+    }
+  }catch(e){}
+  var ctx = focusEnsureAudio();
+  if(!ctx){ _focusMusicNode = null; return; }
+  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
+  var idx = FOCUS_MUSIC.findIndex(function(c){return c===cfg;});
+  var node = focusBuildMusic(ctx, idx);
+  _focusMusicNode = node;
+  toast('🔊 已切换到程序合成（' + cfg.name + '）');
 }
 
 function focusMusicStop(){
@@ -13748,31 +14006,39 @@ function focusMusicStop(){
 // ——自然音 12（雨-高清/海浪/河水/细雨/雨林/风铃/教室/鸟鸣/沙漠/篝火/落叶/蝉鸣/时钟/书香/列车/木鱼）+ 氛围 5（夜雨/太空/教堂/晨雾/雪夜）+ 轻音乐 4（钢琴/弦乐/古琴/八音盒）+ URL 自定义 + 静音
 // ============================================================
 var FOCUS_MUSIC = [
-  // 自然音（13 档）
-  { tab:'nature', name:'雨声-高清', icon:'🌧', mode:'rain_hd' },
-  { tab:'nature', name:'夏日海滩', icon:'🏖', mode:'beach' },
-  { tab:'nature', name:'小河流水', icon:'💧', mode:'stream' },
-  { tab:'nature', name:'细雨', icon:'🌦', mode:'rain_light' },
-  { tab:'nature', name:'热带雨林', icon:'🌴', mode:'jungle' },
-  { tab:'nature', name:'风铃', icon:'🎐', mode:'windbell' },
-  { tab:'nature', name:'课后教室', icon:'🏫', mode:'classroom' },
-  { tab:'nature', name:'春日鸟鸣', icon:'🐦', mode:'birds' },
-  { tab:'nature', name:'沙漠', icon:'🏜', mode:'desert' },
-  { tab:'nature', name:'河边篝火', icon:'🔥', mode:'bonfire' },
-  { tab:'nature', name:'秋风落叶', icon:'🍂', mode:'autumn_wind' },
-  { tab:'nature', name:'火炉边', icon:'♨️', mode:'fireplace' },
-  { tab:'nature', name:'夏夜蝉鸣', icon:'🌙', mode:'cricket' },
+  // 自然音（13 档）：优先尝试真实音频 URL，加载失败走 synth 兜底
+  { tab:'nature', name:'雨声-高清',   icon:'🌧', url:'https://upload.wikimedia.org/wikipedia/commons/3/3b/Rain.ogg',           synth:'rain_hd' },
+  { tab:'nature', name:'夏日海滩',   icon:'🏖', url:'https://upload.wikimedia.org/wikipedia/commons/8/89/Ocean_waves.ogg',  synth:'beach' },
+  { tab:'nature', name:'小河流水',   icon:'💧', url:'', synth:'stream' },
+  { tab:'nature', name:'细雨',       icon:'🌦', url:'https://upload.wikimedia.org/wikipedia/commons/2/2c/Light_rain.ogg',  synth:'rain_light' },
+  { tab:'nature', name:'热带雨林',   icon:'🌴', url:'', synth:'jungle' },
+  { tab:'nature', name:'风铃',       icon:'🎐', url:'', synth:'windbell' },
+  { tab:'nature', name:'课后教室',   icon:'🏫', url:'', synth:'classroom' },
+  { tab:'nature', name:'春日鸟鸣',   icon:'🐦', url:'https://upload.wikimedia.org/wikipedia/commons/e/e1/Birds_singing.ogg', synth:'birds' },
+  { tab:'nature', name:'沙漠',       icon:'🏜', url:'https://upload.wikimedia.org/wikipedia/commons/9/9c/Wind_in_desert.ogg', synth:'desert' },
+  { tab:'nature', name:'河边篝火',   icon:'🔥', url:'https://upload.wikimedia.org/wikipedia/commons/0/02/Crackling_fire.ogg', synth:'bonfire' },
+  { tab:'nature', name:'秋风落叶',   icon:'🍂', url:'', synth:'autumn_wind' },
+  { tab:'nature', name:'火炉边',     icon:'♨️', url:'', synth:'fireplace' },
+  { tab:'nature', name:'夏夜蝉鸣',   icon:'🌙', url:'', synth:'cricket' },
   // 氛围音乐（5 档）
-  { tab:'ambient', name:'夜雨小屋', icon:'🌧', mode:'rain_room' },
-  { tab:'ambient', name:'太空深处', icon:'🚀', mode:'space' },
-  { tab:'ambient', name:'大教堂', icon:'⛪', mode:'cathedral' },
-  { tab:'ambient', name:'晨雾森林', icon:'🌫', mode:'mist_forest' },
-  { tab:'ambient', name:'雪夜炉火', icon:'❄️', mode:'snow_fire' },
-  // 轻音乐（4 档）
-  { tab:'lounge', name:'钢琴独奏', icon:'🎹', mode:'piano' },
-  { tab:'lounge', name:'弦乐低吟', icon:'🎻', mode:'strings' },
-  { tab:'lounge', name:'古琴', icon:'🪕', mode:'guqin' },
-  { tab:'lounge', name:'八音盒', icon:'🎵', mode:'musicbox' },
+  { tab:'ambient', name:'夜雨小屋',  icon:'🌧', url:'', synth:'rain_room' },
+  { tab:'ambient', name:'太空深处',  icon:'🚀', url:'', synth:'space' },
+  { tab:'ambient', name:'大教堂',    icon:'⛪', url:'', synth:'cathedral' },
+  { tab:'ambient', name:'晨雾森林',  icon:'🌫', url:'', synth:'mist_forest' },
+  { tab:'ambient', name:'雪夜炉火',  icon:'❄️', url:'', synth:'snow_fire' },
+  // 轻音乐（4 档，全部用 SoundHelix 真实音频）
+  { tab:'lounge', name:'Pure Memories', icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { tab:'lounge', name:'时光的低语',   icon:'🌙', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { tab:'lounge', name:'静谧钢琴',     icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { tab:'lounge', name:'冥想钢琴 1',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+  { tab:'lounge', name:'冥想钢琴 2',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
+  { tab:'lounge', name:'Aurora Rising', icon:'🌅', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+  { tab:'lounge', name:'行至山明',     icon:'⛰', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
+  { tab:'lounge', name:'青云逐光',     icon:'🌤', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
+  { tab:'lounge', name:'Chill Lo-Fi 1', icon:'🎧', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
+  { tab:'lounge', name:'Chill Jazz 1',  icon:'🎷', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
+  { tab:'lounge', name:'静谧钢琴 1',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3' },
+  { tab:'lounge', name:'Pure Piano',    icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
   // 自定义
   { tab:'custom', name:'自定义 URL', icon:'🔗', mode:'url' }
 ];
@@ -13780,6 +14046,7 @@ var FOCUS_MUSIC = [
 var _focusMusicTab = 'nature';   // 当前 tab：nature/ambient/lounge/custom
 var _focusMusicIdx = 0;          // 当前 tab 内 idx（mute = -1）
 var _focusUrlAudio = null;       // 自定义 URL Audio 元素
+var _focusMusicVolume = 0.60;    // 主音量（v245 提升 0.20→0.60）
 
 // 噪声 buffer 工厂（白噪/粉噪/棕噪）
 function focusMakeNoise(ctx, kind, lenSec){
@@ -14249,10 +14516,12 @@ function focusBuildMusic(ctx, modeIdx){
   var cfg = FOCUS_MUSIC[modeIdx];
   if(!cfg) return null;
   if(cfg.mode === 'url') return null; // url 走 _focusUrlAudio
-  var fn = FOCUS_SYNTH[cfg.mode];
+  // v245：synth 字段驱动（兼容旧 mode 字段）
+  var synthKey = cfg.synth || cfg.mode;
+  var fn = FOCUS_SYNTH[synthKey];
   if(!fn) return null;
   var master = ctx.createGain();
-  master.gain.value = 0.20;
+  master.gain.value = _focusMusicVolume;
   master.connect(ctx.destination);
   var node = fn(ctx, master);
   node.master = master;
@@ -14325,7 +14594,7 @@ function focusOpenUrlInput(){
   try{
     var audio = new Audio(url);
     audio.loop = true;
-    audio.volume = 0.20;
+    audio.volume = _focusMusicVolume;
     audio.crossOrigin = 'anonymous';
     _focusUrlAudio = audio;
     audio.play().then(function(){
@@ -14404,10 +14673,6 @@ function focusRenderStats(){
   var list = focusRangeFilter(_focusRange)(_focus.sessions);
   var totalSec = list.reduce(function(a,s){return a+(s.duration||0);},0);
   var count = list.length;
-  setText('focusStatsCount', count);
-  var hh = Math.floor(totalSec/3600), mm = Math.floor((totalSec%3600)/60);
-  if(hh>0) setText('focusStatsTime', hh+'<span style="font-size:14px">小时</span>'+mm+'<span style="font-size:14px">分</span>');
-  else setText('focusStatsTime', mm+'<span style="font-size:14px">分</span>');
 
   // 日期
   var today = tdCalLocalToday();
@@ -14424,49 +14689,97 @@ function focusRenderStats(){
   var legend = document.getElementById('focusLegend');
   if(!pie || !legend) return;
   if(!keys.length){
-    pie.innerHTML = '<div style="color:rgba(255,255,255,.55);font-size:13px;padding:30px 0">暂无专注记录</div>';
+    pie.innerHTML = '<div style="color:rgba(255,255,255,.55);font-size:13px;padding:60px 0;text-align:center">暂无专注记录</div>';
     legend.innerHTML = '';
     return;
   }
-  // 颜色库（8 色循环）
-  var colors = ['#FF6B6B','#4ECDC4','#FFD93D','#6BCB77','#4D96FF','#A66CFF','#FF9F45','#36AE7C'];
+  // 颜色库（12 色循环）
+  var palette = ['#FF6B6B','#4ECDC4','#FFD93D','#6BCB77','#A66CFF','#FF9F45','#36AE7C','#4D96FF','#FF7AB6','#9C27B0','#FF5722','#00BCD4'];
   // 排序取前 6
   keys.sort(function(a,b){return byTask[b]-byTask[a];});
   var top = keys.slice(0,6);
-  var other = keys.slice(6).reduce(function(a,k){return a+byTask[k];},0);
-  var data = top.map(function(k,i){ return { name:k, value:byTask[k], color:colors[i%colors.length] }; });
-  if(other>0) data.push({ name:'其他', value:other, color:'#888' });
-  // 画饼图（SVG）
-  var cx=100, cy=100, r=80, ir=45;
+  var otherSec = keys.slice(6).reduce(function(a,k){return a+byTask[k];},0);
+  var data = top.map(function(k,i){ return { name:k, value:byTask[k], color:palette[i%palette.length] }; });
+  if(otherSec>0) data.push({ name:'其他', value:otherSec, color:'#888' });
+
+  // ============== 绘制带引导线的饼图 ==============
+  // SVG viewBox 0 0 360 280，饼图中心 (180, 140)，半径 100
+  var cx=180, cy=140, R=100;
   var sum = data.reduce(function(a,d){return a+d.value;},0);
   var startA = -Math.PI/2;
   var paths = '';
-  data.forEach(function(d){
+  var labels = [];
+  data.forEach(function(d, idx){
     var ang = (d.value/sum) * Math.PI*2;
     var endA = startA + ang;
     var large = ang > Math.PI ? 1 : 0;
-    var x1 = cx + r*Math.cos(startA), y1 = cy + r*Math.sin(startA);
-    var x2 = cx + r*Math.cos(endA), y2 = cy + r*Math.sin(endA);
+    var x1 = cx + R*Math.cos(startA), y1 = cy + R*Math.sin(startA);
+    var x2 = cx + R*Math.cos(endA),   y2 = cy + R*Math.sin(endA);
+    var ir = 50;  // 内半径（环形）
     var ix1 = cx + ir*Math.cos(endA), iy1 = cy + ir*Math.sin(endA);
     var ix2 = cx + ir*Math.cos(startA), iy2 = cy + ir*Math.sin(startA);
-    paths += '<path d="M'+x1+' '+y1+' A '+r+' '+r+' 0 '+large+' 1 '+x2+' '+y2+' L '+ix1+' '+iy1+' A '+ir+' '+ir+' 0 '+large+' 0 '+ix2+' '+iy2+' Z" fill="'+d.color+'"/>';
+    paths += '<path d="M'+x1.toFixed(1)+' '+y1.toFixed(1)
+      +' A '+R+' '+R+' 0 '+large+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)
+      +' L '+ix1.toFixed(1)+' '+iy1.toFixed(1)
+      +' A '+ir+' '+ir+' 0 '+large+' 0 '+ix2.toFixed(1)+' '+iy2.toFixed(1)
+      +' Z" fill="'+d.color+'"/>';
+    // 引导线锚点（扇形外缘中点附近）
+    var midA = startA + ang/2;
+    var px = cx + R*Math.cos(midA);
+    var py = cy + R*Math.sin(midA);
+    labels.push({ x:px, y:py, midA:midA, d:d, sum:sum });
     startA = endA;
   });
-  pie.innerHTML = '<svg viewBox="0 0 200 200" style="width:200px;height:200px">'+paths
-    + '<text x="100" y="95" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">'+(sum>0?Math.round(sum/60):0)+'</text>'
-    + '<text x="100" y="115" text-anchor="middle" fill="rgba(255,255,255,.65)" font-size="11">分钟</text>'
+  // 引导线 + 外部标签（左右交错）
+  var lines = '';
+  var labelTotalMin = Math.round(sum/60);
+  var hh = Math.floor(totalSec/3600), mm = Math.floor((totalSec%3600)/60);
+  var totalStr = (hh>0?(hh+'小时'):'')+(mm>0?(mm+'分'):'') || (sum+'秒');
+  labels.forEach(function(L, i){
+    var outX, outY, textX, textY, anchor;
+    var sideRight = (L.midA > -Math.PI/2 && L.midA < Math.PI/2);
+    if(sideRight){
+      outX = 280;
+      anchor = 'start';
+    } else {
+      outX = 80;
+      anchor = 'end';
+    }
+    outY = 40 + i*40;
+    // 引线
+    lines += '<path d="M'+L.x.toFixed(1)+' '+L.y.toFixed(1)
+      +' L '+(sideRight?310:50).toFixed(1)+' '+outY.toFixed(1)
+      +'" stroke="rgba(255,255,255,.35)" stroke-width="1" fill="none"/>';
+    // 标签
+    var pct = Math.round(L.d.value/sum*100);
+    var dt = L.d.value;
+    var dmm = Math.floor(dt/60), dss = dt%60;
+    var timeStr = dmm>0 ? (dmm+'分'+(dss>0?dss+'秒':'')) : (dt+'秒');
+    var name = escHtml(L.d.name.length>6?(L.d.name.slice(0,6)+'…'):L.d.name);
+    lines += '<circle cx="'+(sideRight?310:50).toFixed(1)+'" cy="'+outY.toFixed(1)+'" r="4" fill="'+L.d.color+'"/>';
+    lines += '<text x="'+(sideRight?320:40).toFixed(1)+'" y="'+(outY-3).toFixed(1)+'" fill="rgba(255,255,255,.95)" font-size="12" text-anchor="'+anchor+'" font-weight="600">'+name+'</text>';
+    lines += '<text x="'+(sideRight?320:40).toFixed(1)+'" y="'+(outY+12).toFixed(1)+'" fill="rgba(255,255,255,.55)" font-size="11" text-anchor="'+anchor+'">'+timeStr+' · '+pct+'%</text>';
+  });
+  pie.innerHTML = '<svg viewBox="0 0 360 280" style="width:100%;max-width:360px;height:auto">'
+    + paths
+    + lines
+    + '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">总计</text>'
+    + '<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" fill="#fff" font-size="13" opacity=".85">'+totalStr+'</text>'
     + '</svg>';
-  legend.innerHTML = data.map(function(d){
-    var pct = sum>0 ? Math.round(d.value/sum*100) : 0;
-    var v = focusFmtTime(d.value);
-    return '<div class="focus-legend-item"><span class="focus-legend-dot" style="background:'+d.color+'"></span><span class="focus-legend-name">'+escHtml(d.name)+'</span><span class="focus-legend-val">'+v+' · '+pct+'%</span></div>';
-  }).join('');
+
+  // 底部图例：双列简洁版（与左侧饼图标签互补，主要在饼图没有引导线时保留）
+  legend.innerHTML = '';
 }
 
 /* ---------- 设置 ---------- */
 function focusOpenSettings(){
   document.getElementById('focusSetRing').checked = _focus.settings.ringtone !== false;
   document.getElementById('focusSetVib').checked = _focus.settings.vibrate !== false;
+  document.getElementById('focusSetCooldown').checked = _focus.settings.cooldown !== false;
+  document.getElementById('focusSetVol').value = _focus.settings.volume || 60;
+  setText('focusVolNum', _focus.settings.volume || 60);
+  // 渲染背景图列表
+  focusRenderBgList();
   var m = document.getElementById('focusSettingModal');
   m.style.display='flex';
   m.onclick = function(e){ if(e.target === m) closeFocusSetting(); };
@@ -14475,7 +14788,19 @@ function closeFocusSetting(){ var m=document.getElementById('focusSettingModal')
 function focusSetSave(){
   _focus.settings.ringtone = document.getElementById('focusSetRing').checked;
   _focus.settings.vibrate = document.getElementById('focusSetVib').checked;
+  _focus.settings.cooldown = document.getElementById('focusSetCooldown').checked;
   focusSave();
+}
+function focusVolChange(v){
+  setText('focusVolNum', v);
+  _focus.settings.volume = parseInt(v,10);
+  _focusMusicVolume = Math.max(0.1, Math.min(1, v/100));
+  focusSave();
+  // 实时调正在播放音乐
+  if(_focusMusicNode){
+    if(_focusMusicNode.master){ _focusMusicNode.master.gain.value = _focusMusicVolume; }
+    if(_focusMusicNode.isAudio){ /* Audio.volume 在下次创建时生效 */ }
+  }
 }
 
 function focusCompleteClose(){ var m=document.getElementById('focusCompleteModal'); if(m) m.style.display='none'; focusExit(); }
