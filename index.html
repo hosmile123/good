@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v237-cachebust: 左滑删除全面改为右上角 ⋮ 菜单——①CSS：.swipe-card/.swipe-reveal 从"红色左滑露删除"改为白底卡片 + 右上角圆形 ⋮ 按钮，.swipe-front 右 padding 44px 留位；新增 .wb-row-menu 弹出菜单样式；②bindSwipeList 置空壳(不再左滑)；新增 wbRowMenu(btn,items) 通用菜单(右上角定位，点外部关闭，danger 红色)；③9 个列表(待办/旅行/读书/日记/记账/作息记录/经期/体重/运动)删除按钮全部改为 ⋮+菜单+确认；④用户可见提示"左滑可删除"改"点 ⋮ 可删除" -->
+<!-- v238-cachebust: ①日历点击查看——buildMonth(year,month,marked,prefix) 有记录日期加 onclick(.link 可点样式)，paintCal 传 prefix；生活习惯日历点击 → showDayRoutine(k) 弹窗显示当日 早睡/早起/体重/经期 记录；运动日历点击 → showDayFit(k) 弹窗显示当日运动(类型+距离/时长/kcal/备注)；新增 #routineDayModal/#fitDayModal(wb-modal 复用)；②⋮按钮不挡日期——swipe-front 内联 padding 统一 12px 40px 12px 14px(作息/旅行/读书/日记)，运动卡片日期加 margin-right:34px；③倒数日详情农历修复——solar2lunar 返回 lMonth/lDay，详情误用 lr.monthStr/lr.dayStr(undefined) 改为 LUNAR_MONTH_CN[lr.lMonth-1]+LUNAR_DAY_CN[lr.lDay-1] 拼"农历X月X日" -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -2484,6 +2484,9 @@ function toggleSbCollapse(){
     <div class="section-label">📋 我的拜访记录 <span id="visitListTitle" style="font-weight:400;color:var(--text-light)"></span></div>
     <div class="card" style="padding:0" id="visitList"></div>
     <div class="wb-modal" id="visitModal"></div>
+    <!-- v238：日历点选当日详情弹窗 -->
+    <div class="wb-modal" id="routineDayModal"></div>
+    <div class="wb-modal" id="fitDayModal"></div>
   </div>
 
   </div><!-- /page-client -->
@@ -4331,7 +4334,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var col = e.color || DM_COLORS[0];
       var isBirthday = dmIsBirthdayEvent(e);
       var ageInfo = isBirthday ? dmAgeProgress(e) : null;
-      // 公历/农历标签
+      // 公历/农历标签（v238：修复农历字段——solar2lunar 返回 lMonth/lDay，此前误用不存在的 monthStr/dayStr 显示 undefined）
       var ds = e.date || '';
       var datePill = '<span class="dm-d-pill">'+ds+'</span>';
       var lunarText = '';
@@ -4339,7 +4342,9 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         if(typeof solar2lunar==='function'){
           var parts = ds.split('-');
           var lr = solar2lunar(parseInt(parts[0],10), parseInt(parts[1],10), parseInt(parts[2],10));
-          if(lr) lunarText = '<span class="dm-d-pill">农历 '+lr.monthStr+lr.dayStr+'</span>';
+          if(lr && LUNAR_MONTH_CN && LUNAR_DAY_CN){
+            lunarText = '<span class="dm-d-pill">农历 '+(lr.isLeap?'闰':'')+LUNAR_MONTH_CN[lr.lMonth-1]+'月'+LUNAR_DAY_CN[lr.lDay-1]+'</span>';
+          }
         }
       }catch(err){}
       // 记忆列表
@@ -9431,13 +9436,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 237;                         // v237：左滑删除全面改为右上角 ⋮ 菜单——bindSwipeList 置空壳；新增 wbRowMenu(btn,items) 通用弹出菜单(点外部关闭)；待办/旅行/读书/日记/记账/作息记录/经期/体重/运动 9 个列表删除按钮改为 ⋮ + 菜单确认
+const WB_VERSION = 238;                         // v238：①生活习惯/运动日历有记录的日期可点击查看当日详情(showDayRoutine/showDayFit + routineDayModal/fitDayModal，buildMonth/paintCal 传 prefix)；②⋮删除按钮不再挡日期(swipe-front 右 padding 40px，作息/运动日期前挪)；③倒数日详情农历修复(误用 lr.monthStr/dayStr → 改 LUNAR_MONTH_CN/LUNAR_DAY_CN 拼"农历X月X日")
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 154;                 // v237 发版：153→154
+const WB_DISPLAY_VERSION = 155;                 // v238 发版：154→155
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10136,7 +10141,7 @@ function renderTravel(){
     var grayStyle = t.done ? 'opacity:0.45' : '';
     return '<div class="swipe-card'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
       '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这条旅行记录吗？\'))deleteTravel(\''+t.id+'\')}}])">⋮</button>'+
-      '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 14px;'+grayStyle+'">'+
+      '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 40px 12px 14px;'+grayStyle+'">'+
         '<div class="todo-check'+doneCls+'" onclick="event.stopPropagation();toggleTravelDone(\''+t.id+'\')"></div>'+
         '<div class="li-icon" style="background:#E6F7FF;flex-shrink:0">'+travelEmoji(t.name)+'</div>'+
         '<div class="li-info" style="flex:1;min-width:0"><div class="li-title">'+esc(t.name)+'</div><div class="li-sub">'+esc(t.date||'待定')+' · 预算 ¥'+(+t.budget||0).toLocaleString()+(t.note?' · '+esc(t.note):'')+'</div></div>'+
@@ -10216,7 +10221,7 @@ function renderBooks(){
     var grayStyle = b.done ? 'opacity:0.45' : '';
     return '<div class="swipe-card'+(b.done?' done':'')+'" data-id="'+b.id+'">'+
       '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这条读书记录吗？\'))deleteBook(\''+b.id+'\')}}])">⋮</button>'+
-      '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;'+grayStyle+'">'+
+      '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 40px 12px 14px;'+grayStyle+'">'+
         '<div class="todo-check'+doneCls+'" onclick="event.stopPropagation();toggleBookDone(\''+b.id+'\')" style="margin-top:2px;flex-shrink:0"></div>'+
         '<div class="li-icon" style="background:#F9F0FF;flex-shrink:0">📖</div>'+
         '<div class="li-info" style="flex:1;min-width:0"><div class="li-title">'+esc(b.name)+'</div>'+
@@ -11158,7 +11163,7 @@ function renderDiaryList(){
     var moodEmoji = (e.mood||'').slice(0,2) || '📝';
     return '<div class="swipe-card" data-id="'+e.id+'">'+
       '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除日记\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这篇日记吗？\'))deleteDiaryEntry(\''+e.id+'\')}}])">⋮</button>'+
-      '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px">'+
+      '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 40px 12px 14px">'+
         '<div class="li-icon" style="background:#F6FFED;flex-shrink:0;font-size:20px">'+moodEmoji+'</div>'+
         '<div class="li-info" style="flex:1;min-width:0"><div class="li-title">'+(e.title?esc(e.title):'无标题')+'</div>'+
         '<div class="li-sub">'+(e.date||'')+' · '+(e.mood||'')+'</div>'+
@@ -11671,14 +11676,20 @@ function calHeader(year,month,prefix){
     '<span class="mc-title">'+year+'年'+(month+1)+'月</span>'+
     '<button class="mc-btn" onclick="calStep(\''+prefix+'\',1)">›</button></div>';
 }
-function buildMonth(year,month,marked){
+function buildMonth(year,month,marked,prefix){
   var heads=['一','二','三','四','五','六','日'];
   var html='<div class="mc-heads">'+heads.map(function(h){return '<span>'+h+'</span>';}).join('')+'</div><div class="mc-cells">';
   var first=new Date(year,month,1); var start=(first.getDay()+6)%7; var days=new Date(year,month+1,0).getDate();
   var today=_today();
   for(var i=0;i<start;i++) html+='<span class="mc-cell empty"></span>';
   for(var d=1;d<=days;d++){ var k=_ymd(year,month,d); var on=marked&&marked.has(k);
-    html+='<span class="mc-cell'+(on?' on':'')+(k===today?' today':'')+'">'+d+'</span>'; }
+    // v238：有记录的日期可点击查看当天详情（生活习惯/运动等）
+    var click='';
+    if(on){
+      if(prefix==='sr') click=' onclick="showDayRoutine(\''+k+'\')"';
+      else if(prefix==='fitness') click=' onclick="showDayFit(\''+k+'\')"';
+    }
+    html+='<span class="mc-cell'+(on?' on'+(click?' link':'') :'')+(k===today?' today':'')+'"'+click+'>'+d+'</span>'; }
   html+='</div>'; return html;
 }
 function calStep(prefix,dir){
@@ -11853,7 +11864,7 @@ function renderRoutine(){
 function paintCal(elId,prefix,marked){
   var el=document.getElementById(elId); if(!el) return;
   var s=CAL[prefix];
-  el.innerHTML = calHeader(s.y,s.m,prefix) + buildMonth(s.y,s.m,marked);
+  el.innerHTML = calHeader(s.y,s.m,prefix) + buildMonth(s.y,s.m,marked,prefix);
 }
 function streakCount(dateKeys){
   if(!dateKeys||!dateKeys.length) return 0;
@@ -11910,7 +11921,48 @@ function initSrForm(){
   var sb=document.getElementById('sleepBed'); if(sb) sb.value=hm;
   var sd=document.getElementById('sleepDate'); if(sd) sd.value=_today();
 }
-// 渲染每日打卡记录列表（早睡 + 早起合并，左滑可删除）
+// v238：日历点击某天 → 查看生活习惯当日记录（睡眠/早起/体重/经期）
+function showDayRoutine(k){
+  var r=getRoutine();
+  var parts=[];
+  if(r.sleep.log[k] && r.sleep.log[k].bed) parts.push('🌙 早睡 '+esc(r.sleep.log[k].bed)+(r.sleep.log[k].note?(' · '+esc(r.sleep.log[k].note)):''));
+  if(r.rise.log[k] && r.rise.log[k].time) parts.push('🌅 早起 '+esc(r.rise.log[k].time)+(r.rise.log[k].note?(' · '+esc(r.rise.log[k].note)):''));
+  if(r.weight.log[k] && r.weight.log[k].kg) parts.push('⚖️ 体重 '+r.weight.log[k].kg+' kg');
+  if(r.period.log[k]) parts.push('🩸 经期 第 '+(r.period.log[k].days||1)+' 天');
+  var html='<div class="modal-card"><div class="modal-title">📅 '+k+' 的生活记录</div>';
+  if(parts.length){
+    html+='<div style="max-height:50vh;overflow:auto;margin:10px 0">'+parts.map(function(p){
+      return '<div class="list-item"><div class="li-icon" style="background:#E6F7FF">📌</div><div class="li-info"><div class="li-title">'+p+'</div></div></div>';
+    }).join('')+'</div>';
+  } else {
+    html+='<div class="empty-state"><div class="icon">📭</div><p>这一天没有打卡记录</p></div>';
+  }
+  html+='<button class="btn-primary" style="width:100%" onclick="closeModal(\'routineDayModal\')">关闭</button></div>';
+  var m=document.getElementById('routineDayModal'); if(!m) return;
+  m.innerHTML=html; m.style.display='flex';
+  m.onclick=function(e){ if(e.target===m) closeModal('routineDayModal'); };
+}
+// v238：日历点击某天 → 查看运动当日记录
+function showDayFit(k){
+  var f=getFit(); var arr=f.log[k]; var entries=Array.isArray(arr)?arr:(arr?[arr]:[]);
+  var html='<div class="modal-card"><div class="modal-title">🏃 '+k+' 的运动记录</div>';
+  if(entries.length){
+    html+='<div style="max-height:50vh;overflow:auto;margin:10px 0">'+entries.map(function(x){
+      var info=[];
+      if(+x.dist>0) info.push('📏 '+(+x.dist).toFixed(1)+'km');
+      if(+x.dur>0) info.push('⏱ '+(+x.dur)+'min');
+      if(+x.kcal>0) info.push('🔥 '+(+x.kcal)+'kcal');
+      return '<div class="list-item"><div class="li-icon" style="background:#E6F7FF">'+(FIT_TYPE_ICONS[x.type]||'🏃')+'</div><div class="li-info"><div class="li-title">'+esc(x.type||'运动')+(info.length?' · '+info.join(' · '):'')+'</div>'+(x.note?'<div class="li-sub">'+esc(x.note)+'</div>':'')+'</div></div>';
+    }).join('')+'</div>';
+  } else {
+    html+='<div class="empty-state"><div class="icon">📭</div><p>这一天没有运动记录</p></div>';
+  }
+  html+='<button class="btn-primary" style="width:100%" onclick="closeModal(\'fitDayModal\')">关闭</button></div>';
+  var m=document.getElementById('fitDayModal'); if(!m) return;
+  m.innerHTML=html; m.style.display='flex';
+  m.onclick=function(e){ if(e.target===m) closeModal('fitDayModal'); };
+}
+// 渲染每日打卡记录列表（早睡 + 早起合并，点 ⋮ 可删除）
 function renderSrRecords(r){
   var box=document.getElementById('srRecordList'); if(!box) return;
   var items=[];
@@ -11934,10 +11986,10 @@ function renderSrRecords(r){
     var noteHtml = it.note ? ('<div class="todo-meta" style="margin-top:2px">'+esc(it.note)+'</div>') : '';
     return '<div class="swipe-card" data-id="'+it.date+'">'+
       '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){'+del+'}}])">⋮</button>'+
-      '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 14px">'+
+      '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 40px 12px 14px">'+
         '<span style="font-size:18px">'+it.icon+'</span>'+
         '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">'+it.label+' · '+esc(it.time)+durHtml+'</div>'+noteHtml+'</div>'+
-        '<span style="font-size:12px;color:#999;white-space:nowrap">'+it.date+'</span>'+
+        '<span style="font-size:12px;color:#999;white-space:nowrap;margin-right:2px">'+it.date+'</span>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -13049,7 +13101,7 @@ function renderFitRecords(){
       + '<div class="swipe-front"><div style="flex:1">'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
       + '<div style="font-weight:600">'+(FIT_TYPE_ICONS[it.type]||'🏃')+' '+esc(it.type)+'</div>'
-      + '<div style="font-size:12px;color:var(--text-light)">'+it.date+'</div></div>'
+      + '<div style="font-size:12px;color:var(--text-light);margin-right:34px">'+it.date+'</div></div>'
       + (info.length?'<div style="margin-top:6px;font-size:13px;color:var(--text)">'+info.join(' · ')+'</div>':'')
       + (it.note?'<div style="margin-top:4px;font-size:12px;color:var(--text-light)">'+esc(it.note)+'</div>':'')
       + '</div></div></div>';
