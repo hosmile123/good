@@ -25,6 +25,7 @@
 <!-- v242-cachebust: 专注时刻任务卡 ⋮ 菜单——修正 items 字段名 text→label（wbRowMenu 实际读 label 不读 text，修正前两行都 fallback 显示成「操作」） -->
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
+<!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9712,13 +9713,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 245;                         // v245：专注时刻 4 升级——真实音频 / 1 分钟冷却 / 自定义背景图 / 饼图引导线
+const WB_VERSION = 246;                         // v246：专注时刻真实音频修正——3 个失效 Wikimedia 旧路径 URL 改 Special:FilePath 自动解析 + 移除 crossOrigin 避免 CORS 阻断播放
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 162;                 // v245 发版：160→162
+const WB_DISPLAY_VERSION = 163;                 // v246 发版：162→163
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13934,7 +13935,6 @@ function focusMusicStart(){
       audio.preload = 'auto';
       audio.loop = true;
       audio.volume = _focusMusicVolume;
-      audio.crossOrigin = 'anonymous';
       audio.src = cfg.url;
       _focusMusicNode = {
         stop: function(){ try{audio.pause(); audio.currentTime=0;}catch(e){} },
@@ -14007,16 +14007,16 @@ function focusMusicStop(){
 // ============================================================
 var FOCUS_MUSIC = [
   // 自然音（13 档）：优先尝试真实音频 URL，加载失败走 synth 兜底
-  { tab:'nature', name:'雨声-高清',   icon:'🌧', url:'https://upload.wikimedia.org/wikipedia/commons/3/3b/Rain.ogg',           synth:'rain_hd' },
-  { tab:'nature', name:'夏日海滩',   icon:'🏖', url:'https://upload.wikimedia.org/wikipedia/commons/8/89/Ocean_waves.ogg',  synth:'beach' },
+  { tab:'nature', name:'雨声-高清',   icon:'🌧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Rain.ogg',           synth:'rain_hd' },
+  { tab:'nature', name:'夏日海滩',   icon:'🏖', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ocean_waves.ogg',  synth:'beach' },
   { tab:'nature', name:'小河流水',   icon:'💧', url:'', synth:'stream' },
-  { tab:'nature', name:'细雨',       icon:'🌦', url:'https://upload.wikimedia.org/wikipedia/commons/2/2c/Light_rain.ogg',  synth:'rain_light' },
+  { tab:'nature', name:'细雨',       icon:'🌦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Light_rain.ogg',  synth:'rain_light' },
   { tab:'nature', name:'热带雨林',   icon:'🌴', url:'', synth:'jungle' },
   { tab:'nature', name:'风铃',       icon:'🎐', url:'', synth:'windbell' },
   { tab:'nature', name:'课后教室',   icon:'🏫', url:'', synth:'classroom' },
-  { tab:'nature', name:'春日鸟鸣',   icon:'🐦', url:'https://upload.wikimedia.org/wikipedia/commons/e/e1/Birds_singing.ogg', synth:'birds' },
-  { tab:'nature', name:'沙漠',       icon:'🏜', url:'https://upload.wikimedia.org/wikipedia/commons/9/9c/Wind_in_desert.ogg', synth:'desert' },
-  { tab:'nature', name:'河边篝火',   icon:'🔥', url:'https://upload.wikimedia.org/wikipedia/commons/0/02/Crackling_fire.ogg', synth:'bonfire' },
+  { tab:'nature', name:'春日鸟鸣',   icon:'🐦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Birds_singing.ogg', synth:'birds' },
+  { tab:'nature', name:'沙漠',       icon:'🏜', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Wind_in_desert.ogg', synth:'desert' },
+  { tab:'nature', name:'河边篝火',   icon:'🔥', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Crackling_fire.ogg', synth:'bonfire' },
   { tab:'nature', name:'秋风落叶',   icon:'🍂', url:'', synth:'autumn_wind' },
   { tab:'nature', name:'火炉边',     icon:'♨️', url:'', synth:'fireplace' },
   { tab:'nature', name:'夏夜蝉鸣',   icon:'🌙', url:'', synth:'cricket' },
@@ -14595,7 +14595,6 @@ function focusOpenUrlInput(){
     var audio = new Audio(url);
     audio.loop = true;
     audio.volume = _focusMusicVolume;
-    audio.crossOrigin = 'anonymous';
     _focusUrlAudio = audio;
     audio.play().then(function(){
       _focusMusicNode = { stop:function(){ try{audio.pause();}catch(e){} }, mode:'url', icon:'🔗', name:'自定义 URL', tab:'custom' };
