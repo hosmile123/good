@@ -26,7 +26,7 @@
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
-<!-- v252-cachebust: 专注时刻——①音乐无缝循环(解码为AudioBuffer+裁掉首尾编码静音+采样级loopStart/loopEnd，循环处零停顿；无WebAudio时退回audio loop) ②背景图权限(管理员可增删改最多12张；其他账号仅1张，再传即替换、不可删除；背景图存wb_focus_bgs且不上云) ③专注数据接入云同步(FOCUS_KEY由workbench_focus改wb_focus并迁移旧数据，手机端数据电脑端可见) -->
+<!-- v253-cachebust: 提速——①读操作(GET)与登录统一多后端并行竞速，取最快成功、落选请求立即中止，SCF 冷启动慢时不再干等10s超时（写操作仍主后端+备用双写不丢数据） ②router.html 入口测速改抓 5KB 的 router.html（此前抓 2.2MB 的根路径，等于打开前先下载两份完整应用再跳转第三份，是"打开网页非常慢"的主因）+ 记住上次最快镜像走 1.2s 快速通道 + 跳转延迟 450ms→80ms -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9726,13 +9726,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 252;                         // v252：专注时刻——①音乐改 WebAudio 解码+首尾静音裁剪+采样点循环(循环零停顿)，无 WebAudio 时退回流式播放 ②背景图权限：管理员可增删改(最多12张)、其他账号仅1张(再传替换/不可删) ③专注数据接入云同步(FOCUS_KEY 改 wb_focus 并迁移旧键 workbench_focus)，背景图单独存且不上云避免撑爆同步包
+const WB_VERSION = 253;                         // v253：提速——①读操作与登录统一多后端并行竞速(落选请求立即中止)，SCF 冷启动慢时不再干等 10s 超时 ②_apiFetch 支持外部中止信号 ③router.html 探测改抓 5KB 的 router.html(此前抓 2.2MB 根路径等于打开前先下载两份完整应用) + 记住上次最快镜像走 1.2s 快速通道 + 跳转延迟 450ms→80ms
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 171;                 // v252 发版（171 不含4）
+const WB_DISPLAY_VERSION = 172;                 // v253 发版（172 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -9795,9 +9795,19 @@ function _apiFetch(base, path, opts){
   var _ctrl = new AbortController();
   var _to = setTimeout(function(){ try{ _ctrl.abort(); }catch(e){} }, 10000);
   opts = Object.assign({}, opts || {});
+  var _extSig = opts.signal;                       // v253：外部信号（竞速落选方中止）
+  var _onExtAbort = null;
+  if(_extSig){
+    if(_extSig.aborted){ try{ _ctrl.abort(); }catch(e){} }
+    else if(_extSig.addEventListener){
+      _onExtAbort = function(){ try{ _ctrl.abort(); }catch(e){} };
+      _extSig.addEventListener('abort', _onExtAbort);
+    }
+  }
   opts.signal = _ctrl.signal;
+  function _unhook(){ try{ if(_onExtAbort && _extSig.removeEventListener) _extSig.removeEventListener('abort', _onExtAbort); }catch(e){} }
   return fetch(base + path, opts).then(function(res){
-    clearTimeout(_to);
+    clearTimeout(_to); _unhook();
     const ct = res.headers.get('content-type') || '';
     if(!ct.includes('application/json')) throw new Error('SERVER_OFFLINE'); // HTML（静态托管无后端）
     return res.json().then(function(data){
@@ -9805,7 +9815,7 @@ function _apiFetch(base, path, opts){
       return data;
     });
   }).catch(function(e){
-    clearTimeout(_to);
+    clearTimeout(_to); _unhook();
     if(e.message === 'SERVER_OFFLINE') throw e;
     if(e.name === 'AbortError' || (e.message && (e.message.indexOf('aborted') >= 0 || e.message.indexOf('AbortError') >= 0))){
       throw new Error('SERVER_OFFLINE');
@@ -9820,35 +9830,45 @@ function _apiFetch(base, path, opts){
   });
 }
 
+// v253：多后端并行竞速——谁先成功用谁，其余请求立即中止（认证/读操作共用；写操作仍走主+双写）
+function _apiRace(backends, path, opts){
+  var ctrl = new AbortController();
+  var o = Object.assign({}, opts || {}, { signal: ctrl.signal });
+  var rs = backends.map(function(bk){
+    return _apiFetch(bk.url, path, o)
+      .then(function(d){ return { ok:true, d:d }; })
+      .catch(function(e){ return { ok:false, e:e }; });
+  });
+  return new Promise(function(resolve, reject){
+    var total = rs.length, failed = 0, settled = false;
+    rs.forEach(function(p){
+      p.then(function(r){
+        if(settled) return;
+        if(r.ok){
+          settled = true;
+          try{ ctrl.abort(); }catch(e){}          // 其余落选请求立即中止
+          resolve(r.d);
+        } else {
+          failed++;
+          if(failed === total){ settled = true; reject(r.e || new Error('所有后端均不可用')); }
+        }
+      });
+    });
+  });
+}
+
 async function api(path, method, body){
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if(API_TOKEN) opts.headers['Authorization'] = 'Bearer ' + API_TOKEN;
   if(body) opts.body = JSON.stringify(body);
-  // v229：认证请求（登录/注册）所有后端并行竞速，取最快成功——修复「登录卡顿」根因：
-  //   此前走写双写路径，主后端(SCF) await 等待(10s超时)，SCF 慢时登录长时间卡住不会切到 Supabase。
-  //   认证接口两端语义一致(共享JWT密钥)，任一后端成功即可登录，无需等主后端。
-  const isAuth = (path.indexOf('/api/auth/login') >= 0 || path.indexOf('/api/auth/register') >= 0);
-  if(isAuth && API_BACKENDS.length > 1){
-    var authResults = API_BACKENDS.map(function(bk){
-      return _apiFetch(bk.url, path, opts)
-        .then(function(d){ return { ok:true, d:d }; })
-        .catch(function(e){ return { ok:false, e:e }; });
-    });
-    return new Promise(function(resolve, reject){
-      var total = authResults.length, failed = 0, settled = false;
-      authResults.forEach(function(p){
-        p.then(function(r){
-          if(settled) return;
-          if(r.ok){ settled = true; resolve(r.d); }
-          else {
-            failed++;
-            if(failed === total){ settled = true; reject(r.e || new Error('所有后端均不可用')); }
-          }
-        });
-      });
-    });
-  }
   const isWrite = (method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH');
+  // v229 认证竞速 + v253 读操作也竞速：修复「登录卡顿 / 打开后各种加载慢」——
+  //   此前读操作串行故障转移，SCF 冷启动慢时要干等 10s 超时才切 Supabase；
+  //   现在认证与读全部并行竞速取最快成功（落选请求立即中止省流量）。
+  //   两端数据靠双写保持一致，竞速读安全；写操作仍主后端优先 + 备用双写，永不丢数据。
+  if(!isWrite && API_BACKENDS.length > 1){
+    return _apiRace(API_BACKENDS, path, opts);
+  }
   if(isWrite && API_BACKENDS.length > 1){
     // 写操作：先并行发起备用后端双写（fire-and-forget，不阻塞主路径，失败静默、下次写自愈）
     for(var j=1;j<API_BACKENDS.length;j++){
@@ -9869,13 +9889,8 @@ async function api(path, method, body){
       throw e;
     }
   }
-  // 读操作或单后端：串行故障转移（先主后备）
-  var lastErr = null;
-  for(var i=0;i<API_BACKENDS.length;i++){
-    try { return await _apiFetch(API_BACKENDS[i].url, path, opts); }
-    catch(e){ lastErr = e; }
-  }
-  throw lastErr;
+  // 单后端
+  return _apiFetch(API_BACKENDS[0].url, path, opts);
 }
 
 function wbShowOverlay(show){
