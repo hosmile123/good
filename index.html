@@ -26,7 +26,7 @@
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
-<!-- v247-cachebust: 专注时刻修复——①根因 tdCalLocalToday() 忽略参数→加可选日期参数，修复「今日分钟」误统计全部历史+「连续天数」恒为1；②今日分钟改以实际开始→结束(endTs-startTs)之和为准(focusActualSec)；③音乐🎵按钮改弹出自由选曲面板(focusMusicOpen/Pick/PickMute/Close,不再随机循环)；④统计环形饼图改用实际时长聚合+SVG改 display:block 显式尺寸避免 flex 塌缩不显示 -->
+<!-- v249-cachebust: 专注时刻音乐全改真实音频——自然音/氛围音移除 WebAudio 合成改用 Wikimedia Commons 真实录音(雨/细雨/海浪/鸟鸣/风/篝火 + 白/粉/棕/蓝/紫噪音)；删除轻音乐 tab；真实音频加载失败仅提示不再回退合成 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9725,13 +9725,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 247;                         // v247：专注时刻修复——①tdCalLocalToday 加可选日期参数(此前忽略参数致今日分钟统计全部历史/连续天数恒为1) ②今日分钟改实际开始→结束时长和 ③音乐改自由选曲面板(点🎵弹列表任选,不再随机循环) ④统计环形饼图用实际时长聚合+SVG尺寸加固可见
+const WB_VERSION = 249;                         // v249：专注时刻音乐全改真实音频——自然音/氛围音移除 WebAudio 合成改用 Wikimedia Commons 真实录音(雨/细雨/海浪/鸟鸣/风/篝火 + 白/粉/棕/蓝/紫噪音)，删除轻音乐 tab，真实音频失败仅提示不回退合成
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 167;                 // v247 发版：163→167（跳过含4的164/165/166）
+const WB_DISPLAY_VERSION = 168;                 // v249 发版（168 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13989,28 +13989,18 @@ function focusMusicStart(){
       // 走到 synth 兜底
     }
   }
-  // 走 WebAudio 合成（synth 字段或 mode 字段）
-  var ctx = focusEnsureAudio();
-  if(!ctx) return;
-  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
-  var node = focusBuildMusic(ctx, _focusMusicIdx);
-  _focusMusicNode = node;
+  // 无可用真实音频 URL：提示并停止（不再合成，按用户要求只播真实音频）
+  focusMusicStop();
+  toast('🔊 该曲目没有可用音频，请换一首');
+  return;
 }
 
 function focusFallbackToSynth(cfg){
-  // 真实音频失败时，用 WebAudio 合成兜底并 toast 提示
-  try{
-    if(_focusMusicNode && _focusMusicNode.isAudio){
-      try{_focusMusicNode.stop();}catch(e){}
-    }
-  }catch(e){}
-  var ctx = focusEnsureAudio();
-  if(!ctx){ _focusMusicNode = null; return; }
-  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
-  var idx = FOCUS_MUSIC.findIndex(function(c){return c===cfg;});
-  var node = focusBuildMusic(ctx, idx);
-  _focusMusicNode = node;
-  toast('🔊 已切换到程序合成（' + cfg.name + '）');
+  // 真实音频加载失败：提示并停止（不再回退合成——用户要求只用真实音频）
+  try{ if(_focusMusicNode && _focusMusicNode.isAudio){ try{_focusMusicNode.stop();}catch(e){} } }catch(e){}
+  focusMusicStop();
+  _focusMusicNode = null;
+  toast('🔊 该音频暂时无法播放，请换一首');
 }
 
 function focusMusicStop(){
@@ -14024,48 +14014,29 @@ function focusMusicStop(){
 }
 
 // ============================================================
-// 专注时刻·音乐引擎（v243 重构）：23 档 × 3 tab 程序化 WebAudio 合成
-// ——自然音 12（雨-高清/海浪/河水/细雨/雨林/风铃/教室/鸟鸣/沙漠/篝火/落叶/蝉鸣/时钟/书香/列车/木鱼）+ 氛围 5（夜雨/太空/教堂/晨雾/雪夜）+ 轻音乐 4（钢琴/弦乐/古琴/八音盒）+ URL 自定义 + 静音
+// 专注时刻·音乐引擎（v249）：全部真实音频（HTMLAudio 直连播放，无合成）
+// ——自然音 6（雨声/细雨/海浪/鸟鸣/沙漠风/篝火，Wikimedia 真实录音）+ 氛围白噪 5（白/粉/棕/蓝/紫噪音，Wikimedia「Colors of noise」）+ URL 自定义 + 静音
 // ============================================================
 var FOCUS_MUSIC = [
-  // 自然音（13 档）：优先尝试真实音频 URL，加载失败走 synth 兜底
-  { tab:'nature', name:'雨声-高清',   icon:'🌧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Rain.ogg',           synth:'rain_hd' },
-  { tab:'nature', name:'夏日海滩',   icon:'🏖', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ocean_waves.ogg',  synth:'beach' },
-  { tab:'nature', name:'小河流水',   icon:'💧', url:'', synth:'stream' },
-  { tab:'nature', name:'细雨',       icon:'🌦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Light_rain.ogg',  synth:'rain_light' },
-  { tab:'nature', name:'热带雨林',   icon:'🌴', url:'', synth:'jungle' },
-  { tab:'nature', name:'风铃',       icon:'🎐', url:'', synth:'windbell' },
-  { tab:'nature', name:'课后教室',   icon:'🏫', url:'', synth:'classroom' },
-  { tab:'nature', name:'春日鸟鸣',   icon:'🐦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Birds_singing.ogg', synth:'birds' },
-  { tab:'nature', name:'沙漠',       icon:'🏜', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Wind_in_desert.ogg', synth:'desert' },
-  { tab:'nature', name:'河边篝火',   icon:'🔥', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Crackling_fire.ogg', synth:'bonfire' },
-  { tab:'nature', name:'秋风落叶',   icon:'🍂', url:'', synth:'autumn_wind' },
-  { tab:'nature', name:'火炉边',     icon:'♨️', url:'', synth:'fireplace' },
-  { tab:'nature', name:'夏夜蝉鸣',   icon:'🌙', url:'', synth:'cricket' },
-  // 氛围音乐（5 档）
-  { tab:'ambient', name:'夜雨小屋',  icon:'🌧', url:'', synth:'rain_room' },
-  { tab:'ambient', name:'太空深处',  icon:'🚀', url:'', synth:'space' },
-  { tab:'ambient', name:'大教堂',    icon:'⛪', url:'', synth:'cathedral' },
-  { tab:'ambient', name:'晨雾森林',  icon:'🌫', url:'', synth:'mist_forest' },
-  { tab:'ambient', name:'雪夜炉火',  icon:'❄️', url:'', synth:'snow_fire' },
-  // 轻音乐（4 档，全部用 SoundHelix 真实音频）
-  { tab:'lounge', name:'Pure Memories', icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
-  { tab:'lounge', name:'时光的低语',   icon:'🌙', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
-  { tab:'lounge', name:'静谧钢琴',     icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
-  { tab:'lounge', name:'冥想钢琴 1',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
-  { tab:'lounge', name:'冥想钢琴 2',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3' },
-  { tab:'lounge', name:'Aurora Rising', icon:'🌅', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
-  { tab:'lounge', name:'行至山明',     icon:'⛰', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
-  { tab:'lounge', name:'青云逐光',     icon:'🌤', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
-  { tab:'lounge', name:'Chill Lo-Fi 1', icon:'🎧', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
-  { tab:'lounge', name:'Chill Jazz 1',  icon:'🎷', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
-  { tab:'lounge', name:'静谧钢琴 1',   icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3' },
-  { tab:'lounge', name:'Pure Piano',    icon:'🎹', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
+  // 自然音（真实现场录音 · Wikimedia Commons · 适合睡眠/冥想）
+  { tab:'nature', name:'雨声',     icon:'🌧', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Rain.ogg' },
+  { tab:'nature', name:'细雨',     icon:'🌦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Light_rain.ogg' },
+  { tab:'nature', name:'海浪',     icon:'🌊', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Ocean_waves.ogg' },
+  { tab:'nature', name:'鸟鸣',     icon:'🐦', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Birds_singing.ogg' },
+  { tab:'nature', name:'沙漠风声', icon:'🏜', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Wind_in_desert.ogg' },
+  { tab:'nature', name:'篝火',     icon:'🔥', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Crackling_fire.ogg' },
+  // 氛围白噪（真实噪音录音 · Wikimedia Commons「Colors of noise」· 适合睡眠/冥想）
+  { tab:'ambient', name:'白噪音', icon:'⚪', url:'https://commons.wikimedia.org/wiki/Special:FilePath/White_noise.ogg' },
+  { tab:'ambient', name:'粉噪音', icon:'🌸', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Pink_noise.ogg' },
+  { tab:'ambient', name:'棕噪音', icon:'🟤', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Brown_noise.ogg' },
+  { tab:'ambient', name:'蓝噪音', icon:'🔵', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Blue_noise.ogg' },
+  { tab:'ambient', name:'紫噪音', icon:'🟣', url:'https://commons.wikimedia.org/wiki/Special:FilePath/Violet_noise.ogg' },
   // 自定义
   { tab:'custom', name:'自定义 URL', icon:'🔗', mode:'url' }
 ];
 
-var _focusMusicTab = 'nature';   // 当前 tab：nature/ambient/lounge/custom
+
+var _focusMusicTab = 'nature';   // 当前 tab：nature/ambient/custom
 var _focusMusicIdx = 0;          // 当前 tab 内 idx（mute = -1）
 var _focusUrlAudio = null;       // 自定义 URL Audio 元素
 var _focusMusicVolume = 0.60;    // 主音量（v245 提升 0.20→0.60）
@@ -14558,7 +14529,7 @@ function focusCurrentMusicCfg(){
 
 function focusNextMusic(){
   // 静音 → 当前 tab 第 1 个 → ... → 切 tab（下一个 tab 第 1 个）→ ... → 静音
-  var tabs = ['nature','ambient','lounge','custom'];
+  var tabs = ['nature','ambient','custom'];
   var curTab = (_focusMusicIdx < 0) ? _focusMusicTab : FOCUS_MUSIC[_focusMusicIdx].tab;
   // 在当前 tab 内向后循环
   var sameTab = FOCUS_MUSIC.map(function(c,i){return {c:c,i:i};}).filter(function(o){return o.c.tab===curTab;});
@@ -14641,7 +14612,6 @@ function focusMusicOpen(){
   var tabs = [
     {key:'nature', label:'🌿 自然音'},
     {key:'ambient', label:'🌌 氛围音乐'},
-    {key:'lounge', label:'🎹 轻音乐'},
     {key:'custom', label:'🔗 自定义'}
   ];
   var html = '';
