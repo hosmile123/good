@@ -41,6 +41,7 @@
 <!-- v204-cachebust: 倒数日重做编辑页(图1:蓝条+列表行+进阶折叠+大蓝按钮) + 选择倒数本子面板(图2:可新增自定义倒数本) -->
 <!-- v203-cachebust: 倒数日新增「归档与隐藏」子页(归档/隐藏互斥+tab统计)、11分类130+图标选择器、12款渐变封面、自动贴开关；编辑弹窗脱离page容器(归档页也可打开) -->
 <!-- v202-cachebust: 手机端(<768px) sidebar.open 扩宽到 200px+横排图标/名字——修复 481-768px 设备名字不显示/字号过小；电脑端不受影响 -->
+<!-- v239-cachebust: 倒数日文案调整——卡片/详情「已经」→「已过天数」、「还有」→「剩余天数」（今天保留「今天」/「就是今天」不变） -->
 <!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
@@ -4268,7 +4269,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     function dmCardHtml(e){
       var nt=dmNextDate(e); var d=nt.days; var abs=Math.abs(d);
       var book=dmBookById(e.bookId);
-      var label=(d===0?'今天':(d<0?'已经':'还有'));
+      var label=(d===0?'今天':(d<0?'已过天数':'剩余天数'));
       var col=e.color||DM_COLORS[0];
       var exact = e.showTime ? '<div class="dm-card-exact">'+dmExactDiff(e).text+'</div>' : '';
       return '<div class="dm-card'+(e.highlight?' hl':'')+'" onclick="dmOpenDetail(\''+e.id+'\')">'+
@@ -4330,7 +4331,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       var nt = dmNextDate(e);
       var d = nt.days;
       var abs = Math.abs(d);
-      var label = (d===0?'今天':(d<0?'已经':'还有'));
+      var label = (d===0?'今天':(d<0?'已过天数':'剩余天数'));
       var col = e.color || DM_COLORS[0];
       var isBirthday = dmIsBirthdayEvent(e);
       var ageInfo = isBirthday ? dmAgeProgress(e) : null;
@@ -4398,7 +4399,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
           tagRowHtml +
           '<div class="dm-d-title">'+esc(e.title||'未命名')+'</div>'+
           '<div class="dm-d-days-row"><span class="dm-d-days-num">'+abs+'</span><span class="dm-d-days-unit">天</span></div>'+
-          '<div class="dm-d-sub">距离 '+ds+(lunarText?('（'+lunarText.replace(/<[^>]+>/g,'')+'）'):'')+' '+(d<0?'已过':(d===0?'就是今天':'还有'))+'</div>'+
+          '<div class="dm-d-sub">距离 '+ds+(lunarText?('（'+lunarText.replace(/<[^>]+>/g,'')+'）'):'')+' '+(d<0?'已过天数':(d===0?'就是今天':'剩余天数'))+'</div>'+
           '<div class="dm-d-pill-row">'+datePill+lunarText+'</div>'+
           ageBlock +
         '</div>'+
@@ -9436,13 +9437,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 238;                         // v238：①生活习惯/运动日历有记录的日期可点击查看当日详情(showDayRoutine/showDayFit + routineDayModal/fitDayModal，buildMonth/paintCal 传 prefix)；②⋮删除按钮不再挡日期(swipe-front 右 padding 40px，作息/运动日期前挪)；③倒数日详情农历修复(误用 lr.monthStr/dayStr → 改 LUNAR_MONTH_CN/LUNAR_DAY_CN 拼"农历X月X日")
+const WB_VERSION = 239;                         // v239：倒数日文案调整——卡片/详情「已经」→「已过天数」、「还有」→「剩余天数」（今天保留不变）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 155;                 // v238 发版：154→155
+const WB_DISPLAY_VERSION = 156;                 // v239 发版：155→156
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
