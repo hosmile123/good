@@ -26,6 +26,7 @@
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
+<!-- v247-cachebust: 专注时刻修复——①根因 tdCalLocalToday() 忽略参数→加可选日期参数，修复「今日分钟」误统计全部历史+「连续天数」恒为1；②今日分钟改以实际开始→结束(endTs-startTs)之和为准(focusActualSec)；③音乐🎵按钮改弹出自由选曲面板(focusMusicOpen/Pick/PickMute/Close,不再随机循环)；④统计环形饼图改用实际时长聚合+SVG改 display:block 显式尺寸避免 flex 塌缩不显示 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -1593,7 +1594,7 @@ body.sb-collapsed .sidebar-item:hover::after {
 .focus-stats-tabs { display:flex; gap:6px; background:rgba(255,255,255,.08); border-radius:8px; padding:3px; margin-bottom:14px; width:fit-content; }
 .fsst-tab { padding:5px 14px; border:none; background:transparent; color:rgba(255,255,255,.7); border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; }
 .fsst-tab.on { background:rgba(255,255,255,.92); color:#1a3a6e; font-weight:600; }
-.focus-pie { display:flex; justify-content:center; margin:6px 0 12px; }
+.focus-pie { display:block; text-align:center; margin:6px 0 12px; }
 .focus-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:12px; }
 .focus-legend-item { display:flex; align-items:center; gap:6px; opacity:.92; }
 .focus-legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
@@ -3212,6 +3213,17 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   </div>
 </div>
 
+<!-- v247: 专注时刻·自由选曲面板（点 🎵 弹出，可任选曲目，不再随机循环） -->
+<div id="focusMusicPanel" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9995;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:420px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #f0f0f0">
+      <div style="font-size:16px;font-weight:700">🎵 选择专注音乐</div>
+      <button onclick="focusMusicClose()" style="border:none;background:#f0f0f0;border-radius:50%;width:30px;height:30px;font-size:15px;cursor:pointer;color:#555">✕</button>
+    </div>
+    <div id="focusMusicList" style="padding:8px 12px 14px;overflow:auto"></div>
+  </div>
+</div>
+
 <!-- v218: 作息表编辑弹窗 -->
 <div id="rtSchedEditModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:10001;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:16px;width:92vw;max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
@@ -3336,7 +3348,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <button onclick="focusReset()" title="重置" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">↻</button>
     <button onclick="focusSkip()" title="跳过" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">⏭</button>
     <button onclick="focusToggleRun()" id="focusRunBtn" style="width:64px;height:64px;border:none;background:rgba(255,255,255,.95);border-radius:50%;font-size:26px;cursor:pointer;color:#333;box-shadow:0 4px 20px rgba(0,0,0,.2)">▶</button>
-    <button onclick="focusNextMusic()" title="换音乐" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">🎵</button>
+    <button onclick="focusMusicOpen()" title="选择音乐" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">🎵</button>
     <button onclick="focusStop()" title="结束" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">⏹</button>
   </div>
   <!-- 音乐切换提示 -->
@@ -9713,13 +9725,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 246;                         // v246：专注时刻真实音频修正——3 个失效 Wikimedia 旧路径 URL 改 Special:FilePath 自动解析 + 移除 crossOrigin 避免 CORS 阻断播放
+const WB_VERSION = 247;                         // v247：专注时刻修复——①tdCalLocalToday 加可选日期参数(此前忽略参数致今日分钟统计全部历史/连续天数恒为1) ②今日分钟改实际开始→结束时长和 ③音乐改自由选曲面板(点🎵弹列表任选,不再随机循环) ④统计环形饼图用实际时长聚合+SVG尺寸加固可见
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 163;                 // v246 发版：162→163
+const WB_DISPLAY_VERSION = 167;                 // v247 发版：163→167（跳过含4的164/165/166）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10215,8 +10227,9 @@ function updateTodo(id){
 var TD_CAL_YEAR = new Date().getFullYear();
 var TD_CAL_MONTH = new Date().getMonth();   // 0-11
 var TD_CAL_SEL = null;
-function tdCalLocalToday(){
-  var d=new Date(); var p=function(n){return (n<10?'0':'')+n;};
+function tdCalLocalToday(d){
+  d = (d===undefined||d===null) ? new Date() : new Date(d);
+  var p=function(n){return (n<10?'0':'')+n;};
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
 }
 function renderTodoCalendar(){
@@ -13319,7 +13332,7 @@ function focusRender(){
   var today = tdCalLocalToday();
   var todaySess = _focus.sessions.filter(function(s){ return tdCalLocalToday(new Date(s.endTs)) === today; });
   var todayCount = todaySess.length;
-  var todayMin = Math.round(todaySess.reduce(function(a,s){return a+(s.duration||0);},0)/60);
+  var todayMin = Math.round(todaySess.reduce(function(a,s){return a+focusActualSec(s);},0)/60);
   setText('focusTodayCount', todayCount);
   setText('focusTodayMin', todayMin);
   // 连续天数
@@ -13905,6 +13918,15 @@ function focusFmtTime(sec){
   if(m<60) return m+'分'+(s>0?s+'秒':'');
   var h = Math.floor(m/60), mm = m%60;
   return h+'小时'+(mm>0?mm+'分':'');
+}
+
+// 单次专注的实际时长（秒）：以「开始→结束」墙钟时间为准；缺字段时回退到记录的 duration
+function focusActualSec(s){
+  if(s && s.startTs && s.endTs){
+    var sec = Math.round((s.endTs - s.startTs)/1000);
+    if(sec > 0) return sec;
+  }
+  return (s && s.duration) ? s.duration : 0;
 }
 
 /* ---------- 音乐（WebAudio 环境音） ---------- */
@@ -14614,6 +14636,57 @@ function focusMusicIcon(){
   b.textContent = (cfg && cfg.icon) || '🎵';
 }
 
+// v247: 专注时刻·自由选曲
+function focusMusicOpen(){
+  var tabs = [
+    {key:'nature', label:'🌿 自然音'},
+    {key:'ambient', label:'🌌 氛围音乐'},
+    {key:'lounge', label:'🎹 轻音乐'},
+    {key:'custom', label:'🔗 自定义'}
+  ];
+  var html = '';
+  tabs.forEach(function(tb){
+    var items = [];
+    FOCUS_MUSIC.forEach(function(c,i){ if(c.tab===tb.key) items.push({c:c,i:i}); });
+    if(!items.length) return;
+    html += '<div style="font-size:12px;color:#999;margin:12px 4px 6px;font-weight:600">'+tb.label+'</div>';
+    items.forEach(function(o){
+      var c=o.c, i=o.i, active=(_focusMusicIdx===i);
+      var badge = c.url ? '🌐 真实' : '🎛 合成';
+      html += '<div onclick="focusMusicPick('+i+')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;'+(active?'background:#eef4ff;border:1px solid #4D96FF':'background:#f7f8fa')+'">'
+        + '<span style="font-size:20px">'+c.icon+'</span>'
+        + '<span style="flex:1;font-size:14px;color:#222">'+escHtml(c.name)+'</span>'
+        + (c.mode==='url' ? '<span style="font-size:11px;color:#999">粘贴链接</span>' : '<span style="font-size:11px;color:#bbb">'+badge+'</span>')
+        + (active ? '<span style="color:#4D96FF;font-size:12px;font-weight:600">▶ 播放中</span>' : '')
+        + '</div>';
+    });
+  });
+  html += '<div onclick="focusMusicPickMute()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;background:#f7f8fa;margin-top:8px">'
+    + '<span style="font-size:20px">🔇</span><span style="flex:1;font-size:14px;color:#222">静音</span>'
+    + (_focusMusicIdx<0?'<span style="color:#4D96FF;font-size:12px;font-weight:600">当前</span>':'') + '</div>';
+  var list = document.getElementById('focusMusicList'); if(list) list.innerHTML = html;
+  var p = document.getElementById('focusMusicPanel'); if(p) p.style.display='flex';
+}
+function focusMusicPick(idx){
+  _focusMusicIdx = idx;
+  if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio=null; }
+  var cfg = FOCUS_MUSIC[idx];
+  if(cfg && cfg.mode==='url'){ focusMusicClose(); focusOpenUrlInput(); return; }
+  focusMusicStart();
+  focusMusicIcon();
+  focusShowTip('🎵 '+cfg.icon+' '+cfg.name);
+  focusMusicOpen(); // 刷新高亮
+}
+function focusMusicPickMute(){
+  _focusMusicIdx = -1;
+  if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio=null; }
+  focusMusicStop();
+  focusMusicIcon();
+  focusShowTip('🔇 已静音');
+  focusMusicOpen();
+}
+function focusMusicClose(){ var p=document.getElementById('focusMusicPanel'); if(p) p.style.display='none'; }
+
 function focusBeep(){
   var ctx = focusEnsureAudio();
   if(!ctx) return;
@@ -14670,7 +14743,7 @@ function focusRangeFilter(range){
 
 function focusRenderStats(){
   var list = focusRangeFilter(_focusRange)(_focus.sessions);
-  var totalSec = list.reduce(function(a,s){return a+(s.duration||0);},0);
+  var totalSec = list.reduce(function(a,s){return a+focusActualSec(s);},0);
   var count = list.length;
 
   // 日期
@@ -14681,7 +14754,7 @@ function focusRenderStats(){
   var byTask = {};
   list.forEach(function(s){
     var k = s.taskTitle || '未命名';
-    byTask[k] = (byTask[k]||0) + (s.duration||0);
+    byTask[k] = (byTask[k]||0) + focusActualSec(s);
   });
   var keys = Object.keys(byTask);
   var pie = document.getElementById('focusPie');
@@ -14759,7 +14832,7 @@ function focusRenderStats(){
     lines += '<text x="'+(sideRight?320:40).toFixed(1)+'" y="'+(outY-3).toFixed(1)+'" fill="rgba(255,255,255,.95)" font-size="12" text-anchor="'+anchor+'" font-weight="600">'+name+'</text>';
     lines += '<text x="'+(sideRight?320:40).toFixed(1)+'" y="'+(outY+12).toFixed(1)+'" fill="rgba(255,255,255,.55)" font-size="11" text-anchor="'+anchor+'">'+timeStr+' · '+pct+'%</text>';
   });
-  pie.innerHTML = '<svg viewBox="0 0 360 280" style="width:100%;max-width:360px;height:auto">'
+  pie.innerHTML = '<svg viewBox="0 0 360 280" style="display:block;width:100%;max-width:360px;height:auto;margin:0 auto">'
     + paths
     + lines
     + '<text x="'+cx+'" y="'+(cy-4)+'" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">总计</text>'
