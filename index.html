@@ -23,6 +23,7 @@
 <!-- v197-cachebust: 手机端返回键导航栈——整页(tab)逐级回退+弹窗逐层关闭，到首页再按才退出；电脑端不启用 -->
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v242-cachebust: 专注时刻任务卡 ⋮ 菜单——修正 items 字段名 text→label（wbRowMenu 实际读 label 不读 text，修正前两行都 fallback 显示成「操作」） -->
+<!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9691,13 +9692,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 242;                         // v242：专注时刻任务卡 ⋮ 菜单字段名修正（text→label，原 v241 两行 fallback 显示成「操作」）
+const WB_VERSION = 243;                         // v243：专注时刻音乐引擎重构——5 档→23 档 × 3 tab（自然音 13 + 氛围 5 + 轻音乐 4 + URL 自定义），全部程序化 WebAudio 合成
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 159;                 // v242 发版：158→159
+const WB_DISPLAY_VERSION = 160;                 // v243 发版：159→160
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13267,8 +13268,7 @@ var FOCUS_TYPE_SUB = {
 var _focus = null;      // 状态
 var _focusTick = null;   // 计时器 handle
 var _focusAudio = null;  // WebAudio 上下文
-var _focusMusicNode = null; // 当前音乐节点
-var _focusMusicType = -1;   // -1=静音,0/1/2/3=四种
+var _focusMusicNode = null; // 当前音乐节点（{stop, mode, master, icon, name, tab}）
 var _focusBgIdx = 0;
 var _focusRun = false;   // 是否在跑
 var _focusRest = false;  // 当前是不是休息段
@@ -13569,7 +13569,7 @@ function focusToggleRun(){
     }
     var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '⏸';
     // 解锁音频（如果用户点过音乐按钮就播放）
-    if(_focusMusicType >= 0) focusMusicStart();
+    if(_focusMusicIdx >= 0) focusMusicStart();
     focusRenderTimer();
   }
 }
@@ -13717,12 +13717,19 @@ function focusEnsureAudio(){
 }
 
 function focusMusicStart(){
-  if(_focusMusicType < 0) return;
+  if(_focusMusicIdx < 0) return;
   focusMusicStop();
   var ctx = focusEnsureAudio();
   if(!ctx) return;
   if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
-  var node = focusBuildMusic(ctx, _focusMusicType);
+  var cfg = FOCUS_MUSIC[_focusMusicIdx];
+  if(!cfg) return;
+  // url 模式
+  if(cfg.mode === 'url'){
+    focusOpenUrlInput();
+    return;
+  }
+  var node = focusBuildMusic(ctx, _focusMusicIdx);
   _focusMusicNode = node;
 }
 
@@ -13731,98 +13738,612 @@ function focusMusicStop(){
     if(_focusMusicNode && _focusMusicNode.stop) _focusMusicNode.stop();
   }catch(e){}
   try{
-    if(_focusMusicNode && _focusMusicNode.gain) _focusMusicNode.gain.gain.value = 0;
+    if(_focusMusicNode && _focusMusicNode.master) _focusMusicNode.master.gain.value = 0;
   }catch(e){}
   _focusMusicNode = null;
 }
 
-function focusBuildMusic(ctx, type){
-  // 共用：白噪 buffer
-  var bufLen = 2 * ctx.sampleRate;
+// ============================================================
+// 专注时刻·音乐引擎（v243 重构）：23 档 × 3 tab 程序化 WebAudio 合成
+// ——自然音 12（雨-高清/海浪/河水/细雨/雨林/风铃/教室/鸟鸣/沙漠/篝火/落叶/蝉鸣/时钟/书香/列车/木鱼）+ 氛围 5（夜雨/太空/教堂/晨雾/雪夜）+ 轻音乐 4（钢琴/弦乐/古琴/八音盒）+ URL 自定义 + 静音
+// ============================================================
+var FOCUS_MUSIC = [
+  // 自然音（13 档）
+  { tab:'nature', name:'雨声-高清', icon:'🌧', mode:'rain_hd' },
+  { tab:'nature', name:'夏日海滩', icon:'🏖', mode:'beach' },
+  { tab:'nature', name:'小河流水', icon:'💧', mode:'stream' },
+  { tab:'nature', name:'细雨', icon:'🌦', mode:'rain_light' },
+  { tab:'nature', name:'热带雨林', icon:'🌴', mode:'jungle' },
+  { tab:'nature', name:'风铃', icon:'🎐', mode:'windbell' },
+  { tab:'nature', name:'课后教室', icon:'🏫', mode:'classroom' },
+  { tab:'nature', name:'春日鸟鸣', icon:'🐦', mode:'birds' },
+  { tab:'nature', name:'沙漠', icon:'🏜', mode:'desert' },
+  { tab:'nature', name:'河边篝火', icon:'🔥', mode:'bonfire' },
+  { tab:'nature', name:'秋风落叶', icon:'🍂', mode:'autumn_wind' },
+  { tab:'nature', name:'火炉边', icon:'♨️', mode:'fireplace' },
+  { tab:'nature', name:'夏夜蝉鸣', icon:'🌙', mode:'cricket' },
+  // 氛围音乐（5 档）
+  { tab:'ambient', name:'夜雨小屋', icon:'🌧', mode:'rain_room' },
+  { tab:'ambient', name:'太空深处', icon:'🚀', mode:'space' },
+  { tab:'ambient', name:'大教堂', icon:'⛪', mode:'cathedral' },
+  { tab:'ambient', name:'晨雾森林', icon:'🌫', mode:'mist_forest' },
+  { tab:'ambient', name:'雪夜炉火', icon:'❄️', mode:'snow_fire' },
+  // 轻音乐（4 档）
+  { tab:'lounge', name:'钢琴独奏', icon:'🎹', mode:'piano' },
+  { tab:'lounge', name:'弦乐低吟', icon:'🎻', mode:'strings' },
+  { tab:'lounge', name:'古琴', icon:'🪕', mode:'guqin' },
+  { tab:'lounge', name:'八音盒', icon:'🎵', mode:'musicbox' },
+  // 自定义
+  { tab:'custom', name:'自定义 URL', icon:'🔗', mode:'url' }
+];
+
+var _focusMusicTab = 'nature';   // 当前 tab：nature/ambient/lounge/custom
+var _focusMusicIdx = 0;          // 当前 tab 内 idx（mute = -1）
+var _focusUrlAudio = null;       // 自定义 URL Audio 元素
+
+// 噪声 buffer 工厂（白噪/粉噪/棕噪）
+function focusMakeNoise(ctx, kind, lenSec){
+  var bufLen = Math.floor((lenSec||2) * ctx.sampleRate);
   var buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
   var data = buf.getChannelData(0);
-  if(type === 3){
-    // 粉噪（Paul Kellet 近似）
+  if(kind === 'pink'){
     var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
     for(var i=0;i<bufLen;i++){
-      var white = Math.random()*2-1;
-      b0 = 0.99886*b0 + white*0.0555179;
-      b1 = 0.99332*b1 + white*0.0750759;
-      b2 = 0.96900*b2 + white*0.1538520;
-      b3 = 0.86650*b3 + white*0.3104856;
-      b4 = 0.55000*b4 + white*0.5329522;
-      b5 = -0.7616*b5 - white*0.0168980;
-      data[i] = (b0+b1+b2+b3+b4+b5+b6+white*0.5362)*0.11;
-      b6 = white*0.115926;
+      var w = Math.random()*2-1;
+      b0 = 0.99886*b0 + w*0.0555179;
+      b1 = 0.99332*b1 + w*0.0750759;
+      b2 = 0.96900*b2 + w*0.1538520;
+      b3 = 0.86650*b3 + w*0.3104856;
+      b4 = 0.55000*b4 + w*0.5329522;
+      b5 = -0.7616*b5 - w*0.0168980;
+      data[i] = (b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11;
+      b6 = w*0.115926;
     }
-  } else {
+  } else if(kind === 'brown'){
+    var last = 0;
+    for(var i=0;i<bufLen;i++){
+      var w = Math.random()*2-1;
+      last = (last + 0.02*w) / 1.02;
+      data[i] = last * 3.5;
+    }
+  } else { // white
     for(var i=0;i<bufLen;i++){ data[i] = Math.random()*2-1; }
   }
-  var src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-  var gain = ctx.createGain(); gain.gain.value = 0.18;
-  // 滤波
+  return buf;
+}
+
+// 启振一个 BufferSource 节点链：buf → filter → gain → master
+function focusStartNoise(ctx, kind, filterCfg, master){
+  var src = ctx.createBufferSource();
+  src.buffer = focusMakeNoise(ctx, kind);
+  src.loop = true;
   var filter = ctx.createBiquadFilter();
-  if(type === 0){ filter.type='lowpass'; filter.frequency.value=900; }      // 雨声
-  else if(type === 1){ filter.type='lowpass'; filter.frequency.value=600; } // 海浪
-  else if(type === 2){ filter.type='lowpass'; filter.frequency.value=1800; }// 森林
-  else if(type === 3){ filter.type='lowpass'; filter.frequency.value=1200; }// 粉噪
-  src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  filter.type = filterCfg.type || 'lowpass';
+  filter.frequency.value = filterCfg.freq || 1000;
+  filter.Q.value = filterCfg.Q || 0.7;
+  var gain = ctx.createGain();
+  gain.gain.value = filterCfg.gain != null ? filterCfg.gain : 0.18;
+  src.connect(filter); filter.connect(gain); gain.connect(master);
   src.start(0);
-  // 海浪加 LFO
-  if(type === 1){
-    var lfo = ctx.createOscillator(); lfo.frequency.value = 0.18;
-    var lfoGain = ctx.createGain(); lfoGain.gain.value = 0.10;
-    lfo.connect(lfoGain); lfoGain.connect(gain.gain);
-    lfo.start(0);
-    return { stop:function(){ try{lfo.stop();}catch(e){} try{src.stop();}catch(e){} }, gain:gain };
-  }
-  // 森林：偶尔加啁啾
-  if(type === 2){
-    var tInt = setInterval(function(){
-      if(!_focusMusicNode || _focusMusicNode !== src) { clearInterval(tInt); return; }
+  return { src:src, filter:filter, gain:gain };
+}
+
+// 启 LFO 振幅调制（lfoHz 控制 gain.gain 在 ±depth 间摇摆）
+function focusStartLFO(ctx, target, lfoHz, depth){
+  var lfo = ctx.createOscillator();
+  lfo.frequency.value = lfoHz;
+  lfo.type = 'sine';
+  var lfoGain = ctx.createGain();
+  lfoGain.gain.value = depth;
+  lfo.connect(lfoGain); lfoGain.connect(target.gain);
+  lfo.start(0);
+  return lfo;
+}
+
+// 启一段短脉冲（freq/dur/gain），用于"鸟叫/水滴/噼啪"
+function focusPing(ctx, dest, freq, dur, peakGain, type){
+  var o = ctx.createOscillator();
+  o.frequency.value = freq;
+  o.type = type || 'sine';
+  var g = ctx.createGain();
+  g.gain.value = 0;
+  o.connect(g); g.connect(dest);
+  o.start(0);
+  g.gain.setValueAtTime(0, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(peakGain, ctx.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+  o.stop(ctx.currentTime + dur + 0.05);
+  return o;
+}
+
+// ===== 13 个自然音合成器 =====
+function focusSynthRainHD(ctx, master){
+  // 雨声-高清：白噪 + 高通(让雨滴"啪"声) + 中等低通(去掉刺耳) + 偶发大水滴
+  var n = focusStartNoise(ctx, 'white', { type:'bandpass', freq:3500, Q:0.5, gain:0.22 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='rain_hd') { clearInterval(t); return; }
+    if(Math.random()<0.5) focusPing(ctx, master, 1200+Math.random()*2000, 0.08, 0.06, 'sine');
+  }, 220);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'rain_hd' };
+}
+function focusSynthBeach(ctx, master){
+  // 夏日海滩：粉噪 + 低通 + LFO 潮汐(0.12Hz) + 偶发海鸥(下滑 1200→400Hz)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:500, Q:0.7, gain:0.25 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.12, 0.10);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='beach') { clearInterval(t); return; }
+    if(Math.random()<0.3){
       var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(1100+Math.random()*400, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(400+Math.random()*100, ctx.currentTime+0.4);
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.025, ctx.currentTime+0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.45);
+      o.connect(g); g.connect(master);
+      o.start(0); o.stop(ctx.currentTime+0.5);
+    }
+  }, 6000);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'beach' };
+}
+function focusSynthStream(ctx, master){
+  // 小河流水：粉噪 + 带通(中频 1500Hz) + 快速 LFO + 偶发水滴(高频短脉冲)
+  var n = focusStartNoise(ctx, 'pink', { type:'bandpass', freq:1500, Q:1.2, gain:0.20 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.8, 0.06);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='stream') { clearInterval(t); return; }
+    focusPing(ctx, master, 2400+Math.random()*1500, 0.06, 0.04, 'sine');
+  }, 700);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'stream' };
+}
+function focusSynthRainLight(ctx, master){
+  // 细雨：白噪 + 高通(去沉闷) + 极轻
+  var n = focusStartNoise(ctx, 'white', { type:'highpass', freq:800, Q:0.7, gain:0.10 }, master);
+  var n2 = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:300, Q:0.7, gain:0.06 }, master);
+  return { stop:function(){ try{n.src.stop();}catch(e){} try{n2.src.stop();}catch(e){} }, mode:'rain_light' };
+}
+function focusSynthJungle(ctx, master){
+  // 热带雨林：白噪 + 低频雨底层 + 频繁鸟啁啾(900~3500Hz) + 远雷(偶发低频隆隆)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:600, Q:0.7, gain:0.16 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='jungle') { clearInterval(t); return; }
+    var r = Math.random();
+    if(r<0.7){
+      // 鸟啁啾：短促双音
+      var f = 900+Math.random()*2600;
+      focusPing(ctx, master, f, 0.12, 0.06, 'sine');
+      setTimeout(function(){ focusPing(ctx, master, f*1.3, 0.10, 0.05, 'sine'); }, 80);
+    } else if(r<0.85){
+      // 远雷：低频短隆隆
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 50+Math.random()*20;
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.04, ctx.currentTime+0.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+1.5);
+      o.connect(g); g.connect(master);
+      o.start(0); o.stop(ctx.currentTime+1.6);
+    }
+  }, 900);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'jungle' };
+}
+function focusSynthWindbell(ctx, master){
+  // 风铃：白噪极轻 + 随机高频 sine ping(800~2400Hz) + 长衰减
+  var n = focusStartNoise(ctx, 'white', { type:'lowpass', freq:1500, Q:0.7, gain:0.04 }, master);
+  var notes = [880, 988, 1109, 1175, 1318, 1480, 1760, 1976, 2093, 2349]; // A5~D7
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='windbell') { clearInterval(t); return; }
+    var f = notes[Math.floor(Math.random()*notes.length)];
+    focusPing(ctx, master, f, 1.5, 0.06, 'sine');
+  }, 2200);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'windbell' };
+}
+function focusSynthClassroom(ctx, master){
+  // 课后教室：粉噪低通(像远人嗡嗡) + 偶发椅子嘎吱(短促低频) + 偶发纸页沙沙
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:400, Q:0.7, gain:0.20 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='classroom') { clearInterval(t); return; }
+    var r = Math.random();
+    if(r<0.4){
+      // 椅子嘎吱：短促低频锯齿
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(70+Math.random()*30, ctx.currentTime);
+      o.frequency.linearRampToValueAtTime(120+Math.random()*30, ctx.currentTime+0.15);
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.04, ctx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.2);
+      o.connect(g); g.connect(master);
+      o.start(0); o.stop(ctx.currentTime+0.25);
+    } else {
+      // 翻页沙沙：短促白噪 burst
+      var src = ctx.createBufferSource();
+      src.buffer = focusMakeNoise(ctx, 'white', 0.15);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.06, ctx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.12);
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 2500;
+      src.connect(hp); hp.connect(g); g.connect(master);
+      src.start(0); src.stop(ctx.currentTime+0.15);
+    }
+  }, 3500);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'classroom' };
+}
+function focusSynthBirds(ctx, master){
+  // 春日鸟鸣：极轻粉噪底 + 频繁多频啁啾
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:300, Q:0.7, gain:0.05 }, master);
+  var notes = [880, 1109, 1318, 1568, 1760, 2093, 2349, 2637, 2794, 3136];
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='birds') { clearInterval(t); return; }
+    if(Math.random()<0.6){
+      var f = notes[Math.floor(Math.random()*notes.length)];
+      focusPing(ctx, master, f, 0.20, 0.05, 'sine');
+      if(Math.random()<0.5) setTimeout(function(){ focusPing(ctx, master, f*1.25, 0.15, 0.04, 'sine'); }, 100);
+    }
+  }, 1500);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'birds' };
+}
+function focusSynthDesert(ctx, master){
+  // 沙漠：棕噪(风声) + 极慢 LFO + 偶发沙粒呼啸(中高频短脉冲)
+  var n = focusStartNoise(ctx, 'brown', { type:'bandpass', freq:400, Q:0.5, gain:0.18 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.15, 0.08);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='desert') { clearInterval(t); return; }
+    if(Math.random()<0.3){
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(800+Math.random()*600, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(200+Math.random()*200, ctx.currentTime+0.6);
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.025, ctx.currentTime+0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.6);
+      o.connect(g); g.connect(master);
+      o.start(0); o.stop(ctx.currentTime+0.65);
+    }
+  }, 5000);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'desert' };
+}
+function focusSynthBonfire(ctx, master){
+  // 河边篝火：粉噪低频(火焰呼呼) + 频繁噼啪声(短促宽带噪声 burst)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:300, Q:0.7, gain:0.15 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='bonfire') { clearInterval(t); return; }
+    var src = ctx.createBufferSource();
+    src.buffer = focusMakeNoise(ctx, 'white', 0.05);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.08+Math.random()*0.04, ctx.currentTime+0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.04);
+    src.connect(g); g.connect(master);
+    src.start(0); src.stop(ctx.currentTime+0.05);
+  }, 800);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'bonfire' };
+}
+function focusSynthAutumnWind(ctx, master){
+  // 秋风落叶：棕噪(风声) + 中速 LFO + 偶发落叶沙沙(短白噪 burst)
+  var n = focusStartNoise(ctx, 'brown', { type:'bandpass', freq:500, Q:0.5, gain:0.16 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.4, 0.07);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='autumn_wind') { clearInterval(t); return; }
+    if(Math.random()<0.4){
+      var src = ctx.createBufferSource();
+      src.buffer = focusMakeNoise(ctx, 'white', 0.18);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.05, ctx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.16);
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 3000;
+      src.connect(hp); hp.connect(g); g.connect(master);
+      src.start(0); src.stop(ctx.currentTime+0.18);
+    }
+  }, 1800);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'autumn_wind' };
+}
+function focusSynthFireplace(ctx, master){
+  // 火炉边：粉噪极低频(火焰低吼) + 不规则噼啪
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:200, Q:0.7, gain:0.18 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='fireplace') { clearInterval(t); return; }
+    if(Math.random()<0.5){
+      var src = ctx.createBufferSource();
+      src.buffer = focusMakeNoise(ctx, 'white', 0.04);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.06+Math.random()*0.04, ctx.currentTime+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.03);
+      src.connect(g); g.connect(master);
+      src.start(0); src.stop(ctx.currentTime+0.04);
+    }
+  }, 600);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'fireplace' };
+}
+function focusSynthCricket(ctx, master){
+  // 夏夜蝉鸣：粉噪底(夜色) + 周期性蝉鸣脉冲(高频短脉冲组)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:500, Q:0.7, gain:0.10 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='cricket') { clearInterval(t); return; }
+    // 一组 3-5 个短脉冲(1500~5000Hz)
+    var count = 3 + Math.floor(Math.random()*3);
+    for(var i=0;i<count;i++){
+      setTimeout(function(){
+        focusPing(ctx, master, 1500+Math.random()*3500, 0.04, 0.06, 'triangle');
+      }, i*70);
+    }
+  }, 900);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} }, mode:'cricket' };
+}
+
+// ===== 5 个氛围音乐合成器 =====
+function focusSynthRainRoom(ctx, master){
+  // 夜雨小屋：雨底层 + 室内暖低频(粉噪极低) + 偶发远雷
+  var rain = focusStartNoise(ctx, 'white', { type:'lowpass', freq:1200, Q:0.7, gain:0.16 }, master);
+  var room = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:120, Q:0.7, gain:0.10 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='rain_room') { clearInterval(t); return; }
+    if(Math.random()<0.15){
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = 40+Math.random()*15;
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.03, ctx.currentTime+0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+2.5);
+      o.connect(g); g.connect(master);
+      o.start(0); o.stop(ctx.currentTime+2.6);
+    }
+  }, 7000);
+  return { stop:function(){ clearInterval(t); try{rain.src.stop();}catch(e){} try{room.src.stop();}catch(e){} }, mode:'rain_room' };
+}
+function focusSynthSpace(ctx, master){
+  // 太空深处：粉噪极低频(宇宙嗡鸣) + 缓慢 LFO + 偶发"星尘"高频 ping
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:80, Q:0.7, gain:0.18 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.08, 0.06);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='space') { clearInterval(t); return; }
+    if(Math.random()<0.4){
+      focusPing(ctx, master, 2500+Math.random()*2500, 1.2, 0.03, 'sine');
+    }
+  }, 3500);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'space' };
+}
+function focusSynthCathedral(ctx, master){
+  // 大教堂：粉噪(空间混响感) + 缓慢低频正弦(管风琴底色) + 偶发钟声(低频方波衰减)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:400, Q:0.7, gain:0.08 }, master);
+  var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 110;
+  var g = ctx.createGain(); g.gain.value = 0.05;
+  o.connect(g); g.connect(master); o.start(0);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='cathedral') { clearInterval(t); return; }
+    if(Math.random()<0.25){
+      var b = ctx.createOscillator();
+      var bg = ctx.createGain();
+      b.type = 'triangle';
+      var f = [196, 220, 247, 262, 294, 330][Math.floor(Math.random()*6)];
+      b.frequency.value = f;
+      bg.gain.setValueAtTime(0, ctx.currentTime);
+      bg.gain.linearRampToValueAtTime(0.06, ctx.currentTime+0.02);
+      bg.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+3.0);
+      b.connect(bg); bg.connect(master);
+      b.start(0); b.stop(ctx.currentTime+3.1);
+    }
+  }, 5000);
+  return { stop:function(){ clearInterval(t); try{n.src.stop();}catch(e){} try{o.stop();}catch(e){} }, mode:'cathedral' };
+}
+function focusSynthMistForest(ctx, master){
+  // 晨雾森林：粉噪极轻 + 极慢 LFO + 偶发鸟鸣 + 偶发远处水滴
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:600, Q:0.7, gain:0.10 }, master);
+  var lfo = focusStartLFO(ctx, n, 0.06, 0.05);
+  var notes = [880, 1175, 1397, 1568, 1760, 2093];
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='mist_forest') { clearInterval(t); return; }
+    var r = Math.random();
+    if(r<0.6) focusPing(ctx, master, notes[Math.floor(Math.random()*notes.length)], 0.15, 0.04, 'sine');
+    else focusPing(ctx, master, 2000+Math.random()*1500, 0.08, 0.03, 'sine');
+  }, 2200);
+  return { stop:function(){ clearInterval(t); try{lfo.stop();}catch(e){} try{n.src.stop();}catch(e){} }, mode:'mist_forest' };
+}
+function focusSynthSnowFire(ctx, master){
+  // 雪夜炉火：粉噪低频(火光暖底) + 偶发噼啪 + 偶发风雪呼啸(白噪短脉冲)
+  var fire = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:250, Q:0.7, gain:0.14 }, master);
+  var t = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='snow_fire') { clearInterval(t); return; }
+    var r = Math.random();
+    if(r<0.5){
+      // 噼啪
+      var src = ctx.createBufferSource();
+      src.buffer = focusMakeNoise(ctx, 'white', 0.04);
+      var g = ctx.createGain();
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.06+Math.random()*0.03, ctx.currentTime+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.03);
+      src.connect(g); g.connect(master);
+      src.start(0); src.stop(ctx.currentTime+0.04);
+    } else {
+      // 风雪
+      var src2 = ctx.createBufferSource();
+      src2.buffer = focusMakeNoise(ctx, 'white', 0.4);
       var g2 = ctx.createGain();
-      o.frequency.value = 1800 + Math.random()*2200;
-      o.type='sine';
-      g2.gain.value = 0;
-      o.connect(g2); g2.connect(gain);
-      o.start(0);
       g2.gain.setValueAtTime(0, ctx.currentTime);
-      g2.gain.linearRampToValueAtTime(0.04, ctx.currentTime+0.02);
-      g2.gain.linearRampToValueAtTime(0, ctx.currentTime+0.18);
-      o.stop(ctx.currentTime+0.2);
-    }, 2400);
-    return { stop:function(){ clearInterval(tInt); try{src.stop();}catch(e){} }, gain:gain, src:src };
-  }
-  return { stop:function(){ try{src.stop();}catch(e){} }, gain:gain, src:src };
+      g2.gain.linearRampToValueAtTime(0.04, ctx.currentTime+0.1);
+      g2.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.4);
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 1500;
+      src2.connect(hp); hp.connect(g2); g2.connect(master);
+      src2.start(0); src2.stop(ctx.currentTime+0.4);
+    }
+  }, 1200);
+  return { stop:function(){ clearInterval(t); try{fire.src.stop();}catch(e){} }, mode:'snow_fire' };
+}
+
+// ===== 4 个轻音乐合成器（旋律层） =====
+function focusStartMelody(ctx, master, scale, interval, gainPeak, dur, type){
+  // 周期性按音阶触发 sine 短音
+  var t = setInterval(function(){
+    if(!_focusMusicNode) { clearInterval(t); return; }
+    var f = scale[Math.floor(Math.random()*scale.length)];
+    focusPing(ctx, master, f, dur, gainPeak, type||'sine');
+  }, interval);
+  return t;
+}
+function focusSynthPiano(ctx, master){
+  // 钢琴独奏：C 大调音阶 5~6 音随机 + 中速(1.5s) + 弱背景(粉噪极轻)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:200, Q:0.7, gain:0.04 }, master);
+  var scale = [261.6, 293.7, 329.6, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3]; // C4~E5
+  var tInt = focusStartMelody(ctx, master, scale, 1400, 0.10, 0.8, 'sine');
+  return { stop:function(){ clearInterval(tInt); try{n.src.stop();}catch(e){} }, mode:'piano' };
+}
+function focusSynthStrings(ctx, master){
+  // 弦乐低吟：A 小调 5~6 音 + 慢速(2.2s) + 长衰减 + 弱粉噪底
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:300, Q:0.7, gain:0.06 }, master);
+  var scale = [220.0, 246.9, 261.6, 293.7, 329.6, 392.0, 440.0]; // A3~A4
+  var tInt = focusStartMelody(ctx, master, scale, 2200, 0.07, 2.0, 'triangle');
+  return { stop:function(){ clearInterval(tInt); try{n.src.stop();}catch(e){} }, mode:'strings' };
+}
+function focusSynthGuqin(ctx, master){
+  // 古琴：五声音阶 + 慢速(2.6s) + 弱粉噪 + 偶发滑音(频率线性变化)
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:250, Q:0.7, gain:0.05 }, master);
+  var scale = [220.0, 261.6, 293.7, 329.6, 392.0, 440.0, 493.9]; // C 大调五声
+  var tInt = setInterval(function(){
+    if(!_focusMusicNode || _focusMusicNode.mode!=='guqin') { clearInterval(tInt); return; }
+    var f = scale[Math.floor(Math.random()*scale.length)];
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(f*0.95, ctx.currentTime+1.5);
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.10, ctx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+1.6);
+    o.connect(g); g.connect(master);
+    o.start(0); o.stop(ctx.currentTime+1.7);
+  }, 2600);
+  return { stop:function(){ clearInterval(tInt); try{n.src.stop();}catch(e){} }, mode:'guqin' };
+}
+function focusSynthMusicbox(ctx, master){
+  // 八音盒：C 大调高八度 + 快速(0.7s) + 高频 sine 短脉冲 + 极轻背景
+  var n = focusStartNoise(ctx, 'pink', { type:'lowpass', freq:200, Q:0.7, gain:0.03 }, master);
+  var scale = [523.3, 587.3, 659.3, 698.5, 784.0, 880.0, 987.8, 1046.5, 1174.7, 1318.5]; // C5~E6
+  var tInt = focusStartMelody(ctx, master, scale, 700, 0.06, 0.4, 'sine');
+  return { stop:function(){ clearInterval(tInt); try{n.src.stop();}catch(e){} }, mode:'musicbox' };
+}
+
+// ===== 分派表 =====
+var FOCUS_SYNTH = {
+  rain_hd:focusSynthRainHD, beach:focusSynthBeach, stream:focusSynthStream,
+  rain_light:focusSynthRainLight, jungle:focusSynthJungle, windbell:focusSynthWindbell,
+  classroom:focusSynthClassroom, birds:focusSynthBirds, desert:focusSynthDesert,
+  bonfire:focusSynthBonfire, autumn_wind:focusSynthAutumnWind, fireplace:focusSynthFireplace,
+  cricket:focusSynthCricket,
+  rain_room:focusSynthRainRoom, space:focusSynthSpace, cathedral:focusSynthCathedral,
+  mist_forest:focusSynthMistForest, snow_fire:focusSynthSnowFire,
+  piano:focusSynthPiano, strings:focusSynthStrings, guqin:focusSynthGuqin, musicbox:focusSynthMusicbox
+};
+
+function focusBuildMusic(ctx, modeIdx){
+  // modeIdx 是 FOCUS_MUSIC 数组下标；mute 走 -1
+  var cfg = FOCUS_MUSIC[modeIdx];
+  if(!cfg) return null;
+  if(cfg.mode === 'url') return null; // url 走 _focusUrlAudio
+  var fn = FOCUS_SYNTH[cfg.mode];
+  if(!fn) return null;
+  var master = ctx.createGain();
+  master.gain.value = 0.20;
+  master.connect(ctx.destination);
+  var node = fn(ctx, master);
+  node.master = master;
+  node.icon = cfg.icon; node.name = cfg.name; node.tab = cfg.tab;
+  return node;
+}
+
+function focusCurrentMusicCfg(){
+  if(_focusMusicIdx < 0) return null;
+  return FOCUS_MUSIC[_focusMusicIdx];
 }
 
 function focusNextMusic(){
-  _focusMusicType = (_focusMusicType + 1) % 5;  // -1→0, 0→1, ..., 3→-1(静音)
-  if(_focusMusicType === -1) focusMusicStop(); else focusMusicStart();
+  // 静音 → 当前 tab 第 1 个 → ... → 切 tab（下一个 tab 第 1 个）→ ... → 静音
+  var tabs = ['nature','ambient','lounge','custom'];
+  var curTab = (_focusMusicIdx < 0) ? _focusMusicTab : FOCUS_MUSIC[_focusMusicIdx].tab;
+  // 在当前 tab 内向后循环
+  var sameTab = FOCUS_MUSIC.map(function(c,i){return {c:c,i:i};}).filter(function(o){return o.c.tab===curTab;});
+  var idxInTab = (_focusMusicIdx < 0) ? -1 : sameTab.findIndex(function(o){return o.i===_focusMusicIdx;});
+  if(idxInTab < sameTab.length - 1){
+    // tab 内向后
+    _focusMusicIdx = sameTab[idxInTab+1].i;
+  } else {
+    // 切到下一个 tab
+    var tIdx = tabs.indexOf(curTab);
+    var nextTab = tabs[(tIdx+1) % tabs.length];
+    var nextFirst = FOCUS_MUSIC.findIndex(function(c){return c.tab===nextTab;});
+    _focusMusicIdx = nextFirst;
+    _focusMusicTab = nextTab;
+  }
+  // 关闭旧 URL 音频
+  if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio=null; }
+  focusMusicStart();
   focusMusicIcon();
-  var names = ['🔇 静音','🌧 雨声','🌊 海浪','🌲 森林','🌫 白噪'];
-  var cur = (_focusMusicType + 1) % 5;
-  focusShowTip(names[cur]);
+  var cfg = FOCUS_MUSIC[_focusMusicIdx];
+  focusShowTip('🎵 '+cfg.icon+' '+cfg.name);
 }
 
 function focusToggleMusic(){
-  if(_focusMusicType === -1){
-    // 开
-    _focusMusicType = 0;
-    if(_focusRun) focusMusicStart(); else focusShowTip('已选择：🌧 雨声（开始计时后播放）');
+  if(_focusMusicIdx < 0){
+    // 开：选当前 tab 第 1 项
+    var first = FOCUS_MUSIC.findIndex(function(c){return c.tab===_focusMusicTab;});
+    _focusMusicIdx = first < 0 ? 0 : first;
   } else {
-    _focusMusicType = -1;
-    focusMusicStop();
+    // 关
+    _focusMusicIdx = -1;
   }
+  if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio=null; }
+  if(_focusMusicIdx < 0) focusMusicStop(); else focusMusicStart();
   focusMusicIcon();
-  if(_focusMusicType === -1) focusShowTip('🔇 已静音');
+  if(_focusMusicIdx < 0) focusShowTip('🔇 已静音');
+  else focusShowTip('🎵 '+(FOCUS_MUSIC[_focusMusicIdx].icon||'')+' '+FOCUS_MUSIC[_focusMusicIdx].name);
 }
 
 function focusMusicIcon(){
   var b = document.getElementById('focusMusicBtn');
   if(!b) return;
-  b.textContent = _focusMusicType === -1 ? '🔇' : '🎵';
+  if(_focusMusicIdx < 0){ b.textContent = '🔇'; return; }
+  b.textContent = FOCUS_MUSIC[_focusMusicIdx].icon || '🎵';
+}
+
+// 自定义 URL 弹窗
+function focusOpenUrlInput(){
+  var url = prompt('粘贴音频 URL（mp3/m4a/ogg/wav；支持 http(s)）：');
+  if(!url) return;
+  url = url.trim();
+  if(!/^https?:\/\//i.test(url)){ toast('URL 必须以 http(s):// 开头'); return; }
+  if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio=null; }
+  focusMusicStop();
+  try{
+    var audio = new Audio(url);
+    audio.loop = true;
+    audio.volume = 0.20;
+    audio.crossOrigin = 'anonymous';
+    _focusUrlAudio = audio;
+    audio.play().then(function(){
+      _focusMusicNode = { stop:function(){ try{audio.pause();}catch(e){} }, mode:'url', icon:'🔗', name:'自定义 URL', tab:'custom' };
+      focusShowTip('🔗 正在播放自定义音频');
+    }).catch(function(err){
+      _focusUrlAudio = null;
+      toast('播放失败（可能 CORS 限制）：'+err.message);
+    });
+  }catch(e){ toast('创建音频失败：'+e.message); }
+}
+
+function focusMusicIcon(){
+  var b = document.getElementById('focusMusicBtn');
+  if(!b) return;
+  if(_focusMusicIdx < 0){ b.textContent = '🔇'; return; }
+  var cfg = FOCUS_MUSIC[_focusMusicIdx];
+  b.textContent = (cfg && cfg.icon) || '🎵';
 }
 
 function focusBeep(){
