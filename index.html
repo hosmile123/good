@@ -28,7 +28,7 @@
 <!-- v217-cachebust: 同步徽标改为「仅首页可见」——wbSyncBadgeVisibility() 按 wbCurrentPage()==='home' 设 display，switchPage 末尾与创建时调用，其他页面不再显示；后端切换逻辑同 v216 -->
 <!-- v218-cachebust: ①笔记新增分类(固定 工作/生活/其他 + 自定义分类标题颜色 + 可增删其他分类) ②生活习惯新增「作息表」子页(多套作息模板/周期/时间段开关/作息库) ③待办新增「月历」子页(月网格待办记事+今日高亮+按日筛选+最近待办) -->
 <!-- v219-cachebust: ①删除待办「日志」subtab ②月历chip勾选完成时联动变灰+画横线 ③笔记支持字体颜色(10色调色板)+加粗开关(作用于整篇) ④作息表重做：周日期条+24小时环形钟(SVG彩色段：睡眠/工作/学习/运动/生活/其他)+时间轴列表(圆点+时段+图标+时长+分类)；slot新增cat字段 ⑤倒数日详情页：金色渐变hero卡(BIRTHDAY FILE标签+大数字天数+日期pill) + 人生进度(出生年份→本岁百分比+进度条) + 记忆时间轴(增删/列表) + ⋯菜单(编辑/归档/隐藏/删除) -->
-<!-- v236-cachebust: 运动统计时间筛选新增「今日」——#fitRangeRow 顺序改为 今日/本周[默认active]/本月/年月；_fitInRange 加 today 分支(dateStr===tdCalLocalToday)；首卡标签 rlabel 支持 今日(次)；_fitRange.type 默认仍 week -->
+<!-- v237-cachebust: 左滑删除全面改为右上角 ⋮ 菜单——①CSS：.swipe-card/.swipe-reveal 从"红色左滑露删除"改为白底卡片 + 右上角圆形 ⋮ 按钮，.swipe-front 右 padding 44px 留位；新增 .wb-row-menu 弹出菜单样式；②bindSwipeList 置空壳(不再左滑)；新增 wbRowMenu(btn,items) 通用菜单(右上角定位，点外部关闭，danger 红色)；③9 个列表(待办/旅行/读书/日记/记账/作息记录/经期/体重/运动)删除按钮全部改为 ⋮+菜单+确认；④用户可见提示"左滑可删除"改"点 ⋮ 可删除" -->
 <!-- v213-cachebust: 跨设备云同步重做——①Storage拦截记录wb_键mtime ②上传store改{key:{v,t}}结构(后端原样存取零改动) ③拉取按mtime逐键合并(云端新覆盖/本地新保留/删除同步) ④修复新设备dirty误判把老数据整包覆盖云端新数据 → 多平台数据不再不一致 -->
 <!-- v212-cachebust: 生活密码新增「倒数日」勾选框(默认不勾)——勾选后电脑端打开倒数日需输生活密码；子页「归档与隐藏」随主页面一并拦截(防绕过)，验证后跳回原页面 -->
 <!-- v211-cachebust: 设备管理完善3点——①已踢出的设备整行变灰+图标去色+按钮禁用 ②列表包含所有缓存设备(离线⚪也显示可踢，在线🟢每60s心跳刷新) ③boot自动恢复先device/check后register——被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码 -->
@@ -872,11 +872,30 @@ body.sb-collapsed .sidebar-item:hover::after {
 .client-card-inner { position: relative; z-index: 2; background: #fff; display: flex; align-items: center; gap: 12px; padding: 14px; box-sizing: border-box; cursor: pointer; }
 .client-del-reveal { position: absolute; top: 0; right: 0; height: 100%; width: 88px; background: #ff4d4f; color: #fff; border: none; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 1; cursor: pointer; }
 /* 客户卡片删除已迁移到「更多」⋮ 菜单（v159），不再需要左滑删除交互 */
-/* 通用左滑删除（待办 / 体重 / 收支明细 等复用） */
-.swipe-card { position: relative; overflow: hidden; background: #ff4d4f; }
-.swipe-reveal { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #ff4d4f; color: #fff; border: none; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 1; cursor: pointer; }
-.swipe-front { position: relative; z-index: 2; background: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 14px; box-sizing: border-box; transition: transform .2s; border-bottom: 1px solid #F5F5F5; }
-/* 桌面端不再 hover 自动左滑；改为手动拖拽(鼠标)/触摸左滑才露出删除按钮（见 bindSwipeList / bindClientSwipe） */
+/* 通用行卡片（待办 / 体重 / 收支明细 / 运动 / 作息 等复用）——v237 起不再左滑，删除改为右上角 ⋮ 菜单 */
+.swipe-card { position: relative; background: #fff; border-radius: 10px; margin-bottom: 8px; overflow: visible; }
+.swipe-reveal {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #f5f6f8; color: #666; border: none; font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; z-index: 3; cursor: pointer;
+  line-height: 1;
+}
+.swipe-reveal:hover { background: #e8eaee; }
+.swipe-front { position: relative; z-index: 2; background: #fff; display: flex; align-items: center; gap: 10px; padding: 12px 44px 12px 14px; box-sizing: border-box; border-radius: 10px; border: 1px solid #F0F0F0; }
+/* v237：行内 ⋮ 弹出菜单 */
+.wb-row-menu {
+  position: fixed; z-index: 99999; background: #fff; border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15); overflow: hidden; min-width: 130px;
+  padding: 4px 0;
+}
+.wb-row-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 11px 16px; font-size: 13px; color: #333; background: none; border: none;
+  text-align: left; cursor: pointer;
+}
+.wb-row-menu-item:hover { background: #f5f6f8; }
+.wb-row-menu-item.danger { color: #FF4D4F; font-weight: 500; }
 .client-avatar {
   width: 44px; height: 44px; border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), #5B6CF9); color: white;
@@ -2767,12 +2786,12 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
     <div id="apptTodoBox"></div>
     <div class="card todo-list" id="todoList">
-      <div class="todo-item" data-cat="客户跟进" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">联系张总确认企财险续保方案</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
-      <div class="todo-item" data-cat="保函业务" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">准备中建三局投标保函材料</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag" style="background:#F6FFED;color:#52C41A">保函业务</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
-      <div class="todo-item" data-cat="学习提升" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">研读建工险附加条款</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag" style="background:#F9F0FF;color:#722ED1">学习提升</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
-      <div class="todo-item" data-cat="保单办理" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">提交华为企财险投保资料</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag">保单办理</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
-      <div class="todo-item" data-cat="客户跟进" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">回访万达物业责任险到期情况</div><div class="todo-meta">2026-08-01</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
-      <div class="todo-item" data-cat="佣金待结算" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">核对 7 月佣金明细，提交流水结算申请</div><div class="todo-meta">2026-08-05</div></div><span class="todo-cat-tag" style="background:#FFF7E6;color:#FA8C16">佣金待结算</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span></div>
+      <div class="todo-item" data-cat="客户跟进" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">联系张总确认企财险续保方案</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-item" data-cat="保函业务" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">准备中建三局投标保函材料</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag" style="background:#F6FFED;color:#52C41A">保函业务</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-item" data-cat="学习提升" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">研读建工险附加条款</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag" style="background:#F9F0FF;color:#722ED1">学习提升</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-item" data-cat="保单办理" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">提交华为企财险投保资料</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag">保单办理</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-item" data-cat="客户跟进" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">回访万达物业责任险到期情况</div><div class="todo-meta">2026-08-01</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-item" data-cat="佣金待结算" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">核对 7 月佣金明细，提交流水结算申请</div><div class="todo-meta">2026-08-05</div></div><span class="todo-cat-tag" style="background:#FFF7E6;color:#FA8C16">佣金待结算</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
     </div>
     <p style="text-align:center;color:var(--text-light);font-size:12px;margin-top:12px">完成的每一项，都是业绩的基石</p>
   </div>
@@ -2887,7 +2906,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   <div class="section-label">📊 起床趋势分析</div>
   <div class="card"><div id="riseChart" style="min-height:110px"></div></div>
     <!-- 每日打卡记录：左滑删除 -->
-    <div class="section-label">📋 每日打卡记录（左滑可删除）</div>
+    <div class="section-label">📋 每日打卡记录（点 ⋮ 可删除）</div>
     <div class="card"><div id="srRecordList"></div></div>
   </div>
 
@@ -6255,7 +6274,7 @@ function addTodo() {
   item.className = 'todo-item';
   item.setAttribute('data-cat', cat);
   item.setAttribute('data-done', 'false');
-  item.innerHTML = `<div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">${text}</div><div class="todo-meta">刚刚添加</div></div><span class="todo-cat-tag">${cat}</span><span class="todo-delete" onclick="deleteTodo(this)">🗑</span>`;
+  item.innerHTML = `<div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">${text}</div><div class="todo-meta">刚刚添加</div></div><span class="todo-cat-tag">${cat}</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span>`;
   list.insertBefore(item, list.firstChild);
   input.value = '';
   applyTodoFilter();
@@ -6546,57 +6565,40 @@ function toggleClientMenu(id, btn){
     }, true);
   }, 0);
 }
-// 通用左滑删除：容器内 .swipe-card 左滑露出背后的删除按钮
-// 触摸端用 touch 事件；电脑端改用鼠标按住拖拽（不再 hover 自动滑出，需手动左滑）
-function bindSwipeList(containerId){
-  var cards = document.querySelectorAll('#' + containerId + ' .swipe-card');
-  cards.forEach(function(card){
-    var front = card.querySelector('.swipe-front');
-    if(!front || front._bound) return; front._bound = true;
-    var startX = 0, startY = 0, dx = 0, dy = 0, moved = false, dragging = false;
-    function onStart(x, y){ startX = x; startY = y; dx = 0; dy = 0; moved = false; dragging = true; front.style.transition = ''; }
-    function onMove(x, y){
-      if(!dragging) return;
-      dx = x - startX; dy = y - startY;
-      if(Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
-      if(Math.abs(dy) > Math.abs(dx)) return; // 主要是纵向位移 → 视为滚动，不滑出
-      if(dx < 0) front.style.transform = 'translateX(' + Math.max(dx, -76) + 'px)';
-    }
-    function onEnd(){
-      if(!dragging) return false; dragging = false;
-      var slidOut = false;
-      if(moved && Math.abs(dx) > Math.abs(dy)){
-        front.style.transition = 'transform .2s';
-        front.style.transform = (dx < -38) ? 'translateX(-76px)' : 'translateX(0)';
-        front._guard = true; setTimeout(function(){ front._guard = false; }, 350);
-        slidOut = dx < -38;
-      }
-      startX = 0; startY = 0;
-      return slidOut;
-    }
-    // 触摸端
-    card.addEventListener('touchstart', function(e){ onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-    card.addEventListener('touchmove', function(e){ onMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
-    card.addEventListener('touchend', onEnd);
-    // 电脑端：鼠标按住向左拖动才滑出（不再悬停自动滑出）
-    card.addEventListener('mousedown', function(e){
-      if(e.button !== 0) return;
-      onStart(e.clientX, e.clientY);
-      var blocked = false;
-      function mm(ev){ onMove(ev.clientX, ev.clientY); }
-      function blockClick(ev){ if(blocked && front.contains(ev.target)){ ev.stopPropagation(); ev.preventDefault(); } }
-      function mu(){
-        var slidOut = onEnd();
-        document.removeEventListener('mousemove', mm);
-        document.removeEventListener('mouseup', mu);
-        document.removeEventListener('click', blockClick, true);
-        if(slidOut){ blocked = true; setTimeout(function(){ blocked = false; }, 350); }
-      }
-      document.addEventListener('mousemove', mm);
-      document.addEventListener('mouseup', mu);
-      document.addEventListener('click', blockClick, true);
-    });
+// v237：左滑删除已全面移除——删除改为每行右上角 ⋮ 菜单（wbRowMenu），bindSwipeList 保留为空壳避免报错
+function bindSwipeList(containerId){ /* no-op：不再需要左滑绑定 */ }
+// v237：通用行 ⋮ 菜单（点三点弹出删除等操作；点外部关闭）
+function wbRowMenu(btn, items){
+  if(!btn) return;
+  document.querySelectorAll('.wb-row-menu').forEach(function(m){ m.remove(); });
+  var menu = document.createElement('div');
+  menu.className = 'wb-row-menu';
+  menu.innerHTML = (items||[]).map(function(it, i){
+    return '<button type="button" class="wb-row-menu-item'+(it.danger?' danger':'')+'" data-idx="'+i+'">'+(it.icon||'')+' '+esc(it.label||'操作')+'</button>';
+  }).join('');
+  menu.addEventListener('click', function(e){
+    var btnItem = e.target.closest('.wb-row-menu-item');
+    if(!btnItem) return;
+    var idx = parseInt(btnItem.getAttribute('data-idx'),10)||0;
+    var it = (items||[])[idx];
+    e.stopPropagation();
+    menu.remove();
+    if(it && it.fn){ try{ it.fn(); }catch(err){ console.warn('wbRowMenu action error:', err); } }
   });
+  var rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 6) + 'px';
+  var rightSpace = window.innerWidth - rect.right;
+  if(rightSpace < 150) menu.style.right = '8px';
+  else menu.style.right = (window.innerWidth - rect.right) + 'px';
+  document.body.appendChild(menu);
+  setTimeout(function(){
+    document.addEventListener('click', function closeMe(ev){
+      if(!menu.contains(ev.target) && !btn.contains(ev.target)){
+        menu.remove();
+        document.removeEventListener('click', closeMe, true);
+      }
+    }, true);
+  }, 0);
 }
 function renderClients(){
   renderPersonFilter();
@@ -9429,13 +9431,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 236;                         // v236：运动统计时间筛选新增「今日」按钮(放本周前)，_fitInRange 加 today 分支(dateStr===tdCalLocalToday)，首卡标签支持今日(次)；默认仍本周
+const WB_VERSION = 237;                         // v237：左滑删除全面改为右上角 ⋮ 菜单——bindSwipeList 置空壳；新增 wbRowMenu(btn,items) 通用弹出菜单(点外部关闭)；待办/旅行/读书/日记/记账/作息记录/经期/体重/运动 9 个列表删除按钮改为 ⋮ + 菜单确认
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 153;                 // v236 发版：152→153
+const WB_DISPLAY_VERSION = 154;                 // v237 发版：153→154
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -9839,7 +9841,7 @@ function renderTodo(){
   box.innerHTML = list.map(function(t){
     var meta = t.time ? ('🕐 '+(String(t.time).replace('T',' '))) : ('📅 '+(t.date||''));
     return '<div class="swipe-card'+(t.done?' todo-done':'')+'" data-id="'+t.id+'">'+
-      '<button class="swipe-reveal" onclick="deleteTodo(\''+t.id+'\')">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除待办\',icon:\'🗑\',danger:true,fn:function(){deleteTodo(\''+t.id+'\')}}])">⋮</button>'+
       '<div class="swipe-front" data-id="'+t.id+'" data-cat="'+esc(t.cat)+'" data-done="'+(t.done?'true':'false')+'">'+
         '<div class="todo-check'+(t.done?' checked':'')+'" onclick="toggleTodo(this)">✓</div>'+
         '<div class="todo-content"><div class="todo-text">'+esc(t.text)+'</div><div class="todo-meta">'+meta+'</div></div>'+
@@ -10133,7 +10135,7 @@ function renderTravel(){
     var doneCls = t.done ? ' checked' : '';
     var grayStyle = t.done ? 'opacity:0.45' : '';
     return '<div class="swipe-card'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
-      '<button class="swipe-reveal" onclick="event.stopPropagation();(async()=>{ if(await wbConfirmAsync(\'确定删除这条旅行记录吗？\')){deleteTravel(\''+t.id+'\')} })()">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这条旅行记录吗？\'))deleteTravel(\''+t.id+'\')}}])">⋮</button>'+
       '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 14px;'+grayStyle+'">'+
         '<div class="todo-check'+doneCls+'" onclick="event.stopPropagation();toggleTravelDone(\''+t.id+'\')"></div>'+
         '<div class="li-icon" style="background:#E6F7FF;flex-shrink:0">'+travelEmoji(t.name)+'</div>'+
@@ -10213,7 +10215,7 @@ function renderBooks(){
     var doneCls = b.done ? ' checked' : '';
     var grayStyle = b.done ? 'opacity:0.45' : '';
     return '<div class="swipe-card'+(b.done?' done':'')+'" data-id="'+b.id+'">'+
-      '<button class="swipe-reveal" onclick="event.stopPropagation();(async()=>{ if(await wbConfirmAsync(\'确定删除这条读书记录吗？\')){deleteBook(\''+b.id+'\')} })()">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这条读书记录吗？\'))deleteBook(\''+b.id+'\')}}])">⋮</button>'+
       '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;'+grayStyle+'">'+
         '<div class="todo-check'+doneCls+'" onclick="event.stopPropagation();toggleBookDone(\''+b.id+'\')" style="margin-top:2px;flex-shrink:0"></div>'+
         '<div class="li-icon" style="background:#F9F0FF;flex-shrink:0">📖</div>'+
@@ -11155,7 +11157,7 @@ function renderDiaryList(){
   list.innerHTML = entries.length ? entries.map(function(e){
     var moodEmoji = (e.mood||'').slice(0,2) || '📝';
     return '<div class="swipe-card" data-id="'+e.id+'">'+
-      '<button class="swipe-reveal" onclick="event.stopPropagation();(async()=>{ if(await wbConfirmAsync(\'确定删除这篇日记吗？\')){deleteDiaryEntry(\''+e.id+'\')} })()">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除日记\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除这篇日记吗？\'))deleteDiaryEntry(\''+e.id+'\')}}])">⋮</button>'+
       '<div class="swipe-front" style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px">'+
         '<div class="li-icon" style="background:#F6FFED;flex-shrink:0;font-size:20px">'+moodEmoji+'</div>'+
         '<div class="li-info" style="flex:1;min-width:0"><div class="li-title">'+(e.title?esc(e.title):'无标题')+'</div>'+
@@ -11425,7 +11427,7 @@ function txnRow(t){
     '<div class="txn-amt '+(isIn?'in':'out')+'">'+(isIn?'+':'-')+'¥'+(+t.amount||0).toLocaleString()+'</div>'+
   '</div>';
   return '<div class="swipe-card'+(isDone?' txn-done':'')+'" data-id="'+t.id+'">'+
-    '<button class="swipe-reveal" onclick="event.stopPropagation();confirmDelete(\'trans\',\''+t.id+'\')">删除</button>'+
+    '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){confirmDelete(\'trans\',\''+t.id+'\')}}])">⋮</button>'+
     front+'</div>';
 }
 function toggleTxnDone(id){
@@ -11931,7 +11933,7 @@ function renderSrRecords(r){
     var durHtml = (it.type==='rise' && it.dur!=null) ? (' · 睡眠 '+it.dur.toFixed(1)+'h') : '';
     var noteHtml = it.note ? ('<div class="todo-meta" style="margin-top:2px">'+esc(it.note)+'</div>') : '';
     return '<div class="swipe-card" data-id="'+it.date+'">'+
-      '<button class="swipe-reveal" onclick="event.stopPropagation();'+del+'">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){'+del+'}}])">⋮</button>'+
       '<div class="swipe-front" style="display:flex;align-items:center;gap:10px;padding:12px 14px">'+
         '<span style="font-size:18px">'+it.icon+'</span>'+
         '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">'+it.label+' · '+esc(it.time)+durHtml+'</div>'+noteHtml+'</div>'+
@@ -12208,11 +12210,11 @@ function renderPeriodRecords(){
   var keys=Object.keys(r.period.log).sort().reverse();
   if(filter) keys=keys.filter(function(k){ return k.substr(0,7)===filter; });
   if(!keys.length){ box.innerHTML='<div class="empty-state"><div class="icon">🩸</div><p>'+(filter?('「'+filter+'」没有月经记录'):'还没有月经记录')+'</p></div>'; return; }
-  box.innerHTML='<div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary)">共 '+keys.length+' 条 · 平均 '+Math.round(keys.reduce(function(a,k){return a+r.period.log[k].days;},0)/keys.length)+' 天 · 左滑可删除</div>'+
+  box.innerHTML='<div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary)">共 '+keys.length+' 条 · 平均 '+Math.round(keys.reduce(function(a,k){return a+r.period.log[k].days;},0)/keys.length)+' 天</div>'+
     keys.map(function(k){
       var x=r.period.log[k];
       return '<div class="swipe-card" data-id="'+k+'">'+
-        '<button class="swipe-reveal" onclick="deletePeriodRecord(\''+k+'\')">删除</button>'+
+        '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除'+k+'的月经记录吗？\'))deletePeriodRecord(\''+k+'\')}}])">⋮</button>'+
         '<div class="swipe-front">'+
           '<div class="li-icon" style="background:#FFE0B2">🩸</div>'+
           '<div class="li-info"><div class="li-title">'+k+' 开始 · 持续 '+x.days+' 天</div>'+
@@ -12247,7 +12249,7 @@ function renderWeightList(r){
   box.innerHTML = keys.length? keys.map(function(k){
     var x=r.weight.log[k];
     return '<div class="swipe-card" data-id="'+k+'">'+
-      '<button class="swipe-reveal" onclick="deleteWeight(\''+k+'\')">删除</button>'+
+      '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){if(confirm(\'确定删除'+k+'的体重记录吗？\'))deleteWeight(\''+k+'\')}}])">⋮</button>'+
       '<div class="swipe-front">'+
         '<div class="li-icon" style="background:#FCE4F0">⚖️</div>'+
         '<div class="li-info"><div class="li-title">'+x.kg+' kg（'+(x.kg*2)+' 斤）</div><div class="li-sub">'+k+(x.note?(' · '+esc(x.note)):'')+'</div></div>'+
@@ -13041,8 +13043,9 @@ function renderFitRecords(){
     if(it.dur>0) info.push('⏱ '+it.dur+'min');
     if(it.kcal>0) info.push('🔥 '+it.kcal+'kcal');
     var dq = it.date.replace(/'/g, "\\'");
+    var delFn = "if(confirm('确定删除这条运动记录吗？'))deleteFitRecord('"+dq+"',"+it.idx+")";
     return '<div class="swipe-card" data-id="'+it.date+'#'+it.idx+'">'
-      + '<button class="swipe-reveal" onclick="event.stopPropagation();(async()=>{ if(await wbConfirmAsync(\'确定删除这条运动记录吗？\')){deleteFitRecord(\''+dq+'\','+it.idx+')} })()">删除</button>'
+      + '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除记录\',icon:\'🗑\',danger:true,fn:function(){'+delFn+'}}])">⋮</button>'
       + '<div class="swipe-front"><div style="flex:1">'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
       + '<div style="font-weight:600">'+(FIT_TYPE_ICONS[it.type]||'🏃')+' '+esc(it.type)+'</div>'
