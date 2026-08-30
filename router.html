@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<!-- v186-cachebust: 三镜像(GitHub Pages(good) + Vercel + CloudStudio) 智能测速跳转 -->
+<!-- v253-cachebust: 探测改抓 5KB 的 router.html（旧版抓 2.2MB 根路径=打开前先下载两份完整应用，是"打开非常慢"主因）+ 记住最快镜像走快速通道 + 跳转延迟 450ms→80ms -->
 <title>工作台 · 智能入口</title>
 <style>
   *{box-sizing:border-box}
@@ -37,11 +37,13 @@
 <script>
 (function(){
   // v228：双稳定镜像（CloudStudio 临时链接已失效 500，从候选移除，避免拖慢探测）
+  // v253：探测目标从根路径(2.2MB index.html)改为 router.html(约5KB)——
+  //       旧版为了测速会把两份完整应用各下载一遍再跳转第三遍，导致"打开网页非常慢"。
   var MIRRORS=[
     {name:"GitHub Pages", url:"https://hosmile123.github.io/good/"},
     {name:"Vercel",       url:"https://workbench-ten-psi.vercel.app/"}
   ];
-  var TIMEOUT=3000;   // 单镜像探测超时
+  var TIMEOUT=2500;   // 单镜像探测超时（探测对象只有 5KB，足够）
   var SAFETY=5000;    // 全局安全兜底：超过此时间必定显示手动链接
   var msg=document.getElementById("msg");
   var resolved=false; // 防止重复处理
@@ -54,6 +56,10 @@
     }
     return null;
   }
+
+  // 记住/读取上次选中的最快镜像（入口页固定在 github.io，localStorage 可用）
+  function remember(u){ try{ localStorage.setItem("wb_mirror", u); }catch(e){} }
+  function lastGood(){ try{ return localStorage.getItem("wb_mirror")||""; }catch(e){ return ""; } }
 
   // 显示手动链接兜底
   function showFallback(reason){
@@ -71,8 +77,15 @@
     });
   }
 
-  // 探测：仅 HTTP 2xx 视为可达（v228 修复：img.onerror 不再算可达——失效镜像返回 500 时
-  // 会被误判为最快并跳转，导致"打开慢/打不开"；改用 fetch 校验状态码）
+  function go(m, note){
+    if(resolved) return;
+    resolved=true;
+    remember(m.url);
+    if(note) msg.textContent=note;
+    location.replace(m.url);
+  }
+
+  // 探测：仅 HTTP 2xx 视为可达；只抓 5KB 的 router.html，不抓 2.2MB 的应用
   function ping(m){
     return new Promise(function(resolve){
       var start=Date.now();
@@ -88,10 +101,10 @@
         var img=new Image();
         img.onload=function(){clearTimeout(to);finish(true);};
         img.onerror=function(){clearTimeout(to);finish(false);};
-        img.src=m.url+"?_="+Date.now();
+        img.src=m.url+"router.html?_="+Date.now();
         return;
       }
-      fetch(m.url+"?_="+Date.now(), {method:'GET', mode:'cors', cache:'no-store'})
+      fetch(m.url+"router.html?_="+Date.now(), {method:'GET', mode:'cors', cache:'no-store'})
         .then(function(r){ clearTimeout(to); finish(r.ok); })
         .catch(function(){ clearTimeout(to); finish(false); });
     });
@@ -105,19 +118,35 @@
   // 如果浏览器连 Promise 都不支持，直接显示手动链接
   if(typeof Promise==="undefined"){showFallback("浏览器版本较低，请手动选择");return;}
 
+  // 快速通道：上次用过的镜像若 1.2s 内有响应，立即进入（不等全部探测完）
+  var last=lastGood();
+  if(last){
+    var lm=null;
+    MIRRORS.forEach(function(m){ if(m.url===last) lm=m; });
+    if(lm && (!here || here!==lm.url)){
+      (function(){
+        var done=false;
+        var to=setTimeout(function(){done=true;},1200);
+        fetch(lm.url+"router.html?_="+Date.now(), {cache:'no-store'})
+          .then(function(r){ clearTimeout(to); if(!done && r.ok){ done=true; go(lm,"已进入 "+lm.name); } })
+          .catch(function(){ clearTimeout(to); done=true; });
+      })();
+    }
+  }
+
   Promise.all(MIRRORS.map(ping)).then(function(res){
     if(resolved) return;
     var good=res.filter(function(r){return r.ok;});
-    if(!good.length){showFallback("三个镜像暂不可达");return;}
+    if(!good.length){showFallback("镜像暂不可达，请手动选择");return;}
     good.sort(function(a,b){return a.ms-b.ms;});
     var best=good[0];
-    msg.textContent="已选 "+best.m.name+"（"+Math.round(best.ms)+"ms）";
     if(here && here===best.m.url){
       // 当前已是最快可达镜像：直接进应用根路径（避免循环）
+      resolved=true; remember(best.m.url);
       location.replace(best.m.url);
       return;
     }
-    setTimeout(function(){if(!resolved)location.replace(best.m.url);},450);
+    setTimeout(function(){go(best,"已选 "+best.m.name+"（"+Math.round(best.ms)+"ms）");},80);
   }).catch(function(){showFallback("探测出错，请手动选择");});
 })();
 </script>
