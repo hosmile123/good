@@ -26,7 +26,7 @@
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
 <!-- v246-cachebust: 专注时刻真实音频修正——3 个失效 Wikimedia 旧 MD5 路径 URL(雨声/细雨/篝火)改 commons.wikimedia.org/wiki/Special:FilePath/<文件名> 自动解析当前路径；另移除音乐播放 Audio 的 crossOrigin='anonymous'(纯播放无需 CORS，否则 Wikimedia/SoundHelix 等无 CORS 头时会被浏览器静默拦截) -->
-<!-- v251-cachebust: 专注时刻音源换成已核验可达的真实录音(GitHub remvze/moodist，jsDelivr+raw双CDN回退，逐个核验200 audio/mpeg CORS=*)；雨声8首(大雨/细雨/雨打车顶/树叶/帐篷/雨伞/窗户/雷雨)+自然音15首；删除氛围音乐tab；单曲多源依次回退+12秒超时换源；缓存进度仅在有Content-Length时显示百分比否则"下载中"；新增本地音频(可选择本机音频文件，断网可用) -->
+<!-- v252-cachebust: 专注时刻——①音乐无缝循环(解码为AudioBuffer+裁掉首尾编码静音+采样级loopStart/loopEnd，循环处零停顿；无WebAudio时退回audio loop) ②背景图权限(管理员可增删改最多12张；其他账号仅1张，再传即替换、不可删除；背景图存wb_focus_bgs且不上云) ③专注数据接入云同步(FOCUS_KEY由workbench_focus改wb_focus并迁移旧数据，手机端数据电脑端可见) -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9726,13 +9726,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 251;                         // v251：专注时刻音源换为已核验可达的 moodist 真实录音(jsDelivr/raw 双CDN回退)，雨声8首+自然音15首，删除氛围音乐tab，修复缓存下载进度不准(拿不到总大小时显示"下载中")，新增本地音频兜底
+const WB_VERSION = 252;                         // v252：专注时刻——①音乐改 WebAudio 解码+首尾静音裁剪+采样点循环(循环零停顿)，无 WebAudio 时退回流式播放 ②背景图权限：管理员可增删改(最多12张)、其他账号仅1张(再传替换/不可删) ③专注数据接入云同步(FOCUS_KEY 改 wb_focus 并迁移旧键 workbench_focus)，背景图单独存且不上云避免撑爆同步包
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 170;                 // v251 发版（170 不含4）
+const WB_DISPLAY_VERSION = 171;                 // v252 发版（171 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -13271,7 +13271,8 @@ function fitKcalManual(){
    - 背景：8 套预设 CSS 渐变（点击 focusBg 切换）
    - 音乐：WebAudio 生成的 4 种环境音（雨声/海浪/森林鸟鸣/白噪），无外部依赖
    ============================================================ */
-var FOCUS_KEY = 'workbench_focus';
+var FOCUS_KEY = 'wb_focus';            // v252：改 wb_ 前缀才能参与云同步（手机↔电脑互通）
+var FOCUS_BG_KEY = 'wb_focus_bgs';     // 自定义背景图单独存、且不上云（图片 base64 会把同步包撑爆 1MB 上限）
 var FOCUS_QUOTES = [
   '把今天的专注当作给未来自己的礼物。',
   '一次只做一件事，做到极致就是捷径。',
@@ -13312,20 +13313,46 @@ var _focusRange = 'today';
 var _focusAddEdit = null;  // 编辑模式
 
 function focusLoad(){
-  try{ _focus = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null') || { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0, customBgs:[] }; }
-  catch(e){ _focus = { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0, customBgs:[] }; }
+  // 旧键 workbench_focus 不在 wb_ 前缀下（历史上从未上云），迁到 wb_focus，旧键保留作备份
+  try{
+    if(!localStorage.getItem(FOCUS_KEY)){
+      var _oldFocus = localStorage.getItem('workbench_focus');
+      if(_oldFocus) localStorage.setItem(FOCUS_KEY, _oldFocus);
+    }
+  }catch(e){}
+  try{ _focus = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null') || { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0 }; }
+  catch(e){ _focus = { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true,cooldown:true,volume:60}, bgIdx:0 }; }
   if(!_focus.tasks) _focus.tasks = [];
   if(!_focus.sessions) _focus.sessions = [];
   if(!_focus.settings) _focus.settings = {ringtone:true,vibrate:true,cooldown:true,volume:60};
   if(_focus.settings.cooldown===undefined) _focus.settings.cooldown = true;
   if(_focus.settings.volume===undefined) _focus.settings.volume = 60;
-  if(_focus.customBgs===undefined) _focus.customBgs = [];
+  focusBgsLoad();
   if(_focus.bgIdx===undefined) _focus.bgIdx = 0;
   _focusMusicVolume = Math.max(0.1, Math.min(1, (_focus.settings.volume||60)/100));
 }
 
 function focusSave(){
   localStorage.setItem(FOCUS_KEY, JSON.stringify(_focus));
+}
+
+/* ===== 自定义背景图：单独存、不参与云同步（base64 图片会让同步包超过后端 1MB 上限）===== */
+var _focusBgs = [];
+function focusBgsLoad(){
+  try{ _focusBgs = JSON.parse(localStorage.getItem(FOCUS_BG_KEY) || 'null') || []; }catch(e){ _focusBgs = []; }
+  if(!Array.isArray(_focusBgs)) _focusBgs = [];
+  // 旧数据迁移：以前塞在 _focus.customBgs 里
+  try{
+    if(!_focusBgs.length && _focus && Array.isArray(_focus.customBgs) && _focus.customBgs.length){
+      _focusBgs = _focus.customBgs.slice(0, 12);
+      try{ delete _focus.customBgs; }catch(e){}
+      focusBgsSave();
+      focusSave();
+    }
+  }catch(e){}
+}
+function focusBgsSave(){
+  try{ localStorage.setItem(FOCUS_BG_KEY, JSON.stringify(_focusBgs)); }catch(e){}
 }
 
 function focusRender(){
@@ -13531,14 +13558,14 @@ function focusStartSession(id){
   // 背景：先用用户上次选过的 _focus.bgIdx（兼容自定义图）
   if(_focus.bgIdx===undefined || _focus.bgIdx===null) _focus.bgIdx = Math.floor(Math.random()*FOCUS_BG.length);
   // 如果索引指向已删除的自定义图，回退到内置
-  if(_focus.bgIdx >= FOCUS_BG.length + (_focus.customBgs?_focus.customBgs.length:0)) _focus.bgIdx = 0;
+  if(_focus.bgIdx >= FOCUS_BG.length + (_focusBgs?_focusBgs.length:0)) _focus.bgIdx = 0;
   var bg = document.getElementById('focusBg');
   if(bg){
     if(_focus.bgIdx < FOCUS_BG.length){
       bg.style.background = FOCUS_BG[_focus.bgIdx];
     } else {
       var i = _focus.bgIdx - FOCUS_BG.length;
-      var data = (_focus.customBgs||[])[i];
+      var data = (_focusBgs||[])[i];
       if(data) bg.style.background = 'url("'+data+'") center/cover no-repeat';
     }
   }
@@ -13798,7 +13825,7 @@ function focusSkip(){
 
 function focusNextBg(){
   // 切背景：内置渐变（8 套）+ 用户上传（customBgs）循环
-  var total = FOCUS_BG.length + (_focus.customBgs?_focus.customBgs.length:0);
+  var total = FOCUS_BG.length + (_focusBgs?_focusBgs.length:0);
   if(total<=0) return;
   // 用 _focus.bgIdx 作统一索引
   _focus.bgIdx = (_focus.bgIdx + 1) % total;
@@ -13811,7 +13838,7 @@ function focusNextBg(){
     focusShowTip('🎨 切换到内置背景 ' + (_focus.bgIdx+1) + '/' + FOCUS_BG.length);
   } else {
     var i = _focus.bgIdx - FOCUS_BG.length;
-    var data = _focus.customBgs[i];
+    var data = _focusBgs[i];
     if(data){
       bg.style.background = 'url("' + data + '") center/cover no-repeat';
       focusShowTip('🖼 已切到自定义背景 ' + (i+1));
@@ -13830,42 +13857,57 @@ function focusPickBg(idx){
     bg.style.backgroundPosition = 'center';
   } else {
     var i = idx - FOCUS_BG.length;
-    var data = _focus.customBgs[i];
+    var data = _focusBgs[i];
     if(data) bg.style.background = 'url("'+data+'") center/cover no-repeat';
   }
   focusSave();
 }
 
+function focusBgCanManage(){
+  try { return (typeof wbIsAdmin === 'function') ? !!wbIsAdmin() : false; } catch(e){ return false; }
+}
+function focusBgMax(){ return focusBgCanManage() ? 12 : 1; }
 function focusBgUploadClick(){
   document.getElementById('focusBgFile').click();
 }
 function focusBgUploadFiles(files){
   if(!files || !files.length) return;
-  Array.from(files).forEach(function(file){
-    if(!file.type.startsWith('image/')) return;
-    // 读为 dataURL 后压缩到 ≤1280px、JPEG q80
+  var canManage = focusBgCanManage();
+  var max = focusBgMax();
+  var list = Array.prototype.slice.call(files).filter(function(f){ return f && f.type && f.type.indexOf('image/') === 0; });
+  if(!list.length) return;
+  if(!canManage) list = list.slice(0, 1);              // 非管理员一次只处理 1 张
+  list.forEach(function(file){
     var fr = new FileReader();
     fr.onload = function(){
       var img = new Image();
       img.onload = function(){
-        var w = img.width, h = img.height;
-        var max = 1280;
-        var scale = 1;
-        if(Math.max(w,h) > max) scale = max / Math.max(w,h);
+        var w = img.width, h = img.height, maxPx = 1280, scale = 1;
+        if(Math.max(w,h) > maxPx) scale = maxPx / Math.max(w,h);
         var nw = Math.round(w*scale), nh = Math.round(h*scale);
         var c = document.createElement('canvas');
         c.width = nw; c.height = nh;
         c.getContext('2d').drawImage(img, 0, 0, nw, nh);
         var data = c.toDataURL('image/jpeg', 0.8);
-        if(!_focus.customBgs) _focus.customBgs = [];
-        if(_focus.customBgs.length >= 12){
+        if(!_focusBgs) _focusBgs = [];
+        if(_focusBgs.length >= max){
+          if(!canManage){
+            if(!window.confirm('其他账号仅可上传 1 张自定义背景。
+要用这张替换原来的那张吗？')) return;
+            _focusBgs[0] = data;
+            focusBgsSave();
+            focusRenderBgList();
+            focusPickBg(FOCUS_BG.length);
+            toast('已替换你的自定义背景');
+            return;
+          }
           toast('最多 12 张，自定义背景已满');
           return;
         }
-        _focus.customBgs.push(data);
-        focusSave();
+        _focusBgs.push(data);
+        focusBgsSave();
         focusRenderBgList();
-        toast('已上传 1 张背景');
+        toast('已上传背景（'+_focusBgs.length+'/'+max+'）');
       };
       img.src = fr.result;
     };
@@ -13882,24 +13924,30 @@ function focusRenderBgList(){
     html += '<div onclick="focusPickBg('+i+')" style="width:64px;height:48px;border-radius:6px;cursor:pointer;background:'+bg+';'+on+'background-size:cover" title="内置背景 '+(i+1)+'"></div>';
   });
   // 用户上传
-  (_focus.customBgs||[]).forEach(function(data, j){
+  var _bgCanManage = focusBgCanManage();
+  (_focusBgs||[]).forEach(function(data, j){
     var idx = FOCUS_BG.length + j;
     var on = (idx === _focus.bgIdx) ? 'border:2px solid var(--accent-color);' : 'border:2px solid transparent;';
     html += '<div style="position:relative"><div onclick="focusPickBg('+idx+')" style="width:64px;height:48px;border-radius:6px;cursor:pointer;background:url('+data+') center/cover;'+on+'"></div>'
-          + '<button onclick="focusBgDel('+j+')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:#ff4d4f;color:#fff;font-size:12px;cursor:pointer;line-height:1;padding:0">×</button></div>';
+          + (_bgCanManage ? '<button onclick="focusBgDel('+j+')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:#ff4d4f;color:#fff;font-size:12px;cursor:pointer;line-height:1;padding:0" title="删除">×</button>' : '')
+          + '</div>';
   });
+  html += '<div style="width:100%;font-size:11px;color:#999;margin-top:6px;line-height:1.5">'
+        + (_bgCanManage ? '👑 管理员：可上传最多 12 张，点右上角 × 删除' : 'ℹ️ 其他账号仅可上传 1 张：再次上传会替换原图，不可删除')
+        + '</div>';
   c.innerHTML = html;
 }
 function focusBgDel(j){
-  if(j<0 || j>=_focus.customBgs.length) return;
-  _focus.customBgs.splice(j, 1);
+  if(!focusBgCanManage()){ toast('仅管理员可删除背景'); return; }
+  if(j<0 || j>=_focusBgs.length) return;
+  _focusBgs.splice(j, 1);
   // 修正 bgIdx：如果删的是当前正显示，可能落到下一张
-  if(_focus.bgIdx >= FOCUS_BG.length + _focus.customBgs.length){
+  if(_focus.bgIdx >= FOCUS_BG.length + _focusBgs.length){
     _focus.bgIdx = 0;
   } else if(_focus.bgIdx > FOCUS_BG.length + j){
     _focus.bgIdx--;
   }
-  focusSave();
+  focusBgsSave();
   focusRenderBgList();
   toast('已删除');
 }
@@ -13951,61 +13999,68 @@ function focusMusicStart(){
   if(cfg.mode === 'url'){ focusOpenUrlInput(); return; }        // 自定义 URL
   var urls = focusTrackUrls(cfg);
   if(!urls.length){ focusMusicStop(); toast('🔊 该曲目没有可用音频，请换一首'); return; }
-  try{
-    var audio = new Audio();
-    audio.preload = 'auto';
-    audio.loop = true;
-    audio.volume = _focusMusicVolume;
-    _focusMusicNode = {
-      stop: function(){ try{audio.pause(); audio.currentTime=0;}catch(e){} },
-      mode: cfg.name, tab: cfg.tab, icon: cfg.icon, name: cfg.name, isAudio:true, failed:false
-    };
-    var settled = false, timer = null;
-    // 依次尝试每个候选源：出错或 12 秒仍未出声就换下一个
-    function attempt(i){
+
+  var settled = false, timer = null;
+  function clearT(){ if(timer){ clearTimeout(timer); timer = null; } }
+  function failAll(){
+    settled = true; clearT();
+    focusMusicBuf('idle');
+    toast('🔊 该音频暂时无法播放，请换一首或试试「本地音频」');
+    focusMusicStop();
+  }
+  // ① 首选：解码后按采样点无缝循环（循环处零停顿）
+  function tryGapless(i){
+    if(settled) return;
+    if(i >= urls.length){ tryHtml(0); return; }                 // 全失败 → 退回流式播放
+    clearT();
+    timer = setTimeout(function(){ if(!settled) tryGapless(i+1); }, 20000);
+    focusMusicBuf('buf');
+    focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（加载中…）');
+    focusDecodeBuffer(urls[i], function(err, buf){
       if(settled) return;
-      if(i >= urls.length){
-        settled = true;
-        if(timer) clearTimeout(timer);
-        _focusMusicNode.failed = true;
-        focusMusicBuf('idle');
-        toast('🔊 该音频暂时无法播放，请换一首或试试「本地音频」');
-        focusMusicStop();
-        return;
-      }
-      var url = urls[i];
-      var cached = _focusAudioCache[url] && _focusAudioCache[url].blobUrl;
-      audio.src = cached ? _focusAudioCache[url].blobUrl : url;
-      if(timer) clearTimeout(timer);
-      timer = setTimeout(function(){ if(!settled) attempt(i+1); }, 12000);
+      if(err){ tryGapless(i+1); return; }
+      try{
+        var node = focusStartGapless(buf);
+        settled = true; clearT();
+        _focusMusicNode = {
+          stop: function(){ node.stop(); }, master: node.master,
+          mode: cfg.name, tab: cfg.tab, icon: cfg.icon, name: cfg.name, isAudio:true, failed:false
+        };
+        _focusBuf.playing = true;
+        focusMusicBuf('cached');
+        focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（无缝循环）');
+      }catch(e){ tryGapless(i+1); }
+    });
+  }
+  // ② 兜底：没有 WebAudio / 解码失败时用 <audio loop> 流式播放
+  function tryHtml(i){
+    if(settled) return;
+    if(i >= urls.length){ failAll(); return; }
+    clearT();
+    timer = setTimeout(function(){ if(!settled) tryHtml(i+1); }, 12000);
+    try{
+      var audio = new Audio();
+      audio.preload = 'auto'; audio.loop = true; audio.volume = _focusMusicVolume;
+      audio.src = urls[i];
+      _focusMusicNode = {
+        stop: function(){ try{audio.pause(); audio.currentTime=0;}catch(e){} }, el: audio,
+        mode: cfg.name, tab: cfg.tab, icon: cfg.icon, name: cfg.name, isAudio:true, failed:false
+      };
       audio.onplaying = function(){
         if(settled) return;
-        settled = true;
-        if(timer) clearTimeout(timer);
+        settled = true; clearT();
         _focusBuf.playing = true;
         focusMusicBuf('play');
-        focusShowTip('🎵 '+cfg.icon+' '+cfg.name+(cached ? '（已缓存·秒开）' : '（播放中）'));
+        focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（播放中）');
       };
-      audio.onerror = function(){ if(!settled) attempt(i+1); };
-      focusMusicBuf(cached ? 'cached' : 'buf');
-      if(!cached) focusShowTip('🎵 '+cfg.icon+' '+cfg.name+'（加载中…）');
+      audio.onerror = function(){ if(!settled) tryHtml(i+1); };
       var p = audio.play();
-      if(p && p.catch) p.catch(function(){ if(!settled) attempt(i+1); });
-      // 后台下载并缓存（带进度），下次点同一首秒开
-      if(!cached) focusCacheFetch(url, function(pct, fin){
-        if(fin){ if(settled) focusMusicBuf('cached'); }
-        else if(pct >= 0) focusMusicBuf('dl', pct);
-        else focusMusicBuf('dl');            // -2：拿不到总大小，显示"下载中"不显示假百分比
-      });
-    }
-    // 优先从已缓存的源开始
-    var startIdx = 0;
-    for(var k=0;k<urls.length;k++){ if(_focusAudioCache[urls[k]] && _focusAudioCache[urls[k]].blobUrl){ startIdx = k; break; } }
-    attempt(startIdx);
-  }catch(e){
-    focusMusicStop();
-    toast('🔊 该曲目没有可用音频，请换一首');
+      if(p && p.catch) p.catch(function(){ if(!settled) tryHtml(i+1); });
+    }catch(e){ tryHtml(i+1); }
   }
+  try{
+    if(_focusAC()) tryGapless(0); else tryHtml(0);
+  }catch(e){ failAll(); }
 }
 // 本地音频：从本机/手机选一个音频文件播放并缓存（断网也能用）
 function focusPickLocalAudio(){
@@ -14017,20 +14072,40 @@ function focusPickLocalAudio(){
       var f = inp.files && inp.files[0];
       if(!f) return;
       var u = URL.createObjectURL(f);
-      _focusAudioCache['local:'+f.name] = {blobUrl:u, status:'ready', progress:100};
+      _focusAudioCache['local:'+f.name] = {blobUrl:u, blob:f, status:'ready', progress:100};
       if(_focusUrlAudio){ try{_focusUrlAudio.pause();}catch(e){} _focusUrlAudio = null; }
       focusMusicStop();
-      var a = new Audio(u);
-      a.loop = true; a.volume = _focusMusicVolume; a.preload = 'auto';
-      _focusUrlAudio = a;
-      a.play().then(function(){
-        _focusMusicNode = { stop:function(){ try{a.pause();}catch(e){} }, mode:'file', icon:'📁', name:f.name, tab:'custom' };
+      // 优先走无缝循环：本地文件直接解码，无需下载
+      function playHtml(){
+        var a = new Audio(u);
+        a.loop = true; a.volume = _focusMusicVolume; a.preload = 'auto';
+        _focusUrlAudio = a;
+        a.play().then(function(){
+          _focusMusicNode = { stop:function(){ try{a.pause();}catch(e){} }, el:a, mode:'file', icon:'📁', name:f.name, tab:'custom' };
+          focusMusicBuf('cached');
+          focusShowTip('📁 正在播放：'+f.name);
+        }).catch(function(err){
+          _focusUrlAudio = null;
+          toast('播放失败：'+(err && err.message ? err.message : '未知错误'));
+        });
+      }
+      function decodeLocal(){
+        var ctx = _focusAC();
+        if(!ctx || !f.arrayBuffer) return Promise.reject(new Error('no webaudio'));
+        return f.arrayBuffer().then(function(ab){
+          return new Promise(function(res, rej){
+            var p = ctx.decodeAudioData(ab, res, rej);
+            if(p && p.then) p.then(res, rej);
+          });
+        });
+      }
+      decodeLocal().then(function(buf){
+        var node = focusStartGapless(buf);
+        _focusMusicNode = { stop:function(){ node.stop(); }, master:node.master, mode:'file', icon:'📁', name:f.name, tab:'custom' };
+        _focusBuf.playing = true;
         focusMusicBuf('cached');
-        focusShowTip('📁 正在播放：'+f.name);
-      }).catch(function(err){
-        _focusUrlAudio = null;
-        toast('播放失败：'+(err && err.message ? err.message : '未知错误'));
-      });
+        focusShowTip('📁 无缝循环：'+f.name);
+      }).catch(function(){ playHtml(); });
     };
     inp.click();
   }catch(e){ toast('打开文件失败：'+e.message); }
@@ -14111,6 +14186,70 @@ var _focusMusicIdx = 0;          // 当前 tab 内 idx（mute = -1）
 var _focusUrlAudio = null;       // 自定义 URL Audio 元素
 var _focusMusicVolume = 0.60;    // 主音量（v245 提升 0.20→0.60）
 
+// ---- 无缝循环引擎（v252）：mp3 用 <audio loop> 会在首尾各留一段编码静音 → 听得出"顿一下"
+// 改为：整段解码进 AudioBuffer，去掉首尾静音后按采样点 loopStart/loopEnd 循环，做到采样级无缝。
+var _focusDecoded = { url:'', buf:null };
+function _focusAC(){ try{ return (typeof _acx === 'function') ? _acx() : null; }catch(e){ return null; } }
+
+function focusTrimEdges(buf){
+  try{
+    var ch = buf.getChannelData(0), sr = buf.sampleRate, len = ch.length;
+    var scan = Math.min(Math.floor(sr*2), Math.floor(len/2));   // 最多扫首尾各 2 秒
+    var thr = 0.002, s = 0, e = len;
+    for(var i=0;i<scan;i++){ if(Math.abs(ch[i]) > thr){ s = i; break; } }
+    for(var j=len-1;j>len-1-scan;j--){ if(Math.abs(ch[j]) > thr){ e = j+1; break; } }
+    if(e - s < sr*0.5){ s = 0; e = len; }                       // 保险：别把整段切没了
+    return { start: s/sr, end: e/sr };
+  }catch(err){ return { start:0, end: buf ? buf.duration : 0 }; }
+}
+
+function focusDecodeBuffer(url, cb){
+  if(_focusDecoded.url === url && _focusDecoded.buf){ cb(null, _focusDecoded.buf); return; }
+  focusCacheFetch(url, function(pct, fin){
+    if(fin){ /* 下载完成，等解码 */ }
+    else if(pct >= 0) focusMusicBuf('dl', pct);
+    else focusMusicBuf('dl');
+  }).then(function(){
+    var it = _focusAudioCache[url];
+    if(!it || !it.blob) throw new Error('no blob');
+    if(it.blob.arrayBuffer) return it.blob.arrayBuffer();
+    return new Promise(function(res, rej){                       // 老浏览器兜底
+      var fr = new FileReader();
+      fr.onload = function(){ res(fr.result); };
+      fr.onerror = function(){ rej(new Error('read fail')); };
+      fr.readAsArrayBuffer(it.blob);
+    });
+  }).then(function(ab){
+    var ctx = _focusAC();
+    if(!ctx) throw new Error('no webaudio');
+    return new Promise(function(res, rej){
+      var p = ctx.decodeAudioData(ab, res, rej);
+      if(p && p.then) p.then(res, rej);
+    });
+  }).then(function(buf){
+    _focusDecoded = { url:url, buf:buf };
+    cb(null, buf);
+  }).catch(function(err){ cb(err || new Error('decode fail')); });
+}
+
+function focusStartGapless(buf){
+  var ctx = _focusAC();
+  var src = ctx.createBufferSource();
+  src.buffer = buf;
+  var g = ctx.createGain();
+  g.gain.value = _focusMusicVolume;
+  var edge = focusTrimEdges(buf);
+  src.loop = true;
+  try{ src.loopStart = edge.start; src.loopEnd = edge.end; }catch(e){}
+  src.connect(g); g.connect(ctx.destination);
+  src.start(0, edge.start);
+  return {
+    master: g, src: src,
+    stop: function(){ try{src.stop(0);}catch(e){} try{src.disconnect();}catch(e){} try{g.disconnect();}catch(e){} }
+  };
+}
+
+
 // ---- 音频缓存：后台下载 + 进度 + 持久化（Cache API） ----
 var _focusAudioCache = {};   // url -> {blobUrl, status:'loading'|'ready'|'error', progress:0-100}
 var _focusCacheName = 'focus-audio-v1';
@@ -14123,7 +14262,7 @@ function focusCacheFetch(url, cb){
   function doFetch(){
     _focusAudioCache[url] = {blobUrl:null, status:'loading', progress:0};
     if(cb) cb(-2,false);
-    function store(blob){ var u=URL.createObjectURL(blob); _focusAudioCache[url]={blobUrl:u,status:'ready',progress:100}; try{ caches.open(_focusCacheName).then(function(c){ c.put(url, new Response(blob)); }); }catch(e){} }
+    function store(blob){ var u=URL.createObjectURL(blob); _focusAudioCache[url]={blobUrl:u, blob:blob, status:'ready', progress:100}; try{ caches.open(_focusCacheName).then(function(c){ c.put(url, new Response(blob)); }); }catch(e){} }
     function readerProgress(res){
       var total = +res.headers.get('Content-Length') || 0;
       if(!res.body || !res.body.getReader){ return res.blob().then(function(b){ store(b); if(cb) cb(100,true); return URL.createObjectURL(b); }); }
@@ -14141,7 +14280,7 @@ function focusCacheFetch(url, cb){
   }
   if('caches' in window){
     return caches.open(_focusCacheName).then(function(c){ return c.match(url); }).then(function(r){
-      if(r) return r.blob().then(function(b){ var u=URL.createObjectURL(b); _focusAudioCache[url]={blobUrl:u,status:'ready',progress:100}; if(cb) cb(100,true); return u; });
+      if(r) return r.blob().then(function(b){ var u=URL.createObjectURL(b); _focusAudioCache[url]={blobUrl:u, blob:b, status:'ready', progress:100}; if(cb) cb(100,true); return u; });
       return doFetch();
     }).catch(function(){ return doFetch(); });
   }
@@ -14985,7 +15124,7 @@ function focusVolChange(v){
   // 实时调正在播放音乐
   if(_focusMusicNode){
     if(_focusMusicNode.master){ _focusMusicNode.master.gain.value = _focusMusicVolume; }
-    if(_focusMusicNode.isAudio){ /* Audio.volume 在下次创建时生效 */ }
+    if(_focusMusicNode.el){ try{ _focusMusicNode.el.volume = _focusMusicVolume; }catch(e){} }
   }
 }
 
@@ -16745,7 +16884,7 @@ function lpCopyPass(){
 /* ============ 云端同步（v40 省流量+2000词+语法扩展+学习计划重构） ============
    旧实现的三个问题：①把 93KB 死快照一起上传 ②把登录令牌 wb_token 也传上云（安全隐患）
    ③页面上点任何地方都触发一次全量上传。现改为：白名单过滤 + 内容哈希比对 + 最小间隔节流。 */
-var WB_NO_SYNC = /^(wb_user_|wb_meta_|wb_token|wb_session|wb_tts_|wb_tmp_|wb_sync_mt_|wb_sync_s_)/;   // 死数据 / 令牌 / 纯本地态，一律不上云
+var WB_NO_SYNC = /^(wb_user_|wb_meta_|wb_token|wb_session|wb_tts_|wb_tmp_|wb_sync_mt_|wb_sync_s_|wb_focus_bgs)/;   // 死数据 / 令牌 / 纯本地态 / 背景图，一律不上云   // 死数据 / 令牌 / 纯本地态，一律不上云
 var _syncLastHash = '';      // 上次成功上传内容的指纹
 var _syncLastAt   = 0;       // 上次成功上传时间
 var _syncInflight = false;   // 防并发重发
