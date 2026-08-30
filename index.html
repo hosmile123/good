@@ -42,6 +42,7 @@
 <!-- v203-cachebust: 倒数日新增「归档与隐藏」子页(归档/隐藏互斥+tab统计)、11分类130+图标选择器、12款渐变封面、自动贴开关；编辑弹窗脱离page容器(归档页也可打开) -->
 <!-- v202-cachebust: 手机端(<768px) sidebar.open 扩宽到 200px+横排图标/名字——修复 481-768px 设备名字不显示/字号过小；电脑端不受影响 -->
 <!-- v239-cachebust: 倒数日文案调整——卡片/详情「已经」→「已过天数」、「还有」→「剩余天数」（今天保留「今天」/「就是今天」不变） -->
+<!-- v240-cachebust: 生活习惯新增「专注时刻」子页——任务 CRUD（普通番茄钟/定目标/养习惯 × 倒计时/正计时/不计时）、全屏会话页（点击换背景渐变、WebAudio 环境音：雨声/海浪/森林/白噪 4 种可切、循环休息）、任务/统计切换、统计视图按日/周/月/全部渲染 SVG 饼图、设置铃声震动、⋮ 菜单编辑/删除。数据存 localStorage[workbench_focus] -->
 <!-- v196-cachebust: 客户卡片姓名/TOB公司名/副名(联系人-职务)去掉ellipsis硬截断——.client-name/.client-name-tob/.client-subname 改 white-space:normal+word-break:break-word+overflow:visible+max-width:none，长公司名/长姓名完整换行显示 -->
 <title>工作台</title>
 <style>
@@ -1546,6 +1547,59 @@ body.sb-collapsed .sidebar-item:hover::after {
 .wb-cf-btn { flex:1; padding:10px 0; border:none; border-radius:8px; font-size:15px; cursor:pointer; font-family:inherit; }
 .wb-cf-cancel { background:#f0f0f0; color:#666; }
 .wb-cf-ok { background:#ff4d4f; color:#fff; }
+
+/* ===== v240: 专注时刻 ===== */
+.focus-hero { display:flex; align-items:center; background:linear-gradient(135deg,#6366F1 0%,#8B5CF6 50%,#F59E0B 100%); border-radius:14px; padding:14px 8px; color:#fff; margin-bottom:14px; box-shadow:0 4px 12px rgba(99,102,241,.18); }
+.focus-hero-item { flex:1; text-align:center; }
+.focus-hero-divider { width:1px; height:36px; background:rgba(255,255,255,.22); }
+.fh-num { font-size:24px; font-weight:700; line-height:1.1; }
+.fh-label { font-size:11px; opacity:.82; margin-top:3px; letter-spacing:1px; }
+.focus-mini-tabs { display:flex; gap:6px; margin-bottom:12px; background:#f3f4f6; border-radius:10px; padding:3px; }
+.fmt-tab { flex:1; border:none; background:transparent; padding:8px; border-radius:8px; font-size:13px; font-weight:600; color:#666; cursor:pointer; font-family:inherit; }
+.fmt-tab.active { background:#fff; color:var(--primary); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.focus-add-btn { display:block; width:100%; padding:12px; margin-top:12px; background:transparent; border:1.5px dashed #c7c9d4; border-radius:12px; color:#888; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .15s; }
+.focus-add-btn:hover { background:#f8f9fb; border-color:#3B5BDB; color:#3B5BDB; }
+.focus-chip { padding:7px 12px; border:1px solid #e0e2e8; background:#fff; border-radius:18px; font-size:13px; color:#555; cursor:pointer; font-family:inherit; transition:all .12s; }
+.focus-chip:hover { border-color:#3B5BDB; }
+.focus-chip.on { background:#E8F0FF; border-color:#3B5BDB; color:#1d39c4; font-weight:600; }
+.focus-card { position:relative; border-radius:14px; padding:14px 16px; color:#fff; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); overflow:hidden; }
+.focus-card-bg0 { background:linear-gradient(135deg,#a8c0ff 0%,#3f2b96 100%); }
+.focus-card-bg1 { background:linear-gradient(135deg,#fad0c4 0%,#ff9a9e 100%); }
+.focus-card-bg2 { background:linear-gradient(135deg,#84fab0 0%,#8fd3f4 100%); }
+.focus-card-bg3 { background:linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%); }
+.focus-card-bg4 { background:linear-gradient(135deg,#a18cd1 0%,#fbc2eb 100%); }
+.focus-card-bg5 { background:linear-gradient(135deg,#fbc2eb 0%,#a6c1ee 100%); }
+.focus-card-bg6 { background:linear-gradient(135deg,#f6d365 0%,#fda085 100%); }
+.focus-card-bg7 { background:linear-gradient(135deg,#5ee7df 0%,#b490ca 100%); }
+.focus-card-title { font-size:16px; font-weight:700; margin-bottom:4px; padding-right:32px; word-break:break-all; }
+.focus-card-sub { font-size:11px; opacity:.85; display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+.focus-card-sub::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.85); }
+.focus-card-actions { display:flex; align-items:center; justify-content:space-between; }
+.focus-card-done { font-size:11px; opacity:.78; }
+.focus-start-btn { background:rgba(255,255,255,.28); backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,.4); color:#fff; padding:6px 18px; border-radius:18px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.focus-start-btn:hover { background:rgba(255,255,255,.42); }
+.focus-menu-btn { position:absolute; top:10px; right:10px; width:28px; height:28px; border:none; background:rgba(255,255,255,.2); border-radius:50%; color:#fff; font-size:14px; cursor:pointer; line-height:1; }
+.focus-menu-btn:hover { background:rgba(255,255,255,.35); }
+.focus-stats-card { background:linear-gradient(180deg,#1a3a6e 0%,#0d1b3a 100%); border-radius:16px; padding:18px 16px 16px; color:#fff; margin-top:4px; }
+.focus-stats-date { font-size:14px; opacity:.85; margin-bottom:4px; }
+.focus-stats-hero { display:flex; gap:24px; margin-bottom:16px; }
+.fsh-num { font-size:28px; font-weight:700; line-height:1.1; }
+.fsh-label { font-size:11px; opacity:.65; margin-top:4px; letter-spacing:1px; }
+.focus-stats-tabs { display:flex; gap:6px; background:rgba(255,255,255,.08); border-radius:8px; padding:3px; margin-bottom:14px; width:fit-content; }
+.fsst-tab { padding:5px 14px; border:none; background:transparent; color:rgba(255,255,255,.7); border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit; }
+.fsst-tab.on { background:rgba(255,255,255,.92); color:#1a3a6e; font-weight:600; }
+.focus-pie { display:flex; justify-content:center; margin:6px 0 12px; }
+.focus-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:12px; }
+.focus-legend-item { display:flex; align-items:center; gap:6px; opacity:.92; }
+.focus-legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.focus-legend-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.focus-legend-val { opacity:.78; }
+.focus-switch { position:relative; display:inline-block; width:42px; height:24px; }
+.focus-switch input { opacity:0; width:0; height:0; }
+.focus-switch-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#e0e0e0; border-radius:24px; transition:.2s; }
+.focus-switch-slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.focus-switch input:checked + .focus-switch-slider { background:#52C41A; }
+.focus-switch input:checked + .focus-switch-slider:before { transform:translateX(18px); }
 </style>
 </head>
 <body>
@@ -2833,6 +2887,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <button class="subtab" id="rtSmokeTab" onclick="switchSub('rt',this,'rt-smoke')"><span id="rtSmokeLabel">经期</span></button>
     <button class="subtab" onclick="switchSub('rt',this,'rt-weight')">体重</button>
     <button class="subtab" onclick="switchSub('rt',this,'rt-schedule')">📅 作息表</button>
+    <button class="subtab" onclick="switchSub('rt',this,'rt-focus')">🎯 专注时刻</button>
   </div>
 
   <!-- 早睡早起（合并） -->
@@ -3096,6 +3151,69 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button onclick="openRtScheduleLib()">📚 作息库</button>
     </div>
   </div>
+
+  <!-- ========== v240: 专注时刻 ========== -->
+  <div class="subtab-content" id="rt-focus">
+    <!-- 顶部三联统计 -->
+    <div class="focus-hero">
+      <div class="focus-hero-item">
+        <div class="fh-num" id="focusTodayCount">0</div>
+        <div class="fh-label">今日次数</div>
+      </div>
+      <div class="focus-hero-divider"></div>
+      <div class="focus-hero-item">
+        <div class="fh-num" id="focusTodayMin">0</div>
+        <div class="fh-label">今日分钟</div>
+      </div>
+      <div class="focus-hero-divider"></div>
+      <div class="focus-hero-item">
+        <div class="fh-num" id="focusStreak">0</div>
+        <div class="fh-label">连续天数</div>
+      </div>
+    </div>
+
+    <!-- 任务/统计 切换 -->
+    <div class="focus-mini-tabs">
+      <button class="fmt-tab active" id="focusTabTasks" onclick="focusSwitchTab('tasks')">📋 任务</button>
+      <button class="fmt-tab" id="focusTabStats" onclick="focusSwitchTab('stats')">📊 统计</button>
+    </div>
+
+    <!-- 任务视图 -->
+    <div id="focusTasksView">
+      <div class="section-label" style="margin-top:8px">🎯 我的专注任务（点 ⋮ 可删除）</div>
+      <div id="focusTaskList"></div>
+      <div id="focusEmpty" style="display:none;text-align:center;padding:30px 16px;color:var(--text-light);font-size:13px">
+        <div style="font-size:42px;margin-bottom:8px;opacity:.4">🎯</div>
+        <div>还没有专注任务，点下方按钮开始添加</div>
+      </div>
+      <button class="focus-add-btn" onclick="openFocusAdd()">＋ 添加专注任务</button>
+    </div>
+
+    <!-- 统计视图 -->
+    <div id="focusStatsView" style="display:none">
+      <div class="focus-stats-card">
+        <div class="focus-stats-date" id="focusStatsDate">今日</div>
+        <div class="focus-stats-hero">
+          <div class="fsh-item">
+            <div class="fsh-num" id="focusStatsCount">0</div>
+            <div class="fsh-label">次数</div>
+          </div>
+          <div class="fsh-item">
+            <div class="fsh-num" id="focusStatsTime">0<span style="font-size:14px">分</span></div>
+            <div class="fsh-label">时长</div>
+          </div>
+        </div>
+        <div class="focus-stats-tabs">
+          <button class="fsst-tab on" data-fr="today" onclick="focusSetRange(this,'today')">日</button>
+          <button class="fsst-tab" data-fr="week" onclick="focusSetRange(this,'week')">周</button>
+          <button class="fsst-tab" data-fr="month" onclick="focusSetRange(this,'month')">月</button>
+          <button class="fsst-tab" data-fr="all" onclick="focusSetRange(this,'all')">全部</button>
+        </div>
+        <div class="focus-pie" id="focusPie"></div>
+        <div class="focus-legend" id="focusLegend"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- v218: 作息表编辑弹窗 -->
@@ -3132,6 +3250,140 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <button onclick="closeRtScheduleLib()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
     </div>
     <div id="rtSchedLibList" style="padding:14px 18px;overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
+<!-- ========== v240: 添加专注任务弹窗 ========== -->
+<div id="focusAddModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:10010;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:92vw;max-width:440px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700">添加专注任务</div>
+      <div style="display:flex;gap:6px">
+        <button onclick="confirmFocusAdd()" style="width:30px;height:30px;border:none;background:#f0f9eb;border-radius:50%;font-size:16px;cursor:pointer;color:#52C41A;font-weight:700">✓</button>
+        <button onclick="closeFocusAdd()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1">
+      <div style="font-size:11px;color:var(--text-light);margin-bottom:4px">请输入待办名称</div>
+      <input id="focusAddTitle" type="text" placeholder="学习时间" maxlength="30" style="width:100%;padding:12px 4px;border:none;border-bottom:1px solid #e0e0e0;font-size:20px;font-weight:600;outline:none;box-sizing:border-box;margin-bottom:16px;font-family:inherit">
+
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;font-weight:500">任务类型</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="focus-chip on" data-fc-type="pomo" onclick="focusChipType(this)">🍅 普通番茄钟</button>
+        <button class="focus-chip" data-fc-type="goal" onclick="focusChipType(this)">🎯 定目标</button>
+        <button class="focus-chip" data-fc-type="habit" onclick="focusChipType(this)">📅 养习惯</button>
+      </div>
+
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;font-weight:500">计时方式</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="focus-chip on" data-fc-mode="countdown" onclick="focusChipMode(this)">⏳ 倒计时</button>
+        <button class="focus-chip" data-fc-mode="forward" onclick="focusChipMode(this)">▶️ 正向计时</button>
+        <button class="focus-chip" data-fc-mode="none" onclick="focusChipMode(this)">♾️ 不计时</button>
+      </div>
+
+      <div id="focusDurationPicker">
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;font-weight:500">时长</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <button class="focus-chip on" onclick="focusChipDur(this,25)">25 分钟</button>
+          <button class="focus-chip" onclick="focusChipDur(this,35)">35 分钟</button>
+          <button class="focus-chip" onclick="focusChipDur(this,45)">45 分钟</button>
+          <button class="focus-chip" onclick="focusChipDur(this,60)">60 分钟</button>
+          <button class="focus-chip" onclick="focusChipDur(this,0)">⚙️ 自定义</button>
+        </div>
+        <div id="focusCustomDur" style="display:none;margin:8px 0 8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input id="focusCustomMin" type="number" min="1" max="600" value="25" style="width:70px;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:16px;font-weight:700;text-align:center">
+            <span style="color:var(--text-light);font-size:13px">分钟</span>
+          </div>
+        </div>
+        <div id="focusModeHint" style="font-size:11px;color:var(--text-light);margin-bottom:12px">*倒计时 25 分钟即标准番茄钟时间</div>
+      </div>
+
+      <div style="border-top:1px dashed #eee;margin:6px 0 12px"></div>
+      <button onclick="openFocusAdv()" style="width:100%;background:transparent;border:none;color:#3B5BDB;font-size:13px;padding:6px;cursor:pointer">展开更多高级设置 ▾</button>
+      <div id="focusAdvBox" style="display:none;background:#f8f9fa;border-radius:10px;padding:12px;margin-top:8px">
+        <div style="margin-bottom:10px"><div style="font-size:12px;color:var(--text-light);margin-bottom:4px">任务备注</div><textarea id="focusAdvNote" placeholder="本次专注要做什么？" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:13px;resize:none;font-family:inherit;box-sizing:border-box"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><div style="font-size:12px;color:var(--text-light);margin-bottom:4px">循环次数</div><input id="focusAdvLoops" type="number" min="1" max="20" value="1" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;text-align:center;box-sizing:border-box"></div>
+          <div><div style="font-size:12px;color:var(--text-light);margin-bottom:4px">休息时间(分)</div><input id="focusAdvRest" type="number" min="1" max="60" value="5" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;text-align:center;box-sizing:border-box"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px"><input id="focusAdvHide" type="checkbox"><label for="focusAdvHide">完成后第二天不再显示</label></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== v240: 专注会话全屏页 ========== -->
+<div id="focusSessionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9990;overflow:hidden">
+  <!-- 背景层（默认渐变，可点击换） -->
+  <div id="focusBg" class="focus-bg" style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%);transition:background 0.6s ease;cursor:pointer" onclick="focusNextBg()">
+    <div id="focusBgHint" style="position:absolute;bottom:8px;right:14px;color:rgba(255,255,255,.55);font-size:11px;letter-spacing:1px">点击更换背景 ▸</div>
+  </div>
+  <!-- 顶部引用语 -->
+  <div style="position:absolute;top:0;left:0;right:0;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;z-index:2">
+    <div id="focusQuote" style="color:rgba(255,255,255,.85);font-size:13px;line-height:1.6;max-width:80%;font-style:italic"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="focusToggleMusic()" id="focusMusicBtn" style="width:36px;height:36px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:16px;cursor:pointer;color:#fff">🔇</button>
+      <button onclick="focusOpenSettings()" style="width:36px;height:36px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:16px;cursor:pointer;color:#fff">⚙️</button>
+      <button onclick="focusExit()" style="width:36px;height:36px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:16px;cursor:pointer;color:#fff">✕</button>
+    </div>
+  </div>
+  <!-- 中央计时 -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:2;color:#fff">
+    <div id="focusTaskName" style="font-size:14px;letter-spacing:2px;opacity:.8;margin-bottom:4px">学习时间</div>
+    <div id="focusTaskStatus" style="font-size:12px;opacity:.6;margin-bottom:24px">准备开始</div>
+    <div id="focusTimer" style="font-size:88px;font-weight:200;letter-spacing:4px;font-family:'Helvetica Neue',Arial,sans-serif;text-shadow:0 4px 20px rgba(0,0,0,.15);line-height:1">25:00</div>
+    <div id="focusLoop" style="font-size:12px;opacity:.55;margin-top:16px"></div>
+  </div>
+  <!-- 底部控件 -->
+  <div style="position:absolute;bottom:0;left:0;right:0;padding:20px 0 40px;display:flex;justify-content:center;gap:18px;z-index:2">
+    <button onclick="focusReset()" title="重置" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">↻</button>
+    <button onclick="focusSkip()" title="跳过" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">⏭</button>
+    <button onclick="focusToggleRun()" id="focusRunBtn" style="width:64px;height:64px;border:none;background:rgba(255,255,255,.95);border-radius:50%;font-size:26px;cursor:pointer;color:#333;box-shadow:0 4px 20px rgba(0,0,0,.2)">▶</button>
+    <button onclick="focusNextMusic()" title="换音乐" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">🎵</button>
+    <button onclick="focusStop()" title="结束" style="width:48px;height:48px;border:none;background:rgba(255,255,255,.18);backdrop-filter:blur(8px);border-radius:50%;font-size:18px;cursor:pointer;color:#fff">⏹</button>
+  </div>
+  <!-- 音乐切换提示 -->
+  <div id="focusMusicTip" style="position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:3"></div>
+  <!-- 进度环 -->
+  <svg id="focusRing" viewBox="0 0 200 200" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;height:300px;z-index:1;pointer-events:none">
+    <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3"/>
+    <circle id="focusRingProg" cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-dasharray="578" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 100 100)"/>
+  </svg>
+</div>
+
+<!-- ========== v240: 完成提示 ========== -->
+<div id="focusCompleteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9991;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:18px;padding:30px 24px;text-align:center;width:86vw;max-width:380px">
+    <div style="font-size:48px;margin-bottom:8px">🎉</div>
+    <div style="font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:6px">完成一次专注！</div>
+    <div id="focusCompleteDetail" style="font-size:14px;color:var(--text-secondary);margin-bottom:20px">用时 25 分钟</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" style="flex:1;background:#f0f0f0;color:#666" onclick="focusCompleteClose()">关闭</button>
+      <button class="btn-primary" style="flex:1" onclick="focusCompleteNext()">再来一次</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== v240: 专注设置弹窗 ========== -->
+<div id="focusSettingModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9992;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;width:86vw;max-width:380px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:16px;font-weight:700">🔔 铃声震动设置</div>
+      <button onclick="closeFocusSetting()" style="width:30px;height:30px;border:none;background:#f5f5f5;border-radius:50%;font-size:16px;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:14px 18px;overflow-y:auto;flex:1">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5">
+        <div style="font-size:14px">🔔 计时结束后提示音</div>
+        <label class="focus-switch"><input type="checkbox" id="focusSetRing" onchange="focusSetSave()"><span class="focus-switch-slider"></span></label>
+      </div>
+      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">提示音音量跟随铃声（和铃声相同音量）</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5">
+        <div style="font-size:14px">📳 计时结束后震动</div>
+        <label class="focus-switch"><input type="checkbox" id="focusSetVib" onchange="focusSetSave()"><span class="focus-switch-slider"></span></label>
+      </div>
+      <div style="font-size:11px;color:var(--text-light);padding:6px 0 10px">*如需自定义铃声、震动长度等高级选项，可在计时结束后点击我的-更多设置</div>
+    </div>
   </div>
 </div>
 
@@ -9437,13 +9689,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 239;                         // v239：倒数日文案调整——卡片/详情「已经」→「已过天数」、「还有」→「剩余天数」（今天保留不变）
+const WB_VERSION = 240;                         // v240：生活习惯新增「专注时刻」子页（番茄钟 + 全屏倒计时 + 切背景/切音乐 + 统计）
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 156;                 // v239 发版：155→156
+const WB_DISPLAY_VERSION = 157;                 // v240 发版：156→157
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -12973,6 +13225,747 @@ function fitKcalManual(){
   if(kcalIn.value === ''){ fitAutoKcal(); return; }
   kcalIn.setAttribute('data-manual','1');
 }
+
+/* ============================================================
+   v240: 专注时刻（Pomodoro / 倒计时 / 切背景 / 切音乐 / 统计）
+   - 数据：localStorage['workbench_focus'] = { tasks:[], sessions:[], active:null, settings:{}, customQuotes:[] }
+   - 背景：8 套预设 CSS 渐变（点击 focusBg 切换）
+   - 音乐：WebAudio 生成的 4 种环境音（雨声/海浪/森林鸟鸣/白噪），无外部依赖
+   ============================================================ */
+var FOCUS_KEY = 'workbench_focus';
+var FOCUS_QUOTES = [
+  '把今天的专注当作给未来自己的礼物。',
+  '一次只做一件事，做到极致就是捷径。',
+  '安静下来，答案自然会浮现。',
+  '专注是普通人最稀缺的奢侈品。',
+  '时间花在哪里，看得见。',
+  '心无杂念，一往无前。',
+  '慢慢来，比较快。',
+  '此刻的每一分钟，都算数。'
+];
+var FOCUS_BG = [
+  'linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%)',
+  'linear-gradient(135deg,#a1c4fd 0%,#c2e9fb 100%)',
+  'linear-gradient(135deg,#fbc2eb 0%,#a6c1ee 100%)',
+  'linear-gradient(135deg,#84fab0 0%,#8fd3f4 100%)',
+  'linear-gradient(135deg,#a8edea 0%,#fed6e3 100%)',
+  'linear-gradient(135deg,#f6d365 0%,#fda085 100%)',
+  'linear-gradient(135deg,#5ee7df 0%,#b490ca 100%)',
+  'linear-gradient(135deg,#667eea 0%,#764ba2 100%)'
+];
+var FOCUS_CARD_BG = ['focus-card-bg0','focus-card-bg1','focus-card-bg2','focus-card-bg3','focus-card-bg4','focus-card-bg5','focus-card-bg6','focus-card-bg7'];
+var FOCUS_TYPE_LABEL = { pomo:'普通番茄钟', goal:'定目标', habit:'养习惯' };
+var FOCUS_TYPE_SUB = {
+  pomo: function(t){ return t.mode==='forward'?'正计时-番茄':('倒计时-'+t.duration+'分钟'); },
+  goal: function(t){ return '今日 '+(t.done||0)+'/'+t.duration+' 分钟'; },
+  habit: function(t){ return '正计时-习惯'; }
+};
+
+var _focus = null;      // 状态
+var _focusTick = null;   // 计时器 handle
+var _focusAudio = null;  // WebAudio 上下文
+var _focusMusicNode = null; // 当前音乐节点
+var _focusMusicType = -1;   // -1=静音,0/1/2/3=四种
+var _focusBgIdx = 0;
+var _focusRun = false;   // 是否在跑
+var _focusRest = false;  // 当前是不是休息段
+var _focusLoopIdx = 0;   // 当前循环下标
+var _focusRange = 'today';
+var _focusAddEdit = null;  // 编辑模式
+
+function focusLoad(){
+  try{ _focus = JSON.parse(localStorage.getItem(FOCUS_KEY) || 'null') || { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true} }; }
+  catch(e){ _focus = { tasks:[], sessions:[], settings:{ringtone:true,vibrate:true} }; }
+  if(!_focus.tasks) _focus.tasks = [];
+  if(!_focus.sessions) _focus.sessions = [];
+  if(!_focus.settings) _focus.settings = {ringtone:true,vibrate:true};
+  if(_focus.bgIdx===undefined) _focus.bgIdx = 0;
+}
+
+function focusSave(){
+  localStorage.setItem(FOCUS_KEY, JSON.stringify(_focus));
+}
+
+function focusRender(){
+  // 顶部三联
+  var today = tdCalLocalToday();
+  var todaySess = _focus.sessions.filter(function(s){ return tdCalLocalToday(new Date(s.endTs)) === today; });
+  var todayCount = todaySess.length;
+  var todayMin = Math.round(todaySess.reduce(function(a,s){return a+(s.duration||0);},0)/60);
+  _setText('focusTodayCount', todayCount);
+  _setText('focusTodayMin', todayMin);
+  // 连续天数
+  var days = {}, streak = 0;
+  _focus.sessions.forEach(function(s){ var d = tdCalLocalToday(new Date(s.endTs)); days[d] = true; });
+  for(var i=0;i<365;i++){
+    var d = new Date(); d.setDate(d.getDate()-i);
+    var k = tdCalLocalToday(d);
+    if(days[k]) streak++;
+    else if(i>0) break;
+  }
+  _setText('focusStreak', streak);
+
+  // 任务列表
+  var list = document.getElementById('focusTaskList');
+  var empty = document.getElementById('focusEmpty');
+  if(!list) return;
+  if(!_focus.tasks.length){
+    list.innerHTML = '';
+    if(empty) empty.style.display = 'block';
+  } else {
+    if(empty) empty.style.display = 'none';
+    list.innerHTML = _focus.tasks.map(function(t){
+      var bg = FOCUS_CARD_BG[((t.bgIdx||0)) % FOCUS_CARD_BG.length];
+      var sub = FOCUS_TYPE_SUB[t.type] ? FOCUS_TYPE_SUB[t.type](t) : (t.mode==='forward'?'正计时':(t.mode==='none'?'不计时':t.duration+'分钟'));
+      return '<div class="focus-card '+bg+'">'
+        +'<button class="focus-menu-btn" onclick="focusMenu(\''+t.id+'\',this,event)">⋮</button>'
+        +'<div class="focus-card-title">'+escHtml(t.title)+'</div>'
+        +'<div class="focus-card-sub">'+escHtml(sub)+'</div>'
+        +'<div class="focus-card-actions">'
+          +'<div class="focus-card-done">已完成 '+(t.done||0)+' 次</div>'
+          +'<button class="focus-start-btn" onclick="focusStartSession(\''+t.id+'\')">开始</button>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+  focusRenderStats();
+}
+
+function focusMenu(id, btn, e){
+  if(e) e.stopPropagation();
+  var items = [
+    { text:'✏️ 编辑', fn:function(){ focusEditTask(id); } },
+    { text:'🗑 删除', danger:true, fn:function(){
+        wbConfirm('确定删除这个专注任务？历史专注记录会保留。', function(ok){
+          if(!ok) return;
+          _focus.tasks = _focus.tasks.filter(function(t){ return t.id!==id; });
+          focusSave(); focusRender(); toast('已删除');
+        });
+    } }
+  ];
+  wbRowMenu(btn, items);
+}
+
+function focusEditTask(id){
+  var t = _focus.tasks.find(function(x){ return x.id===id; });
+  if(!t) return;
+  _focusAddEdit = id;
+  openFocusAdd();
+  document.getElementById('focusAddTitle').value = t.title || '';
+  // 反选 chip
+  var chips = document.querySelectorAll('#focusAddModal [data-fc-type]');
+  chips.forEach(function(c){ c.classList.toggle('on', c.getAttribute('data-fc-type')===t.type); });
+  var chips2 = document.querySelectorAll('#focusAddModal [data-fc-mode]');
+  chips2.forEach(function(c){ c.classList.toggle('on', c.getAttribute('data-fc-mode')===t.mode); });
+  focusChipDurRefresh(t.duration);
+  document.getElementById('focusAdvNote').value = t.note || '';
+  document.getElementById('focusAdvLoops').value = t.loops || 1;
+  document.getElementById('focusAdvRest').value = t.rest || 5;
+  document.getElementById('focusAdvHide').checked = !!t.hideNextDay;
+  // 显示高级设置区
+  document.getElementById('focusAdvBox').style.display = 'block';
+  // 标题
+  document.querySelector('#focusAddModal > div > div:first-child > div').textContent = '编辑专注任务';
+}
+
+function focusChipType(btn){
+  document.querySelectorAll('#focusAddModal [data-fc-type]').forEach(function(c){ c.classList.remove('on'); });
+  btn.classList.add('on');
+  // 不同类型：pomo 显示时长选择；goal 显示"今日 X/N 分钟"提示；habit 显示正计时
+  var t = btn.getAttribute('data-fc-type');
+  var dur = document.getElementById('focusDurationPicker');
+  if(dur) dur.style.display = (t==='goal') ? 'none' : '';
+}
+function focusChipMode(btn){
+  document.querySelectorAll('#focusAddModal [data-fc-mode]').forEach(function(c){ c.classList.remove('on'); });
+  btn.classList.add('on');
+  var m = btn.getAttribute('data-fc-mode');
+  var dur = document.getElementById('focusDurationPicker');
+  if(m === 'none'){
+    if(dur) dur.style.display = 'none';
+  } else {
+    // pomo/goal/habit 任意模式下倒计时/正计时都允许调整；只在 goal 时隐藏
+    var typeOn = document.querySelector('#focusAddModal [data-fc-type].on');
+    if(typeOn && typeOn.getAttribute('data-fc-type')==='goal'){
+      if(dur) dur.style.display = 'none';
+    } else {
+      if(dur) dur.style.display = '';
+    }
+  }
+}
+function focusChipDur(btn, m){
+  document.querySelectorAll('#focusDurationPicker > div:nth-child(2) > .focus-chip').forEach(function(c){ c.classList.remove('on'); });
+  btn.classList.add('on');
+  var cust = document.getElementById('focusCustomDur');
+  if(cust) cust.style.display = m===0 ? 'block' : 'none';
+  if(m>0){
+    var i = document.getElementById('focusCustomMin'); if(i) i.value = m;
+  }
+}
+function focusChipDurRefresh(dur){
+  var chips = document.querySelectorAll('#focusDurationPicker > div:nth-child(2) > .focus-chip');
+  var matched = false;
+  chips.forEach(function(c){
+    var on = false;
+    if(c.textContent.indexOf(dur+'')>=0 && dur>0){ on = true; matched = true; }
+    c.classList.toggle('on', on);
+  });
+  var cust = document.getElementById('focusCustomDur');
+  if(!matched && dur>0){
+    if(cust) cust.style.display = 'block';
+    var i = document.getElementById('focusCustomMin'); if(i) i.value = dur;
+    // 标记自定义为 on
+    var custBtn = Array.from(chips).find(function(c){ return c.textContent.indexOf('自定义')>=0; });
+    if(custBtn) custBtn.classList.add('on');
+  } else {
+    if(cust) cust.style.display = 'none';
+  }
+}
+
+function openFocusAdd(){
+  _focusAddEdit = null;
+  document.getElementById('focusAddTitle').value = '';
+  document.querySelector('#focusAddModal [data-fc-type="pomo"]').classList.add('on');
+  document.querySelectorAll('#focusAddModal [data-fc-type]').forEach(function(c){ if(c.getAttribute('data-fc-type')!=='pomo') c.classList.remove('on'); });
+  document.querySelector('#focusAddModal [data-fc-mode="countdown"]').classList.add('on');
+  document.querySelectorAll('#focusAddModal [data-fc-mode]').forEach(function(c){ if(c.getAttribute('data-fc-mode')!=='countdown') c.classList.remove('on'); });
+  focusChipDurRefresh(25);
+  document.getElementById('focusAdvNote').value = '';
+  document.getElementById('focusAdvLoops').value = 1;
+  document.getElementById('focusAdvRest').value = 5;
+  document.getElementById('focusAdvHide').checked = false;
+  document.getElementById('focusAdvBox').style.display = 'none';
+  document.querySelector('#focusAddModal > div > div:first-child > div').textContent = '添加专注任务';
+  document.getElementById('focusDurationPicker').style.display = '';
+  var m = document.getElementById('focusAddModal');
+  m.style.display = 'flex';
+  m.onclick = function(e){ if(e.target === m) closeFocusAdd(); };
+  setTimeout(function(){ var i=document.getElementById('focusAddTitle'); if(i) i.focus(); }, 100);
+}
+function closeFocusAdd(){ var m=document.getElementById('focusAddModal'); if(m) m.style.display='none'; _focusAddEdit=null; }
+function openFocusAdv(){ var b=document.getElementById('focusAdvBox'); if(b) b.style.display = b.style.display==='none'?'block':'none'; }
+
+function confirmFocusAdd(){
+  var title = (document.getElementById('focusAddTitle').value||'').trim();
+  if(!title){ toast('请输入任务名'); return; }
+  var typeOn = document.querySelector('#focusAddModal [data-fc-type].on');
+  var modeOn = document.querySelector('#focusAddModal [data-fc-mode].on');
+  var type = typeOn ? typeOn.getAttribute('data-fc-type') : 'pomo';
+  var mode = modeOn ? modeOn.getAttribute('data-fc-mode') : 'countdown';
+  var dur = parseInt(document.getElementById('focusCustomMin').value||'25',10) || 25;
+  var note = document.getElementById('focusAdvNote').value || '';
+  var loops = Math.max(1, parseInt(document.getElementById('focusAdvLoops').value||'1',10) || 1);
+  var rest = Math.max(1, parseInt(document.getElementById('focusAdvRest').value||'5',10) || 5);
+  var hideNextDay = document.getElementById('focusAdvHide').checked;
+
+  if(_focusAddEdit){
+    var t = _focus.tasks.find(function(x){ return x.id===_focusAddEdit; });
+    if(t){ t.title=title; t.type=type; t.mode=mode; t.duration=dur; t.note=note; t.loops=loops; t.rest=rest; t.hideNextDay=hideNextDay; }
+  } else {
+    _focus.tasks.unshift({
+      id:'foc_'+_uid(), title:title, type:type, mode:mode, duration:dur,
+      note:note, loops:loops, rest:rest, hideNextDay:hideNextDay,
+      done:0, bgIdx: Math.floor(Math.random()*FOCUS_CARD_BG.length),
+      createdAt: Date.now()
+    });
+  }
+  focusSave(); focusRender(); closeFocusAdd();
+  toast(_focusAddEdit ? '已更新' : '已添加');
+}
+
+function focusStartSession(id){
+  var t = _focus.tasks.find(function(x){ return x.id===id; });
+  if(!t) return;
+  // 打开全屏
+  _focus.active = {
+    taskId: t.id, taskTitle: t.title, type:t.type, mode:t.mode,
+    duration: t.duration, loops:t.loops||1, rest:t.rest||5,
+    loopIdx: 0, elapsed: 0, target: 0, rest: false, startedAt: Date.now()
+  };
+  if(_focus.active.mode === 'countdown'){ _focus.active.target = (_focus.active.duration||25)*60; _focus.active.elapsed = 0; }
+  else if(_focus.active.mode === 'forward'){ _focus.active.target = 0; _focus.active.elapsed = 0; }
+  else { _focus.active.target = 0; _focus.active.elapsed = 0; }
+  _focusLoopIdx = 0; _focusRest = false; _focusRun = false;
+  // 背景
+  _focusBgIdx = Math.floor(Math.random()*FOCUS_BG.length);
+  var bg = document.getElementById('focusBg'); if(bg) bg.style.background = FOCUS_BG[_focusBgIdx];
+  // 引用语
+  _setText('focusQuote', '"'+FOCUS_QUOTES[Math.floor(Math.random()*FOCUS_QUOTES.length)]+'"');
+  // 任务名
+  _setText('focusTaskName', t.title);
+  _setText('focusTaskStatus', '准备开始');
+  // 计时显示
+  focusRenderTimer();
+  // 循环提示
+  if(_focus.active.loops > 1){ _setText('focusLoop', '第 1/'+_focus.active.loops+' 轮'); } else { _setText('focusLoop', ''); }
+  // 按钮
+  var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
+  // 进度环
+  var ring = document.getElementById('focusRingProg'); if(ring) ring.setAttribute('stroke-dashoffset','0');
+  // 显示全屏
+  var m = document.getElementById('focusSessionModal');
+  m.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  // 立即播放音乐（如已开）
+  focusMusicIcon();
+}
+
+function focusRenderTimer(){
+  var a = _focus.active; if(!a) return;
+  var show;
+  if(a.mode === 'countdown'){
+    var left = Math.max(0, a.target - a.elapsed);
+    show = left;
+  } else {
+    show = a.elapsed;
+  }
+  var h = Math.floor(show/3600);
+  var m = Math.floor((show%3600)/60);
+  var s = show%60;
+  var txt = (h>0?h+':':'') + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  _setText('focusTimer', txt);
+  // 状态
+  var st = document.getElementById('focusTaskStatus');
+  if(st){
+    if(_focusRest) st.textContent = '休息中';
+    else if(_focusRun) st.textContent = '进行中';
+    else st.textContent = '已暂停';
+  }
+  // 进度环（仅倒计时显示）
+  var ring = document.getElementById('focusRingProg');
+  if(ring && a.mode==='countdown' && a.target>0){
+    var pct = a.elapsed / a.target;
+    var c = 578;
+    ring.setAttribute('stroke-dashoffset', String(Math.round(c * (1-pct))));
+  } else if(ring){
+    ring.setAttribute('stroke-dashoffset','0');
+  }
+}
+
+function focusToggleRun(){
+  if(_focusRun){
+    // 暂停
+    _focusRun = false;
+    if(_focusTick){ clearInterval(_focusTick); _focusTick = null; }
+    var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
+    focusRenderTimer();
+  } else {
+    // 开始
+    _focusRun = true;
+    if(!_focusTick){
+      _focusTick = setInterval(function(){
+        if(!_focus.active) return;
+        _focus.active.elapsed++;
+        // 倒计时到 0 → 完成
+        if(_focus.active.mode==='countdown' && _focus.active.elapsed >= _focus.active.target){
+          focusCompleteOne();
+        } else {
+          focusRenderTimer();
+        }
+      }, 1000);
+    }
+    var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '⏸';
+    // 解锁音频（如果用户点过音乐按钮就播放）
+    if(_focusMusicType >= 0) focusMusicStart();
+    focusRenderTimer();
+  }
+}
+
+function focusCompleteOne(){
+  if(!_focus.active) return;
+  // 暂停
+  if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+  _focusRun = false;
+  // 提示音
+  if(_focus.settings.ringtone !== false){ try{ focusBeep(); }catch(e){} }
+  if(_focus.settings.vibrate !== false && navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} }
+  // 记录 session
+  var a = _focus.active;
+  var dur = a.mode==='countdown' ? a.target : a.elapsed;
+  _focus.sessions.push({
+    id:'ses_'+_uid(),
+    taskId: a.taskId, taskTitle: a.taskTitle,
+    type: a.type, mode: a.mode,
+    startTs: a.startedAt,
+    endTs: Date.now(),
+    duration: dur,
+    completed: true
+  });
+  // 任务 done 计数 +1
+  var t = _focus.tasks.find(function(x){ return x.id===a.taskId; });
+  if(t) t.done = (t.done||0)+1;
+  focusSave();
+  focusRender();
+  // 完成弹窗
+  _setText('focusCompleteDetail', '用时 '+focusFmtTime(dur));
+  var cm = document.getElementById('focusCompleteModal');
+  cm.style.display = 'flex';
+  // 如果有循环 → 进入休息
+  if(a.loops > 1 && a.loopIdx + 1 < a.loops){
+    // 自动开始休息
+    setTimeout(function(){
+      cm.style.display = 'none';
+      focusStartRest();
+    }, 1500);
+  } else {
+    // 全部完成：清理活动状态
+    setTimeout(function(){
+      cm.style.display = 'none';
+      focusExit();
+    }, 1500);
+  }
+}
+
+function focusStartRest(){
+  if(!_focus.active) return;
+  _focus.active.loopIdx++;
+  _focusRest = true;
+  _focus.active.elapsed = 0;
+  _focus.active.target = (_focus.active.rest||5)*60;
+  _focus.active.mode = 'countdown';
+  _setText('focusTaskName', '☕ 休息一下');
+  _setText('focusLoop', '第 '+(_focus.active.loopIdx+1)+'/'+_focus.active.loops+' 轮 · 即将开始专注');
+  focusRenderTimer();
+  // 自动开始
+  setTimeout(function(){ focusToggleRun(); }, 800);
+}
+
+function focusStop(){
+  if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+  // 记录一次未完成的 session（如果跑了超过 5 秒）
+  if(_focus.active && _focus.active.elapsed > 5){
+    var a = _focus.active;
+    var dur = a.mode==='countdown' ? Math.min(a.elapsed, a.target) : a.elapsed;
+    _focus.sessions.push({
+      id:'ses_'+_uid(), taskId:a.taskId, taskTitle:a.taskTitle, type:a.type, mode:a.mode,
+      startTs:a.startedAt, endTs:Date.now(), duration:dur, completed:false
+    });
+    focusSave();
+  }
+  focusExit();
+}
+
+function focusExit(){
+  if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+  _focusRun = false; _focusRest = false; _focus.active = null;
+  focusMusicStop();
+  var m = document.getElementById('focusSessionModal'); if(m) m.style.display = 'none';
+  document.body.style.overflow = '';
+  focusRender();
+}
+
+function focusReset(){
+  if(!_focus.active) return;
+  wbConfirm('重置当前计时？', function(ok){
+    if(!ok) return;
+    if(_focus.active.mode==='countdown') _focus.active.elapsed = 0;
+    else _focus.active.elapsed = 0;
+    if(_focusTick){ clearInterval(_focusTick); _focusTick=null; }
+    _focusRun = false;
+    var btn = document.getElementById('focusRunBtn'); if(btn) btn.textContent = '▶';
+    focusRenderTimer();
+  });
+}
+
+function focusSkip(){
+  if(!_focus.active) return;
+  if(_focus.active.mode==='countdown' && _focus.active.target > 0){
+    _focus.active.elapsed = _focus.active.target;
+    focusCompleteOne();
+  }
+}
+
+function focusNextBg(){
+  _focusBgIdx = (_focusBgIdx + 1) % FOCUS_BG.length;
+  var bg = document.getElementById('focusBg');
+  if(bg){
+    bg.style.background = FOCUS_BG[_focusBgIdx];
+    bg.style.transition = 'background 0.6s ease';
+  }
+  focusShowTip('背景已切换');
+}
+
+function focusShowTip(txt){
+  var t = document.getElementById('focusMusicTip');
+  if(!t) return;
+  t.textContent = txt;
+  t.style.opacity = '1';
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.style.opacity = '0'; }, 1200);
+}
+
+function focusFmtTime(sec){
+  if(sec<60) return sec+'秒';
+  var m = Math.floor(sec/60), s = sec%60;
+  if(m<60) return m+'分'+(s>0?s+'秒':'');
+  var h = Math.floor(m/60), mm = m%60;
+  return h+'小时'+(mm>0?mm+'分':'');
+}
+
+/* ---------- 音乐（WebAudio 环境音） ---------- */
+function focusEnsureAudio(){
+  if(_focusAudio) return _focusAudio;
+  try{
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return null;
+    _focusAudio = new Ctx();
+  }catch(e){ _focusAudio = null; }
+  return _focusAudio;
+}
+
+function focusMusicStart(){
+  if(_focusMusicType < 0) return;
+  focusMusicStop();
+  var ctx = focusEnsureAudio();
+  if(!ctx) return;
+  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
+  var node = focusBuildMusic(ctx, _focusMusicType);
+  _focusMusicNode = node;
+}
+
+function focusMusicStop(){
+  try{
+    if(_focusMusicNode && _focusMusicNode.stop) _focusMusicNode.stop();
+  }catch(e){}
+  try{
+    if(_focusMusicNode && _focusMusicNode.gain) _focusMusicNode.gain.gain.value = 0;
+  }catch(e){}
+  _focusMusicNode = null;
+}
+
+function focusBuildMusic(ctx, type){
+  // 共用：白噪 buffer
+  var bufLen = 2 * ctx.sampleRate;
+  var buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  var data = buf.getChannelData(0);
+  if(type === 3){
+    // 粉噪（Paul Kellet 近似）
+    var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for(var i=0;i<bufLen;i++){
+      var white = Math.random()*2-1;
+      b0 = 0.99886*b0 + white*0.0555179;
+      b1 = 0.99332*b1 + white*0.0750759;
+      b2 = 0.96900*b2 + white*0.1538520;
+      b3 = 0.86650*b3 + white*0.3104856;
+      b4 = 0.55000*b4 + white*0.5329522;
+      b5 = -0.7616*b5 - white*0.0168980;
+      data[i] = (b0+b1+b2+b3+b4+b5+b6+white*0.5362)*0.11;
+      b6 = white*0.115926;
+    }
+  } else {
+    for(var i=0;i<bufLen;i++){ data[i] = Math.random()*2-1; }
+  }
+  var src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  var gain = ctx.createGain(); gain.gain.value = 0.18;
+  // 滤波
+  var filter = ctx.createBiquadFilter();
+  if(type === 0){ filter.type='lowpass'; filter.frequency.value=900; }      // 雨声
+  else if(type === 1){ filter.type='lowpass'; filter.frequency.value=600; } // 海浪
+  else if(type === 2){ filter.type='lowpass'; filter.frequency.value=1800; }// 森林
+  else if(type === 3){ filter.type='lowpass'; filter.frequency.value=1200; }// 粉噪
+  src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  src.start(0);
+  // 海浪加 LFO
+  if(type === 1){
+    var lfo = ctx.createOscillator(); lfo.frequency.value = 0.18;
+    var lfoGain = ctx.createGain(); lfoGain.gain.value = 0.10;
+    lfo.connect(lfoGain); lfoGain.connect(gain.gain);
+    lfo.start(0);
+    return { stop:function(){ try{lfo.stop();}catch(e){} try{src.stop();}catch(e){} }, gain:gain };
+  }
+  // 森林：偶尔加啁啾
+  if(type === 2){
+    var tInt = setInterval(function(){
+      if(!_focusMusicNode || _focusMusicNode !== src) { clearInterval(tInt); return; }
+      var o = ctx.createOscillator();
+      var g2 = ctx.createGain();
+      o.frequency.value = 1800 + Math.random()*2200;
+      o.type='sine';
+      g2.gain.value = 0;
+      o.connect(g2); g2.connect(gain);
+      o.start(0);
+      g2.gain.setValueAtTime(0, ctx.currentTime);
+      g2.gain.linearRampToValueAtTime(0.04, ctx.currentTime+0.02);
+      g2.gain.linearRampToValueAtTime(0, ctx.currentTime+0.18);
+      o.stop(ctx.currentTime+0.2);
+    }, 2400);
+    return { stop:function(){ clearInterval(tInt); try{src.stop();}catch(e){} }, gain:gain, src:src };
+  }
+  return { stop:function(){ try{src.stop();}catch(e){} }, gain:gain, src:src };
+}
+
+function focusNextMusic(){
+  _focusMusicType = (_focusMusicType + 1) % 5;  // -1→0, 0→1, ..., 3→-1(静音)
+  if(_focusMusicType === -1) focusMusicStop(); else focusMusicStart();
+  focusMusicIcon();
+  var names = ['🔇 静音','🌧 雨声','🌊 海浪','🌲 森林','🌫 白噪'];
+  var cur = (_focusMusicType + 1) % 5;
+  focusShowTip(names[cur]);
+}
+
+function focusToggleMusic(){
+  if(_focusMusicType === -1){
+    // 开
+    _focusMusicType = 0;
+    if(_focusRun) focusMusicStart(); else focusShowTip('已选择：🌧 雨声（开始计时后播放）');
+  } else {
+    _focusMusicType = -1;
+    focusMusicStop();
+  }
+  focusMusicIcon();
+  if(_focusMusicType === -1) focusShowTip('🔇 已静音');
+}
+
+function focusMusicIcon(){
+  var b = document.getElementById('focusMusicBtn');
+  if(!b) return;
+  b.textContent = _focusMusicType === -1 ? '🔇' : '🎵';
+}
+
+function focusBeep(){
+  var ctx = focusEnsureAudio();
+  if(!ctx) return;
+  if(ctx.state === 'suspended'){ ctx.resume().catch(function(){}); }
+  var o = ctx.createOscillator(); var g = ctx.createGain();
+  o.type='sine'; o.frequency.value=880;
+  g.gain.setValueAtTime(0, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.25, ctx.currentTime+0.02);
+  g.gain.linearRampToValueAtTime(0, ctx.currentTime+0.6);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(0); o.stop(ctx.currentTime+0.65);
+  // 第二声
+  setTimeout(function(){
+    var o2 = ctx.createOscillator(); var g2 = ctx.createGain();
+    o2.type='sine'; o2.frequency.value=1320;
+    g2.gain.setValueAtTime(0, ctx.currentTime);
+    g2.gain.linearRampToValueAtTime(0.22, ctx.currentTime+0.02);
+    g2.gain.linearRampToValueAtTime(0, ctx.currentTime+0.5);
+    o2.connect(g2); g2.connect(ctx.destination);
+    o2.start(0); o2.stop(ctx.currentTime+0.55);
+  }, 250);
+}
+
+/* ---------- 任务/统计 切换 ---------- */
+function focusSwitchTab(tab){
+  document.getElementById('focusTabTasks').classList.toggle('active', tab==='tasks');
+  document.getElementById('focusTabStats').classList.toggle('active', tab==='stats');
+  document.getElementById('focusTasksView').style.display = (tab==='tasks') ? '' : 'none';
+  document.getElementById('focusStatsView').style.display = (tab==='stats') ? '' : 'none';
+  if(tab==='stats') focusRenderStats();
+}
+
+function focusSetRange(btn, r){
+  _focusRange = r;
+  document.querySelectorAll('.fsst-tab').forEach(function(b){ b.classList.toggle('on', b===btn); });
+  focusRenderStats();
+}
+
+function focusRangeFilter(range){
+  var now = Date.now();
+  var dayMs = 86400000;
+  if(range==='today') return function(s){ return tdCalLocalToday(new Date(s.endTs)) === tdCalLocalToday(); };
+  if(range==='week'){
+    var start = new Date(); start.setHours(0,0,0,0);
+    var day = start.getDay() || 7; start.setDate(start.getDate() - day + 1);
+    return function(s){ return s.endTs >= start.getTime(); };
+  }
+  if(range==='month'){
+    var d = new Date(); var sm = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    return function(s){ return s.endTs >= sm; };
+  }
+  return function(){ return true; };
+}
+
+function focusRenderStats(){
+  var list = focusRangeFilter(_focusRange)(_focus.sessions);
+  var totalSec = list.reduce(function(a,s){return a+(s.duration||0);},0);
+  var count = list.length;
+  _setText('focusStatsCount', count);
+  var hh = Math.floor(totalSec/3600), mm = Math.floor((totalSec%3600)/60);
+  if(hh>0) _setText('focusStatsTime', hh+'<span style="font-size:14px">小时</span>'+mm+'<span style="font-size:14px">分</span>');
+  else _setText('focusStatsTime', mm+'<span style="font-size:14px">分</span>');
+
+  // 日期
+  var today = tdCalLocalToday();
+  _setText('focusStatsDate', today + ' · ' + (_focusRange==='today'?'今日':_focusRange==='week'?'本周':_focusRange==='month'?'本月':'全部'));
+
+  // 按任务聚合
+  var byTask = {};
+  list.forEach(function(s){
+    var k = s.taskTitle || '未命名';
+    byTask[k] = (byTask[k]||0) + (s.duration||0);
+  });
+  var keys = Object.keys(byTask);
+  var pie = document.getElementById('focusPie');
+  var legend = document.getElementById('focusLegend');
+  if(!pie || !legend) return;
+  if(!keys.length){
+    pie.innerHTML = '<div style="color:rgba(255,255,255,.55);font-size:13px;padding:30px 0">暂无专注记录</div>';
+    legend.innerHTML = '';
+    return;
+  }
+  // 颜色库（8 色循环）
+  var colors = ['#FF6B6B','#4ECDC4','#FFD93D','#6BCB77','#4D96FF','#A66CFF','#FF9F45','#36AE7C'];
+  // 排序取前 6
+  keys.sort(function(a,b){return byTask[b]-byTask[a];});
+  var top = keys.slice(0,6);
+  var other = keys.slice(6).reduce(function(a,k){return a+byTask[k];},0);
+  var data = top.map(function(k,i){ return { name:k, value:byTask[k], color:colors[i%colors.length] }; });
+  if(other>0) data.push({ name:'其他', value:other, color:'#888' });
+  // 画饼图（SVG）
+  var cx=100, cy=100, r=80, ir=45;
+  var sum = data.reduce(function(a,d){return a+d.value;},0);
+  var startA = -Math.PI/2;
+  var paths = '';
+  data.forEach(function(d){
+    var ang = (d.value/sum) * Math.PI*2;
+    var endA = startA + ang;
+    var large = ang > Math.PI ? 1 : 0;
+    var x1 = cx + r*Math.cos(startA), y1 = cy + r*Math.sin(startA);
+    var x2 = cx + r*Math.cos(endA), y2 = cy + r*Math.sin(endA);
+    var ix1 = cx + ir*Math.cos(endA), iy1 = cy + ir*Math.sin(endA);
+    var ix2 = cx + ir*Math.cos(startA), iy2 = cy + ir*Math.sin(startA);
+    paths += '<path d="M'+x1+' '+y1+' A '+r+' '+r+' 0 '+large+' 1 '+x2+' '+y2+' L '+ix1+' '+iy1+' A '+ir+' '+ir+' 0 '+large+' 0 '+ix2+' '+iy2+' Z" fill="'+d.color+'"/>';
+    startA = endA;
+  });
+  pie.innerHTML = '<svg viewBox="0 0 200 200" style="width:200px;height:200px">'+paths
+    + '<text x="100" y="95" text-anchor="middle" fill="#fff" font-size="20" font-weight="700">'+(sum>0?Math.round(sum/60):0)+'</text>'
+    + '<text x="100" y="115" text-anchor="middle" fill="rgba(255,255,255,.65)" font-size="11">分钟</text>'
+    + '</svg>';
+  legend.innerHTML = data.map(function(d){
+    var pct = sum>0 ? Math.round(d.value/sum*100) : 0;
+    var v = focusFmtTime(d.value);
+    return '<div class="focus-legend-item"><span class="focus-legend-dot" style="background:'+d.color+'"></span><span class="focus-legend-name">'+escHtml(d.name)+'</span><span class="focus-legend-val">'+v+' · '+pct+'%</span></div>';
+  }).join('');
+}
+
+/* ---------- 设置 ---------- */
+function focusOpenSettings(){
+  document.getElementById('focusSetRing').checked = _focus.settings.ringtone !== false;
+  document.getElementById('focusSetVib').checked = _focus.settings.vibrate !== false;
+  var m = document.getElementById('focusSettingModal');
+  m.style.display='flex';
+  m.onclick = function(e){ if(e.target === m) closeFocusSetting(); };
+}
+function closeFocusSetting(){ var m=document.getElementById('focusSettingModal'); if(m) m.style.display='none'; }
+function focusSetSave(){
+  _focus.settings.ringtone = document.getElementById('focusSetRing').checked;
+  _focus.settings.vibrate = document.getElementById('focusSetVib').checked;
+  focusSave();
+}
+
+function focusCompleteClose(){ var m=document.getElementById('focusCompleteModal'); if(m) m.style.display='none'; focusExit(); }
+function focusCompleteNext(){
+  var m=document.getElementById('focusCompleteModal'); if(m) m.style.display='none';
+  if(_focus.active) focusStartSession(_focus.active.taskId);
+}
+
+// boot 时初始化（确保 localStorage 有数据 & 渲染一次）
+function focusInit(){
+  focusLoad();
+  focusRender();
+}
+
 // v235：运动统计时间筛选（本周/本月/年月）
 var _fitRange = { type:'week', ym:'' };
 function _fitYmStr(){ 
@@ -15781,6 +16774,7 @@ function boot(){
     _lifeUnlocked = false; // 每次登录重置解锁态
     loadLifePassConfig(); // 后台加载生活密码配置（电脑端拦截依赖）
     renderLifePassQuickEntry(); // 手机端显示生活密码快捷入口，电脑端隐藏
+    try{ focusInit(); }catch(e){ console.warn('focusInit 异常:', e); }
     applyBackupEnabled(); // 立即按本地开关状态应用数据备份入口显隐
     wbLoadBackupEnabled().then(applyBackupEnabled); // 后台从云端拉取最新开关
     loadAccountPartition().then(applyAccountPartition); // 后台拉取账号分区并按分区隐藏功能
