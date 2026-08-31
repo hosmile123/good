@@ -16,7 +16,7 @@
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
-<!-- v260-cachebust: 修复「关闭工作分区后整页待办消失」——PAGE_PARTITION.todo 由 ['work'] 改为 ['work','life']，使待办页在任一分区开通时即可达；页内仍按分区显隐分组(关工作→只留生活待办) -->
+<!-- v261-cachebust: 待办日历重做为图2 风格(每天最多 8 条彩色 chip + overflow + 自定义背景色)；新增「🗓 月维度」subtab(图3 风格:6×7 大格子每月统计+每格最多 6 条彩色 bar);待办新增 bg 字段(用户自定义背景色,空 = 跟随分类色);编辑弹窗加 8 色选盘；renderTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
@@ -882,6 +882,136 @@ body.sb-collapsed .sidebar-item:hover::after {
 .td-cal-empty {
   text-align: center; padding: 28px 0; color: var(--text-light);
   font-size: 13px;
+}
+
+/* ===== v261: 待办日历高密度 + 月维度 + 颜色选盘 ===== */
+/* 图2 风格：每天至少 6 条 chip 容纳，chip 垂直栈 + 自定义背景色 */
+.td-cal-cell {
+  min-height: 96px;             /* 加高，塞下 8 条 chip（4×2 网格） */
+  padding: 3px 3px 4px 3px;
+  border-radius: 8px;
+  background: #fafbfc;
+  position: relative; cursor: pointer; transition: background .15s, transform .12s;
+  display: flex; flex-direction: column;
+}
+.td-cal-cell:hover { background: #f0f4ff; transform: translateY(-1px); }
+.td-cal-cell .td-cal-num { font-size: 11px; font-weight: 700; margin-bottom: 2px; align-self: flex-start; }
+.td-cal-chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;       /* 4 列对齐太挤，2 列适配 8 条 */
+  gap: 2px; width: 100%;
+}
+.td-cal-chip {
+  font-size: 9px; line-height: 1.2; padding: 2px 3px;
+  border-radius: 4px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+  border: 1px solid rgba(0,0,0,.04);
+}
+.td-cal-more {
+  grid-column: span 2;
+  font-size: 9px; color: #888;
+  background: #f0f1f3; border-radius: 3px;
+  padding: 1px 3px; text-align: center; font-weight: 600;
+}
+
+/* 月维度新页（图3 风格）：7×6 大格子，每格填满当天的全部条目 */
+.td-month-wrapper { padding: 0 2px; }
+.td-month-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin: 8px 0 14px;
+}
+.td-month-stat-card {
+  border-radius: 12px; padding: 10px 6px;
+  text-align: center;
+  background: linear-gradient(135deg,#fff,#f7f8fc);
+  border: 1px solid var(--border);
+}
+.td-month-stat-card.num { background: linear-gradient(135deg,#E6F7FF,#BAE7FF); border-color: #91D5FF; }
+.td-month-stat-card.done { background: linear-gradient(135deg,#F6FFED,#D9F7BE); border-color: #B7EB8F; }
+.td-month-stat-card.delay { background: linear-gradient(135deg,#FFF1F0,#FFCCC7); border-color: #FFA39E; }
+.td-month-stat-card.days { background: linear-gradient(135deg,#FFF7E6,#FFE7BA); border-color: #FFD591; }
+.td-month-stat-num { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.td-month-stat-card.num .td-month-stat-num { color: #1890FF; }
+.td-month-stat-card.done .td-month-stat-num { color: #52C41A; }
+.td-month-stat-card.delay .td-month-stat-num { color: #FF4D4F; }
+.td-month-stat-card.days .td-month-stat-num { color: #FA8C16; }
+.td-month-stat-label { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+
+.td-month-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.td-month-cell {
+  min-height: 92px; padding: 3px;
+  border-radius: 8px; background: #fcfcfe;
+  position: relative; cursor: pointer;
+  border: 1px solid #eef0f5;
+  display: flex; flex-direction: column;
+  transition: transform .12s, box-shadow .15s;
+}
+.td-month-cell:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.06); }
+.td-month-cell.other-month { opacity: .35; }
+.td-month-cell.today {
+  background: linear-gradient(135deg,#fff,#fff8e6);
+  border-color: #FFD591;
+  box-shadow: inset 0 0 0 1px #FA8C16;
+}
+.td-month-cell.selected { box-shadow: inset 0 0 0 2px var(--primary); }
+.td-month-cell-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 3px;
+}
+.td-month-cell-num {
+  font-size: 12px; font-weight: 700;
+  width: 20px; height: 20px; line-height: 20px;
+  border-radius: 50%; text-align: center;
+}
+.td-month-cell.today .td-month-cell-num {
+  background: linear-gradient(135deg,#FA8C16,#FFA940); color: #fff;
+}
+.td-month-cell.weekend .td-month-cell-num { color: #FA8C16; }
+.td-month-cell-bars { display: flex; flex-direction: column; gap: 2px; }
+.td-month-bar {
+  font-size: 9px; line-height: 1.2; padding: 2px 4px;
+  border-radius: 4px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.td-month-bar.done { text-decoration: line-through; opacity: .45; }
+.td-month-bar-overflow {
+  font-size: 9px; text-align: center;
+  color: #888; background: #f0f1f3; border-radius: 4px;
+  padding: 1px 0; font-weight: 600;
+}
+.td-month-cell-foot {
+  margin-top: auto; padding-top: 3px;
+  font-size: 9px; color: var(--text-light);
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px dashed #eef0f3;
+}
+.td-month-cell-foot.done { color: #52C41A; font-weight: 700; }
+.td-month-cell-foot.undone { color: #fa541c; font-weight: 700; }
+
+/* 编辑弹窗里的颜色选盘 */
+.td-color-picker {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 6px;
+}
+.td-color-swatch {
+  width: 28px; height: 28px; border-radius: 8px;
+  cursor: pointer; border: 2px solid transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: transform .12s, border-color .12s;
+}
+.td-color-swatch:hover { transform: scale(1.08); }
+.td-color-swatch.active { border-color: #2F54EB; box-shadow: 0 0 0 2px rgba(47,84,235,.18); }
+.td-color-swatch.custom {
+  background: linear-gradient(135deg,#fff,#f0f1f3);
+  font-weight: 800; color: #888;
+}
+.td-color-note {
+  font-size: 11px; color: var(--text-light);
+  margin-top: 6px; line-height: 1.4;
 }
 
 /* ===== Client ===== */
@@ -2824,6 +2954,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('td',this,'td-list')">待办</button>
     <button class="subtab" onclick="switchSub('td',this,'td-cal')">📅 日历</button>
+    <button class="subtab" onclick="switchSub('td',this,'td-month')">🗓 月维度</button>
   </div>
 
   <!-- 待办 -->
@@ -2892,6 +3023,26 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
         <h4>📋 最近待办</h4>
         <div id="tdCalRecent"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- v261 月维度（图3 风格） -->
+  <div class="subtab-content" id="td-month">
+    <div class="td-month-wrapper">
+      <div class="td-cal-header">
+        <div class="td-cal-title" id="tdMonthTitle">2026年8月</div>
+        <div class="td-cal-nav">
+          <button onclick="tdMonthPrev()">‹</button>
+          <button class="today" onclick="tdMonthToday()">今天</button>
+          <button onclick="tdMonthNext()">›</button>
+        </div>
+      </div>
+      <div class="td-month-stats" id="tdMonthStats"></div>
+      <div class="td-cal-weekdays">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+      </div>
+      <div class="td-month-grid" id="tdMonthGrid"></div>
+      <div class="td-cal-day-todos" id="tdMonthDayTodos" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -6562,6 +6713,7 @@ function switchSub(group, btn, targetId) {
     if(group==='rt' && targetId==='rt-sleeprise'){ initSrForm(); renderRoutine(); }
     if(group==='rt' && targetId==='rt-schedule'){ try{ rtSchedRenderList(); }catch(e){ console.error('rtSchedRenderList', e); } }
     if(group==='td' && targetId==='td-cal'){ try{ renderTodoCalendar(); }catch(e){ console.error('renderTodoCalendar', e); } }
+    if(group==='td' && targetId==='td-month'){ try{ renderTodoMonth(); }catch(e){ console.error('renderTodoMonth', e); } }
     if(group==='diary' && targetId==='diary-vault'){ try{ renderVault(); }catch(e){ console.error('renderVault:', e); } }
   } catch(e) { console.error('switchSub error:', e); }
 }
@@ -9744,13 +9896,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 260;                         // v260：修复「关闭工作分区后整页待办消失」——PAGE_PARTITION.todo 由 ['work'] 改为 ['work','life']，待办页在任一分区开通时即可达；页内仍按 v259 分组显隐(关工作→只留生活待办/关生活→只留工作待办/都关→空状态)。
+const WB_VERSION = 261;                         // v261：待办日历重做为图2 风格——每天最多 8 条彩色 chip + overflow + 自定义背景色（新增待办字段 bg，编辑弹窗加 8 色选盘）；同时新增「🗓 月维度」subtab（图3 风格：6×7 大格子 + 每月 4 项统计 + 每格最多 6 条彩色 bar）；addTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历，避免跨视图不同步。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 179;                 // v260 发版（179 不含4）
+const WB_DISPLAY_VERSION = 180;                 // v261 发版（180 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10092,6 +10244,46 @@ function catColor(cat){
   var m={ '客户跟进':'background:#E6F7FF;color:#1890FF', '保单办理':'background:#F6FFED;color:#52C41A', '保函业务':'background:#FFF7E6;color:#FA8C16', '学习提升':'background:#F9F0FF;color:#722ED1', '行政事务':'background:#F0F5FF;color:#2F54EB', '佣金待结算':'background:#FFF1F0;color:#FF4D4F', '生活':'background:#F5F5F5;color:#666' };
   return m[cat]||m['生活'];
 }
+/* v261: 待办 chip 实际背景色——优先用 t.bg（用户自定义），回退 catColor(t.cat) */
+function chipStyle(t){ return (t && t.bg) ? t.bg : catColor(t && t.cat); }
+/* v261: 颜色选盘预置 8 色 + 「跟随分类」 */
+var TODO_COLOR_PALETTE = [
+  'background:#FFE7E7;color:#D4380D',   // 浅粉
+  'background:#FFF1B0;color:#874D00',   // 浅黄
+  'background:#D9F7BE;color:#237804',   // 浅绿
+  'background:#BAE7FF;color:#0050B3',   // 浅蓝
+  'background:#D9B8FF;color:#391085',   // 浅紫
+  'background:#FFD6E7;color:#C41E7A',   // 品红
+  'background:#B5F5EC;color:#006D75',   // 浅青
+  'background:#F0F0F0;color:#262626'    // 灰
+];
+function pickTodoBg(initialBg){
+  // initial: 已存的 t.bg 或 catColor 默认；返回选中的 style 字符串，或 '' 跟随分类
+  var init = initialBg || '';
+  var html = '<div class="td-color-picker" id="tdColorPicker">';
+  // 「跟随分类」默认色块
+  html += '<div class="td-color-swatch cat-default" data-bg="" title="跟随分类" style="background:linear-gradient(135deg,#fff,#f0f1f3);color:#888;font-weight:800">★</div>';
+  for(var i=0;i<TODO_COLOR_PALETTE.length;i++){
+    html += '<div class="td-color-swatch" data-bg="'+TODO_COLOR_PALETTE[i]+'" title="颜色 '+(i+1)+'" style="'+TODO_COLOR_PALETTE[i]+'"></div>';
+  }
+  html += '</div>';
+  html += '<div class="td-color-note">从调色板选一个背景色，或直接用「★」跟随分类色。后续在日历/列表都会按这里的颜色显示。</div>';
+  return html;
+}
+function bindTodoColorPicker(currentBg){
+  setTimeout(function(){
+    var box = document.getElementById('tdColorPicker');
+    if(!box) return;
+    var targetBg = currentBg || '';
+    box.querySelectorAll('.td-color-swatch').forEach(function(el){
+      if((el.getAttribute('data-bg')||'') === targetBg) el.classList.add('active');
+      el.addEventListener('click', function(){
+        box.querySelectorAll('.td-color-swatch').forEach(function(x){ x.classList.remove('active'); });
+        el.classList.add('active');
+      });
+    });
+  }, 0);
+}
 function funEmoji(cat){ return ({'电影':'🎬','剧集':'📺','游戏':'🎮','活动':'🎡','餐饮':'🍜','交通':'🚌','购物':'🛍️','娱乐':'🎬','居住':'🏠','借入':'🤝','借出':'🤲','医疗':'💊','存钱':'🏦','工资':'💵','佣金':'💼','其他':'📦'})[cat]||'🎯'; }
 function funIcon(cat){ var m={'电影':'background:#E6F7FF','剧集':'background:#F9F0FF','游戏':'background:#F6FFED','活动':'background:#FFF7E6','餐饮':'background:#FFF7E6','交通':'background:#E6F7FF','购物':'background:#F9F0FF','娱乐':'background:#F6FFED','居住':'background:#F0F5FF','借入':'background:#FFF1F0','借出':'background:#FFF0F6','医疗':'background:#E6FFFB','存钱':'background:#F6FFED','工资':'background:#E6F7FF','佣金':'background:#FFF7E6'}; return m[cat]||'background:#F5F5F5'; }
 /* 年/月下拉：填充选项并保持已选值（本次会话内记忆用户选择） */
@@ -10252,9 +10444,11 @@ function addTodo(){
     if(!time) time=nowLocalDatetime();
     var date=time?time.slice(0,10):_today();
     var list=getTodos();
-    list.unshift({id:_uid(),text:text,cat:cat,date:date,time:time,done:false});
+    list.unshift({id:_uid(),text:text,cat:cat,date:date,time:time,done:false,bg:''});
     saveTodos(list);            // 先落盘，确保数据不丢
     renderTodo();               // 再渲染，确保界面立即更新
+    if(typeof renderTodoCalendar==='function') renderTodoCalendar();
+    if(typeof renderTodoMonth==='function') renderTodoMonth();
     input.value='';
     if(timeEl) timeEl.value=nowLocalDatetime();   // 重置为当前时间，方便连续添加
     toast('✅ 已添加：'+text);
@@ -10266,13 +10460,13 @@ function addTodo(){
 function toggleTodo(el){
   var item=el.closest('.swipe-front')||el.closest('.swipe-card'); var id=item.getAttribute('data-id');
   var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
-  t.done=!t.done; saveTodos(list); renderTodo();
+  t.done=!t.done; saveTodos(list); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth();
 }
 function deleteTodo(el){
   wbConfirm('确定删除这个待办吗？', function(ok){ if(!ok) return;
   var item=(typeof el==='string')?document.querySelector('#todoList [data-id="'+el+'"]'):(el.closest('.swipe-front')||el.closest('.todo-item'));
   if(!item) return; var id=item.getAttribute('data-id');
-  var list=getTodos().filter(function(x){return x.id!==id;}); saveTodos(list); renderTodo();
+  var list=getTodos().filter(function(x){return x.id!==id;}); saveTodos(list); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth();
   });
 }
 function nowLocalDatetime(){
@@ -10286,12 +10480,15 @@ function todoCatOptions(sel){
 function editTodo(id){
   var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
   var m=document.getElementById('todoEditModal');
+  var bg=(t.bg||'');
+  var catSwatch=catColor(t.cat||'生活');
   var html='<div class="modal-card">'+
     '<div class="modal-title" style="text-align:left">✏️ 编辑待办</div>'+
     '<div class="modal-form">'+
     '<div class="form-group"><label>待办内容</label><textarea id="todoEditText" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical">'+esc(t.text)+'</textarea></div>'+
     '<div class="form-group"><label>需要处理的时间</label><input type="datetime-local" id="todoEditTime" value="'+esc(t.time||'')+'" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;box-sizing:border-box"></div>'+
     '<div class="form-group"><label>分类</label><select id="todoEditCat" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;box-sizing:border-box;background:#fff">'+todoCatOptions(t.cat)+'</select></div>'+
+    '<div class="form-group"><label>背景颜色</label>'+pickTodoBg(bg)+'</div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:8px">'+
       '<button class="btn-primary" style="flex:1;background:#ff4d4f" onclick="(async()=>{ if(await wbConfirmAsync(\'确定删除该待办？\')){{deleteTodo(\''+id+'\');closeModal(\'todoEditModal\');}} })()">删除</button>'+
@@ -10300,6 +10497,7 @@ function editTodo(id){
     '</div></div>';
   m.innerHTML=html; m.style.display='flex';
   m.onclick=function(e){ if(e.target===m) closeModal('todoEditModal'); };
+  bindTodoColorPicker(bg);
 }
 function updateTodo(id){
   var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
@@ -10307,14 +10505,26 @@ function updateTodo(id){
   if(!text){ toast('内容不能为空'); return; }
   var time=(document.getElementById('todoEditTime').value||'');
   var cat=document.getElementById('todoEditCat').value;
+  // 取颜色选盘选中
+  var pickerEl=document.getElementById('tdColorPicker');
+  var bg='';
+  if(pickerEl){
+    var act=pickerEl.querySelector('.td-color-swatch.active');
+    bg=act?(act.getAttribute('data-bg')||''):'';
+  }
   t.text=text; t.time=time; t.cat=cat; t.date=time?time.slice(0,10):t.date;
-  saveTodos(list); closeModal('todoEditModal'); renderTodo(); toast('已更新');
+  t.bg=bg;        // v261：自定义背景色（空串 = 跟随分类色）
+  saveTodos(list); closeModal('todoEditModal'); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth(); toast('已更新');
 }
 
 /* ---------- 待办月历 ---------- */
 var TD_CAL_YEAR = new Date().getFullYear();
 var TD_CAL_MONTH = new Date().getMonth();   // 0-11
 var TD_CAL_SEL = null;
+/* v261: 月维度独立状态 */
+var TD_MONTH_YEAR = new Date().getFullYear();
+var TD_MONTH_MONTH = new Date().getMonth();
+var TD_MONTH_SEL = null;
 function tdCalLocalToday(d){
   d = (d===undefined||d===null) ? new Date() : new Date(d);
   var p=function(n){return (n<10?'0':'')+n;};
@@ -10343,17 +10553,19 @@ function renderTodoCalendar(){
   }
   while(cells.length%7!==0) cells.push({d:'', other:true, dateStr:null});
   while(cells.length<42) cells.push({d:'', other:true, dateStr:null});
+  /* v261: 每日最多展示 8 条（按添加顺序），chip 背景色优先 t.bg，回退 catColor */
+  var CHIP_MAX = 8;
   var html=cells.map(function(c){
     if(c.other) return '<div class="td-cal-cell other-month"></div>';
     var todos=byDate[c.dateStr]||[];
     var isToday=c.dateStr===todayStr;
     var isSel=c.dateStr===TD_CAL_SEL;
     var chips='';
-    todos.slice(0,3).forEach(function(t){
-      var txt=t.text.length>6?t.text.slice(0,6)+'…':t.text;
-      chips+='<div class="td-cal-chip'+(t.done?' done':'')+'" style="'+catColor(t.cat)+'">'+esc(txt)+'</div>';
+    todos.slice(0,CHIP_MAX).forEach(function(t){
+      var txt=t.text.length>10?t.text.slice(0,10)+'…':t.text;
+      chips+='<div class="td-cal-chip'+(t.done?' done':'')+'" title="'+esc(t.text)+' · '+esc(t.cat)+'" style="'+chipStyle(t)+'">'+esc(txt)+'</div>';
     });
-    if(todos.length>3) chips+='<div class="td-cal-more">+'+ (todos.length-3)+'</div>';
+    if(todos.length>CHIP_MAX) chips+='<div class="td-cal-more">+'+ (todos.length-CHIP_MAX)+'</div>';
     var flag=todos.length?'<div class="td-cal-flag"></div>':'';
     var cls='td-cal-cell'+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
     return '<div class="'+cls+'" onclick="tdCalSelectDate(\''+c.dateStr+'\')">'+
@@ -10381,12 +10593,12 @@ function renderTdCalDay(ds, byDate){
     todos.map(function(t){
       return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
         '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
-        '<div class="td-cal-recent-date" style="'+catColor(t.cat)+'">'+esc(t.cat)+'</div></div>';
+        '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+'</div></div>';
     }).join('');
 }
 function tdCalToggle(id){
   var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
-  t.done=!t.done; saveTodos(list); renderTodoCalendar();
+  t.done=!t.done; saveTodos(list); renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth(); if(typeof renderTodo==='function') renderTodo();
 }
 function renderTdCalRecent(){
   var box=document.getElementById('tdCalRecent'); if(!box) return;
@@ -10398,8 +10610,103 @@ function renderTdCalRecent(){
   box.innerHTML=show.map(function(t){
     return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
       '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
-      '<div class="td-cal-recent-date" style="'+catColor(t.cat)+'">'+esc(t.cat)+' · '+(t.date||'')+'</div></div>';
+      '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+' · '+(t.date||'')+'</div></div>';
   }).join('');
+}
+
+/* ---------- v261: 月维度（图3 风格） ---------- */
+function tdMonthLocalToday(d){
+  d = (d===undefined||d===null) ? new Date() : new Date(d);
+  var p=function(n){return (n<10?'0':'')+n;};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function tdMonthPrev(){ TD_MONTH_MONTH--; if(TD_MONTH_MONTH<0){TD_MONTH_MONTH=11;TD_MONTH_YEAR--;} renderTodoMonth(); }
+function tdMonthNext(){ TD_MONTH_MONTH++; if(TD_MONTH_MONTH>11){TD_MONTH_MONTH=0;TD_MONTH_YEAR++;} renderTodoMonth(); }
+function tdMonthToday(){ var d=new Date(); TD_MONTH_YEAR=d.getFullYear(); TD_MONTH_MONTH=d.getMonth(); TD_MONTH_SEL=tdMonthLocalToday(); renderTodoMonth(); }
+function tdMonthSelectDate(ds){ TD_MONTH_SEL=ds; renderTodoMonth(); }
+
+function renderTodoMonth(){
+  var grid=document.getElementById('tdMonthGrid'); if(!grid) return;
+  if(!TD_MONTH_SEL) TD_MONTH_SEL=tdMonthLocalToday();
+  var list=getTodos();
+  var y=TD_MONTH_YEAR, m=TD_MONTH_MONTH;
+  var first=new Date(y,m,1);
+  var startDay=first.getDay();
+  var daysInMonth=new Date(y,m+1,0).getDate();
+  var daysInPrev=new Date(y,m,0).getDate();
+  var todayStr=tdMonthLocalToday();
+  var title=document.getElementById('tdMonthTitle');
+  if(title) title.textContent=y+'年'+(m+1)+'月';
+  /* byDate + 月度统计 */
+  var byDate={};
+  list.forEach(function(t){ var k=t.date||''; if(!k) return; (byDate[k]||(byDate[k]=[])).push(t); });
+  var monthKey=y+'-'+String(m+1).padStart(2,'0');
+  var inMonth=list.filter(function(t){ return (t.date||'').slice(0,7)===monthKey; });
+  var monthDone=inMonth.filter(function(t){ return t.done; }).length;
+  var monthPending=inMonth.length-monthDone;
+  var today=new Date(); today.setHours(0,0,0,0);
+  var monthDelay=inMonth.filter(function(t){
+    return !t.done && t.date && t.date<tdMonthLocalToday();
+  }).length;
+  var activeDays=Object.keys(byDate).filter(function(k){ return (byDate[k]||[]).some(function(t){return !t.done;}); }).length;
+  var stats=document.getElementById('tdMonthStats');
+  if(stats){
+    stats.innerHTML =
+      '<div class="td-month-stat-card num"><div class="td-month-stat-num">'+inMonth.length+'</div><div class="td-month-stat-label">本月待办</div></div>'+
+      '<div class="td-month-stat-card done"><div class="td-month-stat-num">'+monthDone+'</div><div class="td-month-stat-label">已完成</div></div>'+
+      '<div class="td-month-stat-card delay"><div class="td-month-stat-num">'+monthDelay+'</div><div class="td-month-stat-label">延期</div></div>'+
+      '<div class="td-month-stat-card days"><div class="td-month-stat-num">'+activeDays+'</div><div class="td-month-stat-label">活跃天数</div></div>';
+  }
+  /* 6×7 网格：6 行 = 42 格，首行对齐 1 号 begin */
+  var cells=[];
+  for(var i=startDay-1;i>=0;i--) cells.push({d:daysInPrev-i, other:true, dateStr:null});
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var wkd=new Date(y,m,d).getDay();
+    cells.push({d:d, other:false, dateStr:ds, weekend:(wkd===0||wkd===6)});
+  }
+  while(cells.length<42) cells.push({d:'', other:true, dateStr:null});
+  /* 每格最多 6 条彩色 bar + overflow */
+  var BAR_MAX = 6;
+  var html=cells.map(function(c){
+    if(c.other) return '<div class="td-month-cell other-month"></div>';
+    var todos=(byDate[c.dateStr]||[]);
+    var isToday=c.dateStr===todayStr;
+    var isSel=c.dateStr===TD_MONTH_SEL;
+    var bars='';
+    todos.slice(0,BAR_MAX).forEach(function(t){
+      var txt=t.text.length>14?t.text.slice(0,14)+'…':t.text;
+      bars+='<div class="td-month-bar'+(t.done?' done':'')+'" title="'+esc(t.text)+' · '+esc(t.cat)+'" style="'+chipStyle(t)+'">'+esc(txt)+'</div>';
+    });
+    if(todos.length>BAR_MAX) bars+='<div class="td-month-bar-overflow">+'+ (todos.length-BAR_MAX)+' 更多</div>';
+    var pending=todos.filter(function(t){return !t.done;}).length;
+    var done=todos.length-pending;
+    var footHtml='';
+    if(todos.length){
+      footHtml = '<div class="td-month-cell-foot '+(pending?'undone':'done')+'">'+
+        (pending?'未完 '+pending:done?'全部完成 ✅':'—')+
+        ' <span>共 '+todos.length+'</span></div>';
+    }
+    var cls='td-month-cell'+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
+    return '<div class="'+cls+'" onclick="tdMonthSelectDate(\''+c.dateStr+'\')">'+
+      '<div class="td-month-cell-head"><div class="td-month-cell-num">'+c.d+'</div></div>'+
+      '<div class="td-month-cell-bars">'+bars+'</div>'+footHtml+
+    '</div>';
+  }).join('');
+  grid.innerHTML=html;
+  renderTdMonthDay(TD_MONTH_SEL, byDate);
+}
+function renderTdMonthDay(ds, byDate){
+  var box=document.getElementById('tdMonthDayTodos'); if(!box) return;
+  var todos=(byDate&&byDate[ds])||[];
+  if(!todos.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML='<h4>'+ds+' 的待办 <span class="badge">'+(todos.filter(function(t){return !t.done;}).length)+' 未完成</span></h4>'+
+    todos.map(function(t){
+      return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
+        '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
+        '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+'</div></div>';
+    }).join('');
 }
 
 /* ---------- 娱乐 ---------- */
