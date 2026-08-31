@@ -29,6 +29,7 @@
 <!-- v253-cachebust: 提速——①读操作(GET)与登录统一多后端并行竞速，取最快成功、落选请求立即中止，SCF 冷启动慢时不再干等10s超时（写操作仍主后端+备用双写不丢数据） ②router.html 入口测速改抓 5KB 的 router.html（此前抓 2.2MB 的根路径，等于打开前先下载两份完整应用再跳转第三份，是"打开网页非常慢"的主因）+ 记住上次最快镜像走 1.2s 快速通道 + 跳转延迟 450ms→80ms -->
 <!-- v254-cachebust: 修复 v253 引入的一处语法错误——专注时刻背景图「仅可上传1张」确认弹窗的单引号字符串被拆成两行→整段脚本解析失败→所有事件绑定失效(已登录设备重开卡登录页/点登录无反应/版本角标取不到值)。修复后恢复 v253 的秒进提速逻辑 -->
 <!-- v255-cachebust: 英语单词卡点击不切换(达标横幅早期return+末卡无兜底→改非阻塞横幅+末卡循环)/生活习惯图标🌙→📋/专注时刻统计页空白(focusRangeFilter误当函数调用致list.reduce崩溃→改.filter)/作息表环形钟重做(300·150统一+每段独立配色+段间缝+环外时间标注+当前时段高亮，环/图例/时间轴颜色一致) -->
+<!-- v256-cachebust: 跨设备踢人失联修复——设备列表+校验按 deviceId 合并多后端(任一 revoked 即视为踢出)；轮询改为先 check 后 register(被踢即强制退出不 register)；SCF 后端 register 保留 revoked 状态(防御纵深)。修复手机端设备管理缺电脑/退出电脑端无效的 bug -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9729,13 +9730,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 255;                         // v255：①英语单词卡「我认识/我不认识」点击后卡片不切换——达标横幅早期 return 阻断推进+末卡无兜底，已改为非阻塞横幅+末卡循环回开头 ②生活习惯图标🌙→📋更贴切 ③专注时刻统计页空白(数据不联动)——focusRangeFilter 误当函数直接调用返回布尔致 list.reduce 崩溃，改 .filter() ④作息表环形钟重做：viewBox/尺寸/圆心统一为 300·150，每段独立稳定配色+段间留缝+环外时间区间标注+当前时段高亮放大，环/图例/时间轴三处颜色一致，一眼看清各时段安排
+const WB_VERSION = 256;                         // v256：跨设备踢人/设备列表失联修复——①设备列表+设备校验改为按 deviceId 合并多后端(SCF+Supabase)，任一后端 revoked 即视为踢出，避免双后端写盘偶尔丢一端时手机端设备管理缺电脑、退出电脑端无反应 ②轮询 tick 改为先 check 后 register，被踢设备 check=revoked→强制退出并不再 register，修复 v209/v211 register 每 60s 重写 revoked=false 自我解封的漏洞 ③SCF 后端 register 保留已有 revoked 状态(防御纵深)
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 174;                 // v255 发版（174 不含4）
+const WB_DISPLAY_VERSION = 175;                 // v256 发版（175 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -16318,6 +16319,57 @@ async function wbRegisterDevice(){
     await api('/api/auth/device/register', 'POST', { deviceId: wbGetDeviceId(), type: wbGetDeviceType(), name: (navigator.userAgent||'').slice(0, 60) });
   } catch(e){ /* 旧后端无此接口，忽略 */ }
 }
+// v256：合并多后端设备列表——按 deviceId 合并，取最新 lastSeen，任一后端 revoked=true 即视为 revoked
+//   修复：双后端（SCF+Supabase）写盘偶尔丢一端，单后端 race 读会漏设备/漏 revoked 导致设备列表缺电脑/踢人失败
+async function wbApiDeviceList(){
+  if(!API_BACKENDS || !API_BACKENDS.length) return { ok:false, devices:[], sources:[] };
+  var tasks = API_BACKENDS.map(function(bk){
+    var opts = { method:'GET', headers:{ 'Authorization': 'Bearer ' + (API_TOKEN||'') } };
+    return _apiFetch(bk.url, '/api/auth/device/list', opts)
+      .then(function(d){ return { ok:true, src:bk.id, devices:(d && d.devices)||[] }; })
+      .catch(function(){ return { ok:false, src:bk.id, devices:[] }; });
+  });
+  var rs; try{ rs = await Promise.all(tasks); }catch(e){ rs = []; }
+  var map = {};
+  rs.forEach(function(r){
+    if(!r || !r.ok) return;
+    (r.devices||[]).forEach(function(d){
+      if(!d || !d.deviceId) return;
+      var cur = map[d.deviceId];
+      if(!cur){
+        cur = Object.assign({}, d);
+        cur._sources = [r.src];
+        map[d.deviceId] = cur; return;
+      }
+      if((d.lastSeen||0) > (cur.lastSeen||0)){
+        cur.lastSeen = d.lastSeen;
+        cur.name = d.name || cur.name;
+        cur.type = d.type || cur.type;
+        cur.createdAt = d.createdAt || cur.createdAt;
+      }
+      if(d.revoked) cur.revoked = true;
+      if((d.revokedAt||0) > (cur.revokedAt||0)) cur.revokedAt = d.revokedAt;
+      cur._sources.push(r.src);
+    });
+  });
+  var devs = Object.keys(map).map(function(k){ return map[k]; });
+  devs.sort(function(a,b){ return (b.lastSeen||0) - (a.lastSeen||0); });
+  return { ok:true, devices:devs, sources: rs.map(function(r){ return r.src + (r.ok?':ok':':fail'); }).join(' ') };
+}
+// v256：合并多后端设备校验——任一后端说 revoked=true 即视为 revoked（避免 race 漏踢）
+async function wbApiDeviceCheck(deviceId){
+  if(!API_BACKENDS || !API_BACKENDS.length) return { ok:false, revoked:false };
+  var tasks = API_BACKENDS.map(function(bk){
+    var opts = { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization': 'Bearer ' + (API_TOKEN||'') }, body: JSON.stringify({ deviceId: deviceId }) };
+    return _apiFetch(bk.url, '/api/auth/device/check', opts)
+      .then(function(d){ return { ok:true, revoked:!!(d && d.revoked), src:bk.id }; })
+      .catch(function(){ return { ok:false, revoked:false, src:bk.id }; });
+  });
+  var rs; try{ rs = await Promise.all(tasks); }catch(e){ rs = []; }
+  var anyOk = rs.some(function(r){ return r && r.ok; });
+  var revoked = rs.some(function(r){ return r && r.ok && r.revoked; });
+  return { ok: anyOk, revoked: revoked };
+}
 // 轮询：本设备是否已被远程吊销
 let _deviceWatchTimer = 0;
 function wbStartDeviceWatch(){
@@ -16326,12 +16378,12 @@ function wbStartDeviceWatch(){
   var tick = async function(){
     if(!WB_SESSION || !API_TOKEN) return;
     try {
-      // v211：心跳——每 60 秒刷新一次 lastSeen，设备管理列表才能看到「在线」状态（关掉页面则 5 分钟后显示离线）
+      // v256：先 check（合并多后端校验，任一后端 revoked 即退出），被踢就强制退出并不再 register；
+      //        修复原 v211/v209 的 un-revoke 漏洞——register 每 60s 会重写 revoked=false 自我解封
+      var chk = await wbApiDeviceCheck(wbGetDeviceId());
+      if(chk && chk.ok && chk.revoked){ wbForceLogoutByRevoke(); return; }
+      // 未被踢才刷新 lastSeen（每 60 秒一次）
       if(Date.now() - _lastReg > 60000){ _lastReg = Date.now(); wbRegisterDevice(); }
-      var r = await api('/api/auth/device/check', 'POST', { deviceId: wbGetDeviceId() });
-      if(r && r.ok && r.revoked){
-        wbForceLogoutByRevoke();
-      }
     } catch(e){ /* 忽略轮询异常 */ }
   };
   _deviceWatchTimer = setInterval(tick, 3000);   // v209：15s → 3s（配合 Realtime，实现「立马」退出）
@@ -17407,7 +17459,7 @@ async function showDeviceManager(){
   m.onclick = function(e){ if(e.target === m) closeModal('clientModal'); };
   try {
     if(!API_TOKEN){ var b1=document.getElementById('dmDevList'); if(b1) b1.innerHTML='<span style="color:#999">未登录，无法查看设备</span>'; return; }
-    var res = await api('/api/auth/device/list', 'GET');
+    var res = await wbApiDeviceList();
     var devs = (res && res.devices) || [];
     var curId = '';
     try { curId = wbGetDeviceId(); } catch(e){}
@@ -17508,7 +17560,7 @@ async function confirmLogout(target){
   // 远程退出另一设备：拉取设备列表，吊销该类型下的所有设备
   try {
     if(!API_TOKEN){ toast('远程退出需联网登录后才可用'); return; }
-    var listRes = await api('/api/auth/device/list', 'GET');
+    var listRes = await wbApiDeviceList();
     if(!listRes || !listRes.ok){ toast('获取设备列表失败'); return; }
     var wantType = (target === 'phone') ? 'phone' : 'desktop';
     // v209：原实现用 find 只取第一台，多设备时会漏踢 → 改为 filter，踢掉该类型下所有未吊销设备
@@ -17987,11 +18039,13 @@ function boot(){
       setTimeout(function(){ try{ wbPullAndApply(); }catch(e){ console.warn('auto cloud sync failed:',e); } }, 2000);
       // v211：自动恢复登录也要走设备校验——先 check（若已被远程吊销则立即退出并清缓存，必须重新输账号密码），
       //        未被吊销才 register（刷新 lastSeen）+ 启动轮询/Realtime（顺序不能反：register 会重置 revoked）
-      api('/api/auth/device/check', 'POST', { deviceId: wbGetDeviceId() }).then(function(r){
+      // v256：boot 自动恢复用合并校验（任一后端 revoked 即踢出），被踢的离线设备下次打开立即失效清缓存，必须重新输账号密码
+      wbApiDeviceCheck(wbGetDeviceId()).then(function(r){
         if(r && r.ok && r.revoked){ wbForceLogoutByRevoke(); return; }
         try{ wbRegisterDevice(); }catch(e){}
         try{ wbStartDeviceWatch(); }catch(e){}
       }).catch(function(){
+        // 合并校验全失败时仍按原流程尝试注册 + 启动监听，避免网络抽风卡死登录
         try{ wbRegisterDevice(); }catch(e){}
         try{ wbStartDeviceWatch(); }catch(e){}
       });
