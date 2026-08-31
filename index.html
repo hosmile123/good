@@ -30,7 +30,7 @@
 <!-- v254-cachebust: 修复 v253 引入的一处语法错误——专注时刻背景图「仅可上传1张」确认弹窗的单引号字符串被拆成两行→整段脚本解析失败→所有事件绑定失效(已登录设备重开卡登录页/点登录无反应/版本角标取不到值)。修复后恢复 v253 的秒进提速逻辑 -->
 <!-- v255-cachebust: 英语单词卡点击不切换(达标横幅早期return+末卡无兜底→改非阻塞横幅+末卡循环)/生活习惯图标🌙→📋/专注时刻统计页空白(focusRangeFilter误当函数调用致list.reduce崩溃→改.filter)/作息表环形钟重做(300·150统一+每段独立配色+段间缝+环外时间标注+当前时段高亮，环/图例/时间轴颜色一致) -->
 <!-- v256-cachebust: 跨设备踢人失联修复——设备列表+校验按 deviceId 合并多后端(任一 revoked 即视为踢出)；轮询改为先 check 后 register(被踢即强制退出不 register)；SCF 后端 register 保留 revoked 状态(防御纵深)。修复手机端设备管理缺电脑/退出电脑端无效的 bug -->
-<!-- v257-cachebust: 跨设备踢人根因修复——登录有「离线回退」分支不设API_TOKEN，这类设备永不注册云端(手机看不到/踢不掉)；v257 无条件启动设备监听使离线设备也能收到广播；退出电脑端找不到云端设备时也照样广播；wbRTBroadcast改异步+懒连接等待；设备管理新增自检面板(登录模式/本机已登记/实时通道/双后端设备数)；已踢出设备可「再踢一次」-->
+<!-- v258-cachebust: 待办列表按账号工作/生活分区过滤修复——之前 applyTodoFilter 完全不看 _accountPartition，导致未勾选某分区后该分区分类的待办依旧全显；现按 cat→分区映射过滤('生活' 须 life=true/其他须 work=true) + chip 同步隐藏未开通分区下的分类 + 选中 chip 已不可见时回退到「全部」+ 两者都关时空状态提示「请联系管理员在账号管理中开通」。cat-tab 加 data-cat 属性便于 filter 读取。 -->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -2828,15 +2828,15 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
     <div style="margin-bottom:10px;font-size:13px;font-weight:500;color:var(--text-secondary)">选择分类</div>
     <div class="category-tabs" id="catTabs">
-      <button class="cat-tab active" onclick="filterCat(this,'全部')">全部</button>
-      <button class="cat-tab" onclick="filterCat(this,'客户跟进')">👤 客户跟进</button>
-      <button class="cat-tab" onclick="filterCat(this,'保单办理')">📋 保单办理</button>
-      <button class="cat-tab" onclick="filterCat(this,'保函业务')">📜 保函业务</button>
-      <button class="cat-tab" onclick="filterCat(this,'学习提升')">📚 学习提升</button>
-      <button class="cat-tab" onclick="filterCat(this,'行政事务')">📌 行政事务</button>
-      <button class="cat-tab" onclick="filterCat(this,'佣金待结算')">💰 佣金待结算</button>
-      <button class="cat-tab" onclick="filterCat(this,'生活')">🏠 生活</button>
-      <button class="cat-tab" data-cat-special="appt" onclick="filterCat(this,'预约回访')">📞 预约回访</button>
+      <button class="cat-tab active" data-cat="全部" onclick="filterCat(this,'全部')">全部</button>
+      <button class="cat-tab" data-cat="客户跟进" onclick="filterCat(this,'客户跟进')">👤 客户跟进</button>
+      <button class="cat-tab" data-cat="保单办理" onclick="filterCat(this,'保单办理')">📋 保单办理</button>
+      <button class="cat-tab" data-cat="保函业务" onclick="filterCat(this,'保函业务')">📜 保函业务</button>
+      <button class="cat-tab" data-cat="学习提升" onclick="filterCat(this,'学习提升')">📚 学习提升</button>
+      <button class="cat-tab" data-cat="行政事务" onclick="filterCat(this,'行政事务')">📌 行政事务</button>
+      <button class="cat-tab" data-cat="佣金待结算" onclick="filterCat(this,'佣金待结算')">💰 佣金待结算</button>
+      <button class="cat-tab" data-cat="生活" onclick="filterCat(this,'生活')">🏠 生活</button>
+      <button class="cat-tab" data-cat="预约回访" onclick="filterCat(this,'预约回访')">📞 预约回访</button>
     </div>
     <div class="filter-row">
       <button class="filter-tab active" onclick="filterStatus(this,'all')">全部</button>
@@ -9731,13 +9731,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 257;                         // v257：跨设备踢人真正的根因修复——①登录有「离线回退」分支(wbLoginOK(u,false))不设 API_TOKEN，这类设备永不注册到云端→手机端看不到它也无法踢它；v257 无论云端/离线都**无条件启动设备监听**(wbStartDeviceWatch)，离线设备也能连上 Realtime 收到踢出广播 ②confirmLogout 不再因"云端列表找不到设备"就放弃，找不到也照样广播(唯一能触达离线模式设备的通道) ③wbRTBroadcast 改异步+懒连接等待(最长1.5s)，WS 未就绪时不再静默 return false ④设备管理新增自检面板(登录模式/本机已登记/实时通道/双后端设备数)便于定位 ⑤已踢出设备可「再踢一次」清理僵尸会话
+const WB_VERSION = 258;                         // v258：待办列表按账号工作/生活分区过滤——之前 applyTodoFilter 完全不看 _accountPartition，导致管理员勾掉某个分区后该分类的待办依然全部可见；现在：(1) 待办项按 cat→分区映射过滤，'生活' 须 life=true，其他分类须 work=true；(2) 「选择分类」chip 同步隐藏未开通分区下的分类；(3) 当前选中的 chip 已不在可见分区时自动回退到「全部」；(4) 两者都关闭时显示空状态提示「请联系管理员在账号管理中开通」
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 176;                 // v257 发版（176 不含4）
+const WB_DISPLAY_VERSION = 177;                 // v258 发版（177 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10134,12 +10134,37 @@ function _migrateTodos(){
 }
 function saveTodos(a){ _save('todo',a); }
 function applyTodoFilter() {
+  // v258：按账号工作/生活分区过滤（chip 分类只是"在已开通分区里"再筛选）
+  var ap = ctx_ap();
+  var partOk = function(c){
+    if(c === '生活') return !!ap.life;
+    return !!ap.work; // 客户跟进/保单办理/保函业务/学习提升/行政事务/佣金待结算/预约回访 全部归工作
+  };
   _qa('#todoList .swipe-front').forEach(function(item){
     var c=item.getAttribute('data-cat'); var done=item.getAttribute('data-done')==='true';
     var catOk=(currentTodoCat==='全部'||c===currentTodoCat);
     var statusOk=(currentTodoStatus==='all'||(currentTodoStatus==='done'&&done)||(currentTodoStatus==='pending'&&!done));
-    item.style.display=(catOk&&statusOk)?'':'none';
+    item.style.display=(catOk&&statusOk&&partOk(c))?'':'none';
   });
+  // 顶部「选择分类」chip 同步：未开通分区的分类 chip 隐藏；切换到不可见 chip 时回退到「全部」
+  var tabs = document.querySelectorAll ? document.querySelectorAll('#catTabs .cat-tab') : [];
+  var visibleCat = [];
+  for(var i=0;i<tabs.length;i++){
+    var t=tabs[i];
+    var catAttr = t.getAttribute('data-cat') || (t.getAttribute('onclick')||'').match(/'([^']+)'/) && RegExp.$1;
+    var show = (catAttr === '全部') ? true : (catAttr === '生活' ? !!ap.life : !!ap.work);
+    t.style.display = show ? '' : 'none';
+    if(show && catAttr !== '全部') visibleCat.push(catAttr);
+  }
+  // 当前选中的 chip 已不在可见分区 → 回退到「全部」
+  if(currentTodoCat !== '全部' && visibleCat.indexOf(currentTodoCat) === -1){
+    for(var k=0;k<tabs.length;k++){
+      tabs[k].classList.remove('active');
+      var ca = tabs[k].getAttribute('data-cat');
+      if(ca==='全部') tabs[k].classList.add('active');
+    }
+    currentTodoCat = '全部';
+  }
   // 特殊分类：预约回访——只显示 apptTodoBox，隐藏 todoList
   var box = document.getElementById('apptTodoBox');
   var listEl = document.getElementById('todoList');
@@ -10148,10 +10173,26 @@ function applyTodoFilter() {
     if(listEl) listEl.style.display = 'none';
   } else {
     if(listEl) listEl.style.display = '';
-    // 其他分类下也保持预约回访块可见（让用户能同时看到它），仅在切到「预约回访」时独占
   }
+  // v258：分区全部关闭时显示提示
+  var eb = document.getElementById('todoPartEmpty');
+  if(!ap.work && !ap.life){
+    if(!eb && listEl && listEl.parentNode){
+      eb = document.createElement('div');
+      eb.id = 'todoPartEmpty';
+      eb.style.cssText='text-align:center;color:var(--text-light);font-size:13px;padding:24px 12px;line-height:1.7';
+      eb.innerHTML = '当前账号未开通「工作」和「生活」分区<br><span style="font-size:12px">请联系管理员在「账号管理」中开通</span>';
+      listEl.parentNode.insertBefore(eb, listEl.nextSibling);
+    } else if(eb){ eb.style.display=''; }
+  } else if(eb){ eb.style.display='none'; }
 }
-function renderTodo(){
+// 安全读取账号分区（含页面上 _accountPartition 未及时同步的兜底）
+function ctx_ap(){
+  try{
+    if(typeof _accountPartition !== 'undefined' && _accountPartition) return _accountPartition;
+  }catch(e){}
+  return { work:true, life:true, fun:true };
+}function renderTodo(){
   var list=getTodos(); var box=document.getElementById('todoList'); if(!box) return;
   var te=document.getElementById('todoTime'); if(te && !te.value) te.value=nowLocalDatetime();
   box.innerHTML = list.map(function(t){
