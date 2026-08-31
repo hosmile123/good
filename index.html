@@ -17,6 +17,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
 <!-- v261-cachebust: 待办日历重做为图2 风格(每天最多 8 条彩色 chip + overflow + 自定义背景色)；新增「🗓 月维度」subtab(图3 风格:6×7 大格子每月统计+每格最多 6 条彩色 bar);待办新增 bg 字段(用户自定义背景色,空 = 跟随分类色);编辑弹窗加 8 色选盘；renderTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历 -->
+<!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
@@ -971,6 +972,12 @@ body.sb-collapsed .sidebar-item:hover::after {
   background: linear-gradient(135deg,#FA8C16,#FFA940); color: #fff;
 }
 .td-month-cell.weekend .td-month-cell-num { color: #FA8C16; }
+.td-month-cell-lunar {
+  font-size: 9px; color: #999; font-weight: 500;
+  align-self: flex-start; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.td-month-cell.other-month .td-month-cell-lunar { color: #bbb; }
 .td-month-cell-bars { display: flex; flex-direction: column; gap: 2px; }
 .td-month-bar {
   font-size: 9px; line-height: 1.2; padding: 2px 4px;
@@ -2953,7 +2960,6 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 
   <div class="subtabs">
     <button class="subtab active" onclick="switchSub('td',this,'td-list')">待办</button>
-    <button class="subtab" onclick="switchSub('td',this,'td-cal')">📅 日历</button>
     <button class="subtab" onclick="switchSub('td',this,'td-month')">🗓 月维度</button>
   </div>
 
@@ -3003,29 +3009,6 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <p style="text-align:center;color:var(--text-light);font-size:12px;margin-top:12px">完成的每一项，都是业绩的基石</p>
   </div>
 
-  <!-- 月历 -->
-  <div class="subtab-content" id="td-cal">
-    <div class="td-cal-wrapper">
-      <div class="td-cal-header">
-        <div class="td-cal-title" id="tdCalTitle">2026年8月</div>
-        <div class="td-cal-nav">
-          <button onclick="tdCalPrev()">‹</button>
-          <button class="today" onclick="tdCalToday()">今天</button>
-          <button onclick="tdCalNext()">›</button>
-        </div>
-      </div>
-      <div class="td-cal-weekdays">
-        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
-      </div>
-      <div class="td-cal-grid" id="tdCalGrid"></div>
-      <div class="td-cal-day-todos" id="tdCalDayTodos" style="display:none"></div>
-      <div class="td-cal-recent">
-        <h4>📋 最近待办</h4>
-        <div id="tdCalRecent"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- v261 月维度（图3 风格） -->
   <div class="subtab-content" id="td-month">
     <div class="td-month-wrapper">
@@ -3043,6 +3026,10 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       </div>
       <div class="td-month-grid" id="tdMonthGrid"></div>
       <div class="td-cal-day-todos" id="tdMonthDayTodos" style="display:none"></div>
+      <div class="td-cal-recent" style="margin-top:14px">
+        <h4>📋 最近待办</h4>
+        <div id="tdMonthRecent"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -6712,7 +6699,6 @@ function switchSub(group, btn, targetId) {
     if(group==='td'){ renderAppointmentsTodos(); }
     if(group==='rt' && targetId==='rt-sleeprise'){ initSrForm(); renderRoutine(); }
     if(group==='rt' && targetId==='rt-schedule'){ try{ rtSchedRenderList(); }catch(e){ console.error('rtSchedRenderList', e); } }
-    if(group==='td' && targetId==='td-cal'){ try{ renderTodoCalendar(); }catch(e){ console.error('renderTodoCalendar', e); } }
     if(group==='td' && targetId==='td-month'){ try{ renderTodoMonth(); }catch(e){ console.error('renderTodoMonth', e); } }
     if(group==='diary' && targetId==='diary-vault'){ try{ renderVault(); }catch(e){ console.error('renderVault:', e); } }
   } catch(e) { console.error('switchSub error:', e); }
@@ -9896,13 +9882,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 261;                         // v261：待办日历重做为图2 风格——每天最多 8 条彩色 chip + overflow + 自定义背景色（新增待办字段 bg，编辑弹窗加 8 色选盘）；同时新增「🗓 月维度」subtab（图3 风格：6×7 大格子 + 每月 4 项统计 + 每格最多 6 条彩色 bar）；addTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历，避免跨视图不同步。
+const WB_VERSION = 262;                         // v262：删除原「📅 日历」页，待办仅保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期（含上月尾/下月头，可跨月浏览，点相邻月格自动跳月）+ 每格数字后显示农历；「📋 最近待办」移至月维度下方。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 180;                 // v261 发版（180 不含4）
+const WB_DISPLAY_VERSION = 181;                 // v262 发版（181 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10447,7 +10433,6 @@ function addTodo(){
     list.unshift({id:_uid(),text:text,cat:cat,date:date,time:time,done:false,bg:''});
     saveTodos(list);            // 先落盘，确保数据不丢
     renderTodo();               // 再渲染，确保界面立即更新
-    if(typeof renderTodoCalendar==='function') renderTodoCalendar();
     if(typeof renderTodoMonth==='function') renderTodoMonth();
     input.value='';
     if(timeEl) timeEl.value=nowLocalDatetime();   // 重置为当前时间，方便连续添加
@@ -10460,13 +10445,13 @@ function addTodo(){
 function toggleTodo(el){
   var item=el.closest('.swipe-front')||el.closest('.swipe-card'); var id=item.getAttribute('data-id');
   var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
-  t.done=!t.done; saveTodos(list); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth();
+  t.done=!t.done; saveTodos(list); renderTodo(); if(typeof renderTodoMonth==='function') renderTodoMonth();
 }
 function deleteTodo(el){
   wbConfirm('确定删除这个待办吗？', function(ok){ if(!ok) return;
   var item=(typeof el==='string')?document.querySelector('#todoList [data-id="'+el+'"]'):(el.closest('.swipe-front')||el.closest('.todo-item'));
   if(!item) return; var id=item.getAttribute('data-id');
-  var list=getTodos().filter(function(x){return x.id!==id;}); saveTodos(list); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth();
+  var list=getTodos().filter(function(x){return x.id!==id;}); saveTodos(list); renderTodo(); if(typeof renderTodoMonth==='function') renderTodoMonth();
   });
 }
 function nowLocalDatetime(){
@@ -10514,13 +10499,10 @@ function updateTodo(id){
   }
   t.text=text; t.time=time; t.cat=cat; t.date=time?time.slice(0,10):t.date;
   t.bg=bg;        // v261：自定义背景色（空串 = 跟随分类色）
-  saveTodos(list); closeModal('todoEditModal'); renderTodo(); if(typeof renderTodoCalendar==='function') renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth(); toast('已更新');
+  saveTodos(list); closeModal('todoEditModal'); renderTodo(); if(typeof renderTodoMonth==='function') renderTodoMonth(); toast('已更新');
 }
 
 /* ---------- 待办月历 ---------- */
-var TD_CAL_YEAR = new Date().getFullYear();
-var TD_CAL_MONTH = new Date().getMonth();   // 0-11
-var TD_CAL_SEL = null;
 /* v261: 月维度独立状态 */
 var TD_MONTH_YEAR = new Date().getFullYear();
 var TD_MONTH_MONTH = new Date().getMonth();
@@ -10530,90 +10512,6 @@ function tdCalLocalToday(d){
   var p=function(n){return (n<10?'0':'')+n;};
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
 }
-function renderTodoCalendar(){
-  var grid=document.getElementById('tdCalGrid'); if(!grid) return;
-  if(!TD_CAL_SEL) TD_CAL_SEL=tdCalLocalToday();
-  var list=getTodos();
-  var byDate={};
-  list.forEach(function(t){ var k=t.date||''; if(!k) return; (byDate[k]||(byDate[k]=[])).push(t); });
-  var y=TD_CAL_YEAR, m=TD_CAL_MONTH;
-  var first=new Date(y,m,1);
-  var startDay=first.getDay();                 // 0=周日
-  var daysInMonth=new Date(y,m+1,0).getDate();
-  var daysInPrev=new Date(y,m,0).getDate();
-  var todayStr=tdCalLocalToday();
-  var title=document.getElementById('tdCalTitle');
-  if(title) title.textContent=y+'年'+(m+1)+'月';
-  var cells=[];
-  for(var i=startDay-1;i>=0;i--) cells.push({d:daysInPrev-i, other:true, dateStr:null});
-  for(var d=1;d<=daysInMonth;d++){
-    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var wkd=new Date(y,m,d).getDay();
-    cells.push({d:d, other:false, dateStr:ds, weekend:(wkd===0||wkd===6)});
-  }
-  while(cells.length%7!==0) cells.push({d:'', other:true, dateStr:null});
-  while(cells.length<42) cells.push({d:'', other:true, dateStr:null});
-  /* v261: 每日最多展示 8 条（按添加顺序），chip 背景色优先 t.bg，回退 catColor */
-  var CHIP_MAX = 8;
-  var html=cells.map(function(c){
-    if(c.other) return '<div class="td-cal-cell other-month"></div>';
-    var todos=byDate[c.dateStr]||[];
-    var isToday=c.dateStr===todayStr;
-    var isSel=c.dateStr===TD_CAL_SEL;
-    var chips='';
-    todos.slice(0,CHIP_MAX).forEach(function(t){
-      var txt=t.text.length>10?t.text.slice(0,10)+'…':t.text;
-      chips+='<div class="td-cal-chip'+(t.done?' done':'')+'" title="'+esc(t.text)+' · '+esc(t.cat)+'" style="'+chipStyle(t)+'">'+esc(txt)+'</div>';
-    });
-    if(todos.length>CHIP_MAX) chips+='<div class="td-cal-more">+'+ (todos.length-CHIP_MAX)+'</div>';
-    var flag=todos.length?'<div class="td-cal-flag"></div>':'';
-    var cls='td-cal-cell'+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
-    return '<div class="'+cls+'" onclick="tdCalSelectDate(\''+c.dateStr+'\')">'+
-      '<div class="td-cal-num">'+c.d+'</div>'+flag+
-      '<div class="td-cal-chips">'+chips+'</div></div>';
-  }).join('');
-  grid.innerHTML=html;
-  renderTdCalDay(TD_CAL_SEL, byDate);
-  renderTdCalRecent();
-}
-function tdCalPrev(){ TD_CAL_MONTH--; if(TD_CAL_MONTH<0){TD_CAL_MONTH=11;TD_CAL_YEAR--;} renderTodoCalendar(); }
-function tdCalNext(){ TD_CAL_MONTH++; if(TD_CAL_MONTH>11){TD_CAL_MONTH=0;TD_CAL_YEAR++;} renderTodoCalendar(); }
-function tdCalToday(){ var d=new Date(); TD_CAL_YEAR=d.getFullYear(); TD_CAL_MONTH=d.getMonth(); TD_CAL_SEL=tdCalLocalToday(); renderTodoCalendar(); }
-function tdCalSelectDate(ds){
-  TD_CAL_SEL=ds; renderTodoCalendar();
-  var box=document.getElementById('tdCalDayTodos');
-  if(box) box.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-function renderTdCalDay(ds, byDate){
-  var box=document.getElementById('tdCalDayTodos'); if(!box) return;
-  var todos=(byDate&&byDate[ds])||[];
-  if(!todos.length){ box.style.display='none'; box.innerHTML=''; return; }
-  box.style.display='block';
-  box.innerHTML='<h4>'+ds+' 的待办 <span class="badge">'+(todos.filter(function(t){return !t.done;}).length)+' 未完成</span></h4>'+
-    todos.map(function(t){
-      return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
-        '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
-        '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+'</div></div>';
-    }).join('');
-}
-function tdCalToggle(id){
-  var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
-  t.done=!t.done; saveTodos(list); renderTodoCalendar(); if(typeof renderTodoMonth==='function') renderTodoMonth(); if(typeof renderTodo==='function') renderTodo();
-}
-function renderTdCalRecent(){
-  var box=document.getElementById('tdCalRecent'); if(!box) return;
-  var list=getTodos().slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  var pending=list.filter(function(t){return !t.done;});
-  var done=list.filter(function(t){return t.done;});
-  var show=pending.concat(done).slice(0,30);
-  if(!show.length){ box.innerHTML='<div class="td-cal-empty">暂无待办，去「待办」添加一条吧 📝</div>'; return; }
-  box.innerHTML=show.map(function(t){
-    return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
-      '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
-      '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+' · '+(t.date||'')+'</div></div>';
-  }).join('');
-}
-
 /* ---------- v261: 月维度（图3 风格） ---------- */
 function tdMonthLocalToday(d){
   d = (d===undefined||d===null) ? new Date() : new Date(d);
@@ -10623,7 +10521,13 @@ function tdMonthLocalToday(d){
 function tdMonthPrev(){ TD_MONTH_MONTH--; if(TD_MONTH_MONTH<0){TD_MONTH_MONTH=11;TD_MONTH_YEAR--;} renderTodoMonth(); }
 function tdMonthNext(){ TD_MONTH_MONTH++; if(TD_MONTH_MONTH>11){TD_MONTH_MONTH=0;TD_MONTH_YEAR++;} renderTodoMonth(); }
 function tdMonthToday(){ var d=new Date(); TD_MONTH_YEAR=d.getFullYear(); TD_MONTH_MONTH=d.getMonth(); TD_MONTH_SEL=tdMonthLocalToday(); renderTodoMonth(); }
-function tdMonthSelectDate(ds){ TD_MONTH_SEL=ds; renderTodoMonth(); }
+function tdMonthSelectDate(ds){
+  if(ds){
+    var sp=String(ds).split('-'); var cy=+sp[0], cm=+sp[1]-1;
+    if(cy!==TD_MONTH_YEAR || cm!==TD_MONTH_MONTH){ TD_MONTH_YEAR=cy; TD_MONTH_MONTH=cm; }
+  }
+  TD_MONTH_SEL=ds; renderTodoMonth();
+}
 
 function renderTodoMonth(){
   var grid=document.getElementById('tdMonthGrid'); if(!grid) return;
@@ -10657,19 +10561,22 @@ function renderTodoMonth(){
       '<div class="td-month-stat-card delay"><div class="td-month-stat-num">'+monthDelay+'</div><div class="td-month-stat-label">延期</div></div>'+
       '<div class="td-month-stat-card days"><div class="td-month-stat-num">'+activeDays+'</div><div class="td-month-stat-label">活跃天数</div></div>';
   }
-  /* 6×7 网格：6 行 = 42 格，首行对齐 1 号 begin */
-  var cells=[];
-  for(var i=startDay-1;i>=0;i--) cells.push({d:daysInPrev-i, other:true, dateStr:null});
-  for(var d=1;d<=daysInMonth;d++){
-    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var wkd=new Date(y,m,d).getDay();
-    cells.push({d:d, other:false, dateStr:ds, weekend:(wkd===0||wkd===6)});
+  /* 6×7 = 42 格：含上月尾 + 下月头，全部填真实日期，可跨月浏览 */
+  function makeCell(yy,mm,dd){
+    var ds=yy+'-'+String(mm+1).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    var wkd=new Date(yy,mm,dd).getDay();
+    return {y:yy,m:mm,d:dd,dateStr:ds,other:(mm!==m),weekend:(wkd===0||wkd===6)};
   }
-  while(cells.length<42) cells.push({d:'', other:true, dateStr:null});
-  /* 每格最多 6 条彩色 bar + overflow */
+  var cells=[];
+  var prevY=y, prevM=m-1; if(prevM<0){prevM=11;prevY--;}
+  var prevDays=new Date(prevY,prevM+1,0).getDate();
+  for(var i=startDay-1;i>=0;i--) cells.push(makeCell(prevY,prevM,prevDays-i));
+  for(var d=1;d<=daysInMonth;d++) cells.push(makeCell(y,m,d));
+  var nextY=y, nextM=m+1; if(nextM>11){nextM=0;nextY++;}
+  var ni=1; while(cells.length<42){ cells.push(makeCell(nextY,nextM,ni)); ni++; }
+  /* 每格最多 6 条彩色 bar + overflow；数字后附农历 */
   var BAR_MAX = 6;
   var html=cells.map(function(c){
-    if(c.other) return '<div class="td-month-cell other-month"></div>';
     var todos=(byDate[c.dateStr]||[]);
     var isToday=c.dateStr===todayStr;
     var isSel=c.dateStr===TD_MONTH_SEL;
@@ -10687,14 +10594,17 @@ function renderTodoMonth(){
         (pending?'未完 '+pending:done?'全部完成 ✅':'—')+
         ' <span>共 '+todos.length+'</span></div>';
     }
-    var cls='td-month-cell'+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
+    var lunar=tdLunarDay(c.y,c.m+1,c.d);
+    var lunarHtml = lunar ? '<span class="td-month-cell-lunar">'+lunar+'</span>' : '';
+    var cls='td-month-cell'+(c.other?' other-month':'')+(isToday?' today':'')+(c.weekend?' weekend':'')+(isSel?' selected':'');
     return '<div class="'+cls+'" onclick="tdMonthSelectDate(\''+c.dateStr+'\')">'+
-      '<div class="td-month-cell-head"><div class="td-month-cell-num">'+c.d+'</div></div>'+
+      '<div class="td-month-cell-head"><div class="td-month-cell-num">'+c.d+'</div>'+lunarHtml+'</div>'+
       '<div class="td-month-cell-bars">'+bars+'</div>'+footHtml+
     '</div>';
   }).join('');
   grid.innerHTML=html;
   renderTdMonthDay(TD_MONTH_SEL, byDate);
+  renderTdMonthRecent();
 }
 function renderTdMonthDay(ds, byDate){
   var box=document.getElementById('tdMonthDayTodos'); if(!box) return;
@@ -10703,10 +10613,40 @@ function renderTdMonthDay(ds, byDate){
   box.style.display='block';
   box.innerHTML='<h4>'+ds+' 的待办 <span class="badge">'+(todos.filter(function(t){return !t.done;}).length)+' 未完成</span></h4>'+
     todos.map(function(t){
-      return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdCalToggle(\''+t.id+'\')">'+
+      return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdTodoToggle(\''+t.id+'\')">'+
         '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
         '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+'</div></div>';
     }).join('');
+}
+/* v262: 农历辅助（复用全局 solar2lunar / LUNAR_DAY_CN / LUNAR_MONTH_CN，内置 1900-2100 引擎） */
+function tdLunarDay(y,m,d){
+  try{
+    if(typeof solar2lunar!=='function') return '';
+    var r=solar2lunar(y,m,d); if(!r) return '';
+    if(r.lDay===1) return (r.isLeap?'闰':'')+(typeof LUNAR_MONTH_CN!=='undefined'?LUNAR_MONTH_CN[r.lMonth-1]:'')+'月';
+    return (typeof LUNAR_DAY_CN!=='undefined')?LUNAR_DAY_CN[r.lDay-1]:'';
+  }catch(e){ return ''; }
+}
+/* v262: 月维度内勾选切换（替代已删除的 tdCalToggle） */
+function tdTodoToggle(id){
+  var list=getTodos(); var t=list.find(function(x){return x.id===id;}); if(!t) return;
+  t.done=!t.done; saveTodos(list);
+  if(typeof renderTodoMonth==='function') renderTodoMonth();
+  if(typeof renderTodo==='function') renderTodo();
+}
+/* v262: 「最近待办」移到月维度下方 */
+function renderTdMonthRecent(){
+  var box=document.getElementById('tdMonthRecent'); if(!box) return;
+  var list=getTodos().slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  var pending=list.filter(function(t){return !t.done;});
+  var done=list.filter(function(t){return t.done;});
+  var show=pending.concat(done).slice(0,30);
+  if(!show.length){ box.innerHTML='<div class="td-cal-empty">暂无待办，去「待办」添加一条吧 📝</div>'; return; }
+  box.innerHTML=show.map(function(t){
+    return '<div class="td-cal-recent-item'+(t.done?' done':'')+'" onclick="tdTodoToggle(\''+t.id+'\')">'+
+      '<div class="td-cal-recent-text">'+esc(t.text)+'</div>'+
+      '<div class="td-cal-recent-date" style="'+chipStyle(t)+'">'+esc(t.cat)+' · '+(t.date||'')+'</div></div>';
+  }).join('');
 }
 
 /* ---------- 娱乐 ---------- */
