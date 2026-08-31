@@ -16,6 +16,7 @@
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
+<!-- v260-cachebust: 修复「关闭工作分区后整页待办消失」——PAGE_PARTITION.todo 由 ['work'] 改为 ['work','life']，使待办页在任一分区开通时即可达；页内仍按分区显隐分组(关工作→只留生活待办) -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
@@ -6217,7 +6218,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
 const PAGE_PARTITION = {
   performance: ['work'],   // 工作(业绩)
   client: ['work'],        // 客户
-  todo: ['work'],          // 待办
+  todo: ['work','life'],   // 待办：工作/生活两区都有待办，任一分区开通即页面可见；关哪个只隐藏哪个分区对应的待办分组（v260 修复：原 ['work'] 导致关工作分区后整页待办不可达，生活待办也一并消失）
   notes: ['work','life'],  // 笔记（同属两区）
   english: ['life'],       // 英语
   fun: ['fun'],            // 娱乐（v142：独立分区，不再隶属生活）
@@ -9743,13 +9744,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 259;                         // v259：待办列表拆分为「工作待办 / 生活待办」两个独立版本，各自随账号工作/生活分区整体显隐（关闭工作分区→整段工作待办隐藏，只留生活待办；关闭生活→只留工作待办；都关→空状态提示）。applyTodoFilter 改为按版本分组显隐+组内分类/状态筛选，分区加载后统一经 applyPartitionUI 刷新待办。
+const WB_VERSION = 260;                         // v260：修复「关闭工作分区后整页待办消失」——PAGE_PARTITION.todo 由 ['work'] 改为 ['work','life']，待办页在任一分区开通时即可达；页内仍按 v259 分组显隐(关工作→只留生活待办/关生活→只留工作待办/都关→空状态)。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 178;                 // v259 发版（178 不含4）
+const WB_DISPLAY_VERSION = 179;                 // v260 发版（179 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
