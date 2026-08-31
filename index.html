@@ -15,6 +15,7 @@
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
+<!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
 <!-- v184-cachebust: Supabase 备用后端上线并启用双活——API_BACKENDS 硬编码 Edge Function URL(https://rjkxcdhikrfpjmqqosvs.supabase.co/functions/v1/workbench-api)；读故障转移+写双写生效，SCF 挂自动切 Supabase -->
@@ -523,6 +524,16 @@ body.sb-collapsed .sidebar-item:hover::after {
 .todo-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
 .todo-cat-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--primary-light); color: var(--primary); }
 .todo-delete { color: var(--text-light); cursor: pointer; font-size: 16px; padding: 4px; }
+/* v259：待办拆分为「工作待办 / 生活待办」两个版本，各自随账号分区显隐 */
+.todo-group { margin-bottom: 14px; }
+.todo-group:last-child { margin-bottom: 0; }
+.todo-group-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--text-secondary);
+  margin: 2px 2px 8px; padding-bottom: 5px; border-bottom: 1px dashed #eee;
+}
+.todo-sublist { display: flex; flex-direction: column; gap: 8px; }
+.todo-empty { text-align: center; color: var(--text-light); font-size: 12px; padding: 14px 0; }
 
 /* ===== v218: 笔记分类 ===== */
 .note-cat-bar {
@@ -2854,12 +2865,8 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     </div>
     <div id="apptTodoBox"></div>
     <div class="card todo-list" id="todoList">
-      <div class="todo-item" data-cat="客户跟进" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">联系张总确认企财险续保方案</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
-      <div class="todo-item" data-cat="保函业务" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">准备中建三局投标保函材料</div><div class="todo-meta">2026-08-03</div></div><span class="todo-cat-tag" style="background:#F6FFED;color:#52C41A">保函业务</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
-      <div class="todo-item" data-cat="学习提升" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">研读建工险附加条款</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag" style="background:#F9F0FF;color:#722ED1">学习提升</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
-      <div class="todo-item" data-cat="保单办理" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">提交华为企财险投保资料</div><div class="todo-meta">2026-08-02</div></div><span class="todo-cat-tag">保单办理</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
-      <div class="todo-item" data-cat="客户跟进" data-done="true"><div class="todo-check checked" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text" style="text-decoration:line-through;color:var(--text-light)">回访万达物业责任险到期情况</div><div class="todo-meta">2026-08-01</div></div><span class="todo-cat-tag">客户跟进</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
-      <div class="todo-item" data-cat="佣金待结算" data-done="false"><div class="todo-check" onclick="toggleTodo(this)">✓</div><div class="todo-content"><div class="todo-text">核对 7 月佣金明细，提交流水结算申请</div><div class="todo-meta">2026-08-05</div></div><span class="todo-cat-tag" style="background:#FFF7E6;color:#FA8C16">佣金待结算</span><span class="todo-delete" title="更多操作" onclick="wbRowMenu(this,[{label:&quot;删除待办&quot;,icon:&quot;🗑&quot;,danger:true,fn:function(){deleteTodo(this)}}])">⋮</span></div>
+      <div class="todo-group" id="todoWorkGroup"><div class="todo-group-head">💼 工作待办</div><div id="todoListWork" class="todo-sublist"></div></div>
+      <div class="todo-group" id="todoLifeGroup"><div class="todo-group-head">🏠 生活待办</div><div id="todoListLife" class="todo-sublist"></div></div>
     </div>
     <p style="text-align:center;color:var(--text-light);font-size:12px;margin-top:12px">完成的每一项，都是业绩的基石</p>
   </div>
@@ -6314,6 +6321,11 @@ function applyAccountPartition(){
   }
   console.log('[partition] 已应用账号分区过滤，当前可见：work=' + _accountPartition.work + ' life=' + _accountPartition.life + ' fun=' + _accountPartition.fun);
 }
+// v259：分区加载/变更后，侧边栏+首页+待办列表一并刷新（待办已拆成工作/生活两个版本，需随分区显隐）
+function applyPartitionUI(){
+  try { applyAccountPartition(); } catch(e){}
+  try { if(typeof applyTodoFilter === 'function') applyTodoFilter(); } catch(e){}
+}
 // 登录后拉取当前账号分区（后端不可用时不收窄，避免误隐藏）
 async function loadAccountPartition(){
   // 管理员永远全开，避免误隐藏管理面板
@@ -9731,13 +9743,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 258;                         // v258：待办列表按账号工作/生活分区过滤——之前 applyTodoFilter 完全不看 _accountPartition，导致管理员勾掉某个分区后该分类的待办依然全部可见；现在：(1) 待办项按 cat→分区映射过滤，'生活' 须 life=true，其他分类须 work=true；(2) 「选择分类」chip 同步隐藏未开通分区下的分类；(3) 当前选中的 chip 已不在可见分区时自动回退到「全部」；(4) 两者都关闭时显示空状态提示「请联系管理员在账号管理中开通」
+const WB_VERSION = 259;                         // v259：待办列表拆分为「工作待办 / 生活待办」两个独立版本，各自随账号工作/生活分区整体显隐（关闭工作分区→整段工作待办隐藏，只留生活待办；关闭生活→只留工作待办；都关→空状态提示）。applyTodoFilter 改为按版本分组显隐+组内分类/状态筛选，分区加载后统一经 applyPartitionUI 刷新待办。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 177;                 // v258 发版（177 不含4）
+const WB_DISPLAY_VERSION = 178;                 // v259 发版（178 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10129,43 +10141,48 @@ function _migrateTodos(){
     out.push({id:_uid(),text:'研读建工险附加条款',cat:'学习提升',date:'2026-08-02',done:true});
     out.push({id:_uid(),text:'提交华为企财险投保资料',cat:'保单办理',date:'2026-08-02',done:true});
     out.push({id:_uid(),text:'核对 7 月佣金明细，提交流水结算申请',cat:'佣金待结算',date:'2026-08-05',done:false});
+    out.push({id:_uid(),text:'给家人打个电话问周末安排',cat:'生活',date:_today(),done:false});
   }
   return out;
 }
 function saveTodos(a){ _save('todo',a); }
 function applyTodoFilter() {
-  // v258：按账号工作/生活分区过滤（chip 分类只是"在已开通分区里"再筛选）
+  // v259：待办拆成「工作待办 / 生活待办」两个独立版本，各自随账号分区整体显隐
   var ap = ctx_ap();
-  var partOk = function(c){
-    if(c === '生活') return !!ap.life;
-    return !!ap.work; // 客户跟进/保单办理/保函业务/学习提升/行政事务/佣金待结算/预约回访 全部归工作
-  };
-  _qa('#todoList .swipe-front').forEach(function(item){
-    var c=item.getAttribute('data-cat'); var done=item.getAttribute('data-done')==='true';
-    var catOk=(currentTodoCat==='全部'||c===currentTodoCat);
-    var statusOk=(currentTodoStatus==='all'||(currentTodoStatus==='done'&&done)||(currentTodoStatus==='pending'&&!done));
-    item.style.display=(catOk&&statusOk&&partOk(c))?'':'none';
+  var wg = document.getElementById('todoWorkGroup');
+  if(wg) wg.style.display = ap.work ? '' : 'none';   // 关闭工作分区 → 整段工作待办隐藏
+  var lg = document.getElementById('todoLifeGroup');
+  if(lg) lg.style.display = ap.life ? '' : 'none';   // 关闭生活分区 → 整段生活待办隐藏
+  // 各版本内部再按「分类 / 状态」筛选
+  ['todoListWork','todoListLife'].forEach(function(id){
+    var box = document.getElementById(id);
+    if(!box) return;
+    box.querySelectorAll('.swipe-front').forEach(function(item){
+      var c = item.getAttribute('data-cat');
+      var done = item.getAttribute('data-done') === 'true';
+      var catOk = (currentTodoCat === '全部' || c === currentTodoCat);
+      var statusOk = (currentTodoStatus === 'all' || (currentTodoStatus === 'done' && done) || (currentTodoStatus === 'pending' && !done));
+      item.style.display = (catOk && statusOk) ? '' : 'none';
+    });
   });
-  // 顶部「选择分类」chip 同步：未开通分区的分类 chip 隐藏；切换到不可见 chip 时回退到「全部」
+  // 顶部「选择分类」chip：未开通分区的分类隐藏；当前选中不可见 → 回退「全部」
   var tabs = document.querySelectorAll ? document.querySelectorAll('#catTabs .cat-tab') : [];
   var visibleCat = [];
   for(var i=0;i<tabs.length;i++){
-    var t=tabs[i];
-    var catAttr = t.getAttribute('data-cat') || (t.getAttribute('onclick')||'').match(/'([^']+)'/) && RegExp.$1;
+    var t = tabs[i];
+    var catAttr = t.getAttribute('data-cat');
     var show = (catAttr === '全部') ? true : (catAttr === '生活' ? !!ap.life : !!ap.work);
     t.style.display = show ? '' : 'none';
-    if(show && catAttr !== '全部') visibleCat.push(catAttr);
+    if(show && catAttr !== '全部' && catAttr !== '预约回访') visibleCat.push(catAttr);
   }
-  // 当前选中的 chip 已不在可见分区 → 回退到「全部」
-  if(currentTodoCat !== '全部' && visibleCat.indexOf(currentTodoCat) === -1){
+  if(currentTodoCat !== '全部' && currentTodoCat !== '预约回访' && visibleCat.indexOf(currentTodoCat) === -1){
     for(var k=0;k<tabs.length;k++){
       tabs[k].classList.remove('active');
-      var ca = tabs[k].getAttribute('data-cat');
-      if(ca==='全部') tabs[k].classList.add('active');
+      if(tabs[k].getAttribute('data-cat') === '全部') tabs[k].classList.add('active');
     }
     currentTodoCat = '全部';
   }
-  // 特殊分类：预约回访——只显示 apptTodoBox，隐藏 todoList
+  // 特殊分类「预约回访」：只显示 apptTodoBox，隐藏整个待办列表
   var box = document.getElementById('apptTodoBox');
   var listEl = document.getElementById('todoList');
   if(currentTodoCat === '预约回访'){
@@ -10174,7 +10191,7 @@ function applyTodoFilter() {
   } else {
     if(listEl) listEl.style.display = '';
   }
-  // v258：分区全部关闭时显示提示
+  // 工作 + 生活 两个分区都关闭 → 提示开通
   var eb = document.getElementById('todoPartEmpty');
   if(!ap.work && !ap.life){
     if(!eb && listEl && listEl.parentNode){
@@ -10195,7 +10212,7 @@ function ctx_ap(){
 }function renderTodo(){
   var list=getTodos(); var box=document.getElementById('todoList'); if(!box) return;
   var te=document.getElementById('todoTime'); if(te && !te.value) te.value=nowLocalDatetime();
-  box.innerHTML = list.map(function(t){
+  var itemHtml=function(t){
     var meta = t.time ? ('🕐 '+(String(t.time).replace('T',' '))) : ('📅 '+(t.date||''));
     return '<div class="swipe-card'+(t.done?' todo-done':'')+'" data-id="'+t.id+'">'+
       '<button class="swipe-reveal" title="更多操作" onclick="event.stopPropagation();wbRowMenu(this,[{label:\'删除待办\',icon:\'🗑\',danger:true,fn:function(){deleteTodo(\''+t.id+'\')}}])">⋮</button>'+
@@ -10206,7 +10223,15 @@ function ctx_ap(){
         '<span class="todo-edit" onclick="editTodo(\''+t.id+'\')">✏️</span>'+
       '</div>'+
     '</div>';
-  }).join('') || '<p style="text-align:center;color:var(--text-light);font-size:12px;padding:18px">还没有待办，上面添加一条吧 📝</p>';
+  };
+  // v259：拆成「工作待办 / 生活待办」两个独立版本，各自随账号分区显隐
+  var wItems=list.filter(function(t){ return t.cat!=='生活'; });
+  var lItems=list.filter(function(t){ return t.cat==='生活'; });
+  var wHtml = wItems.length ? wItems.map(itemHtml).join('') : '<div class="todo-empty">💼 暂无工作待办</div>';
+  var lHtml = lItems.length ? lItems.map(itemHtml).join('') : '<div class="todo-empty">🏠 暂无生活待办</div>';
+  box.innerHTML =
+    '<div class="todo-group" id="todoWorkGroup"><div class="todo-group-head">💼 工作待办</div><div id="todoListWork" class="todo-sublist">'+wHtml+'</div></div>'+
+    '<div class="todo-group" id="todoLifeGroup"><div class="todo-group-head">🏠 生活待办</div><div id="todoListLife" class="todo-sublist">'+lHtml+'</div></div>';
   bindSwipeList('todoList');
   applyTodoFilter();
   var done=list.filter(function(t){return t.done;}).length;
@@ -16334,7 +16359,7 @@ async function wbLoginOK(user, fromCloud){
   loadLifePassConfig().then(function(){ renderLifePassQuickEntry(); }).catch(function(){});
   try { applyBackupEnabled(); } catch(e){} // 立即按本地开关状态应用数据备份入口显隐
   wbLoadBackupEnabled().then(applyBackupEnabled).catch(function(){}); // 后台从云端拉取最新开关
-  loadAccountPartition().then(applyAccountPartition).catch(function(){});
+  loadAccountPartition().then(applyPartitionUI).catch(function(){});
   // 跨设备退出：注册本设备会话 + 启动被远程踢出的监听
   wbRegisterDevice();
   wbStartDeviceWatch();
@@ -18161,7 +18186,7 @@ function boot(){
     try{ focusInit(); }catch(e){ console.warn('focusInit 异常:', e); }
     applyBackupEnabled(); // 立即按本地开关状态应用数据备份入口显隐
     wbLoadBackupEnabled().then(applyBackupEnabled); // 后台从云端拉取最新开关
-    loadAccountPartition().then(applyAccountPartition); // 后台拉取账号分区并按分区隐藏功能
+    loadAccountPartition().then(applyPartitionUI); // 后台拉取账号分区并按分区隐藏功能（含待办两版本显隐）
     // 后台静默同步云端数据（不阻塞 UI）：启动定时双向同步循环（每 45s 推+拉、切前台立即拉）
     if(API_TOKEN){
       wbStartSyncLoop();
