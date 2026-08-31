@@ -30,6 +30,7 @@
 <!-- v254-cachebust: 修复 v253 引入的一处语法错误——专注时刻背景图「仅可上传1张」确认弹窗的单引号字符串被拆成两行→整段脚本解析失败→所有事件绑定失效(已登录设备重开卡登录页/点登录无反应/版本角标取不到值)。修复后恢复 v253 的秒进提速逻辑 -->
 <!-- v255-cachebust: 英语单词卡点击不切换(达标横幅早期return+末卡无兜底→改非阻塞横幅+末卡循环)/生活习惯图标🌙→📋/专注时刻统计页空白(focusRangeFilter误当函数调用致list.reduce崩溃→改.filter)/作息表环形钟重做(300·150统一+每段独立配色+段间缝+环外时间标注+当前时段高亮，环/图例/时间轴颜色一致) -->
 <!-- v256-cachebust: 跨设备踢人失联修复——设备列表+校验按 deviceId 合并多后端(任一 revoked 即视为踢出)；轮询改为先 check 后 register(被踢即强制退出不 register)；SCF 后端 register 保留 revoked 状态(防御纵深)。修复手机端设备管理缺电脑/退出电脑端无效的 bug -->
+<!-- v257-cachebust: 跨设备踢人根因修复——登录有「离线回退」分支不设API_TOKEN，这类设备永不注册云端(手机看不到/踢不掉)；v257 无条件启动设备监听使离线设备也能收到广播；退出电脑端找不到云端设备时也照样广播；wbRTBroadcast改异步+懒连接等待；设备管理新增自检面板(登录模式/本机已登记/实时通道/双后端设备数)；已踢出设备可「再踢一次」-->
 <!-- v200-cachebust: 新增「倒数日」生活功能——page-daysmatter 页面(分类:生活/工作/纪念日/全部)+左侧导航「倒数日」+首页快捷「倒数日」；数据存 localStorage(workbench_daysmatter_events)；弹窗 z-index 置顶 -->
 <!-- v215-cachebust: 同步可见化+压缩上传——①新增同步状态徽标(🟢已同步/🔄同步中/🔴异常/⚪离线,点击手动同步) ②上传前gzip压缩(storeGz)绕开1MB上限 ③失败原因吐司(413数据过大/401登录失效/网络) ④后端upload支持storeGz解压+上限放宽到5MB -->
 <!-- v216-cachebust: ①账号管理新增「后端」下拉(每账号:自动双写/优先SCF/优先Supabase)，wb_bkpref_<email>持久化，wbApplyBackendPref 重排 API_BACKENDS 顺序([0]=优先读写)，双写永远开启→切换不影响数据与跨平台同步 ②同步徽标固定首页首行居中(top:8px) -->
@@ -9730,13 +9731,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 256;                         // v256：跨设备踢人/设备列表失联修复——①设备列表+设备校验改为按 deviceId 合并多后端(SCF+Supabase)，任一后端 revoked 即视为踢出，避免双后端写盘偶尔丢一端时手机端设备管理缺电脑、退出电脑端无反应 ②轮询 tick 改为先 check 后 register，被踢设备 check=revoked→强制退出并不再 register，修复 v209/v211 register 每 60s 重写 revoked=false 自我解封的漏洞 ③SCF 后端 register 保留已有 revoked 状态(防御纵深)
+const WB_VERSION = 257;                         // v257：跨设备踢人真正的根因修复——①登录有「离线回退」分支(wbLoginOK(u,false))不设 API_TOKEN，这类设备永不注册到云端→手机端看不到它也无法踢它；v257 无论云端/离线都**无条件启动设备监听**(wbStartDeviceWatch)，离线设备也能连上 Realtime 收到踢出广播 ②confirmLogout 不再因"云端列表找不到设备"就放弃，找不到也照样广播(唯一能触达离线模式设备的通道) ③wbRTBroadcast 改异步+懒连接等待(最长1.5s)，WS 未就绪时不再静默 return false ④设备管理新增自检面板(登录模式/本机已登记/实时通道/双后端设备数)便于定位 ⑤已踢出设备可「再踢一次」清理僵尸会话
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 175;                 // v256 发版（175 不含4）
+const WB_DISPLAY_VERSION = 176;                 // v257 发版（176 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -16434,10 +16435,26 @@ function wbRTConnect(){
     }, 25000);
   }catch(e){ /* Realtime 不可用：静默回退轮询 */ }
 }
-function wbRTBroadcast(devType, devId){
-  var ws = _wbRT.ws;
-  if(!ws || ws.readyState !== 1) return false;
+// v257：改为异步 + 懒连接等待——WebSocket 可能仍在握手中（或断线后需重建），
+//       原实现「未 OPEN 直接 return false」会让「退出电脑端」静默失效且无任何提示。
+//       现在最多等 1.5s 让握手完成，仍失败才返回 false（调用方据此给明确提示）。
+async function wbRTBroadcast(devType, devId){
   try{
+    if(!WB_SESSION) return false;
+    var ws = _wbRT.ws;
+    if(!ws || ws.readyState !== 1){
+      try{ wbRTConnect(); }catch(e){}
+      // 非阻塞轮询等待 OPEN（每 100ms 检查一次，最多 1.5s）
+      var deadline = Date.now() + 1500;
+      while(Date.now() < deadline){
+        var w = _wbRT.ws;
+        if(w && w.readyState === 1){ ws = w; break; }
+        if(!w || w.readyState === 3){ try{ wbRTConnect(); }catch(e){} }   // CLOSED → 重建
+        await new Promise(function(r){ setTimeout(r, 100); });
+      }
+      ws = _wbRT.ws;
+      if(!ws || ws.readyState !== 1) return false;
+    }
     _wbRT.ref++;
     // v210：带 deviceId 时精准踢单台；不带时按类型踢（兼容 v209 的 confirmLogout 全类型踢）
     ws.send(JSON.stringify([String(_wbRT.ref), String(_wbRT.ref), wbRTTopic(), 'broadcast', {
@@ -17458,13 +17475,24 @@ async function showDeviceManager(){
   m.style.display = 'flex';
   m.onclick = function(e){ if(e.target === m) closeModal('clientModal'); };
   try {
-    if(!API_TOKEN){ var b1=document.getElementById('dmDevList'); if(b1) b1.innerHTML='<span style="color:#999">未登录，无法查看设备</span>'; return; }
-    var res = await wbApiDeviceList();
+    // v257：离线账号模式（无 API_TOKEN）时不再直接 return——仍要渲染下面的诊断信息，
+    //       让用户看得到「本机为何没出现在列表里」
+    var res = API_TOKEN ? await wbApiDeviceList() : { ok:false, devices:[], sources:'离线模式未查询' };
     var devs = (res && res.devices) || [];
     var curId = '';
     try { curId = wbGetDeviceId(); } catch(e){}
     var box = document.getElementById('dmDevList');
-    if(!devs || !devs.length){ if(box) box.innerHTML='<span style="color:#999">暂无在线设备</span>'; return; }
+    if(!API_TOKEN){
+      var warnHtml = '<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:8px;padding:10px 12px;margin-bottom:10px;text-align:left;font-size:12px;line-height:1.7;color:#ad6800">'
+        + '⚠️ <b>本机处于「离线账号模式」</b><br>本机登录时后端不可用，未走云端登录，因此<b>不会出现在云端设备列表里</b>，也无法被其他设备远程踢出。<br>解决：退出后重新登录（确保联网），本机就会正常登记。'
+        + '</div>';
+      if(box) box.innerHTML = warnHtml + wbDevDiagHtml(curId, [], res);
+      return;
+    }
+    if(!devs || !devs.length){
+      if(box) box.innerHTML='<span style="color:#999">暂无在线设备</span>' + wbDevDiagHtml(curId, devs, res);
+      return;
+    }
     var html = '<div style="text-align:right;font-size:12px;color:#999;padding:0 2px 6px">共 '+devs.length+' 台设备</div>';
     html += devs.map(function(d){
       var isCur = d.deviceId === curId;
@@ -17482,7 +17510,8 @@ async function showDeviceManager(){
       if(isCur){
         btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#999;flex:0 0 auto" onclick="doLogout()">退出本机</button>';
       } else if(isRevoked){
-        btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#ddd;color:#999;flex:0 0 auto" disabled>已踢出</button>';
+        // v257：已吊销但浏览器可能仍挂着会话（僵尸态）→ 允许再踢一次，只广播不再吊销
+        btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#faad14;flex:0 0 auto" onclick="reKickDevice(\''+d.deviceId+'\',\''+d.type+'\')">再踢一次</button>';
       } else {
         btn = '<button class="btn-primary" style="padding:5px 12px;font-size:12px;background:#e64340;flex:0 0 auto" onclick="kickDevice(\''+d.deviceId+'\',\''+d.type+'\')">踢出</button>';
       }
@@ -17492,11 +17521,63 @@ async function showDeviceManager(){
         '<div style="flex:1;min-width:0"><div style="font-size:14px;color:'+(isRevoked?'#bbb':'#333')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+(isCur?' <span style="color:#1677ff;font-size:11px">● 当前</span>':'')+'</div>'+
         '<div style="font-size:12px;color:#999">'+label+' · '+rel+' · '+status+'</div></div>'+btn+'</div>';
     }).join('');
-    if(box) box.innerHTML = html;
+    if(box) box.innerHTML = html + wbDevDiagHtml(curId, devs, res);
   } catch(e){
     var b2 = document.getElementById('dmDevList');
-    if(b2) b2.innerHTML='<span style="color:#999">获取设备列表失败</span>';
+    var cid=''; try{ cid=wbGetDeviceId(); }catch(e2){}
+    if(b2) b2.innerHTML='<span style="color:#999">获取设备列表失败：'+esc((e&&e.message)||'')+'</span>' + wbDevDiagHtml(cid, [], null);
   }
+}
+// v257：设备管理自检信息——排查「设备不出现在列表里 / 踢不掉」的关键数据
+function wbDevDiagHtml(curId, devs, res){
+  try{
+    var rtTxt = '未连接', rtOk = false;
+    try{
+      var w = _wbRT && _wbRT.ws;
+      if(!w) rtTxt = '未连接';
+      else if(w.readyState===0) rtTxt = '连接中';
+      else if(w.readyState===1){ rtTxt = '🟢 已连接'; rtOk = true; }
+      else if(w.readyState===2) rtTxt = '关闭中';
+      else rtTxt = '🔴 已断开';
+    }catch(e){}
+    var mode = API_TOKEN
+      ? '<span style="color:#52c41a">☁️ 云端登录</span>'
+      : '<span style="color:#e64340">📴 离线账号模式（不登记云端）</span>';
+    var inList = (devs||[]).some(function(d){ return d.deviceId === curId; });
+    var nScf=0, nSupa=0;
+    (devs||[]).forEach(function(d){
+      var s = d._sources || [];
+      if(s.indexOf('scf') >= 0) nScf++;
+      if(s.indexOf('supa') >= 0) nSupa++;
+    });
+    var rows = [
+      ['登录账号', esc(String(WB_SESSION || '（未登录）'))],
+      ['登录模式', mode],
+      ['本机设备ID', esc(String(curId||'').slice(0,16)) + (String(curId||'').length>16?'…':'')],
+      ['本机已登记', inList ? '<span style="color:#52c41a">✅ 是</span>' : '<span style="color:#e64340">❌ 否</span>'],
+      ['实时通道', rtOk ? '<span style="color:#52c41a">🟢 已连接</span>' : '<span style="color:#e64340">'+rtTxt+'</span>'],
+      ['后端设备数', 'SCF '+nScf+' 台 · Supabase '+nSupa+' 台']
+    ];
+    return '<div style="margin-top:12px;background:#f7f8fa;border-radius:8px;padding:8px 10px;text-align:left;font-size:11px;line-height:1.9;color:#888">'
+      + '<div style="font-weight:700;color:#666;margin-bottom:4px">🔍 自检信息（排查用）</div>'
+      + rows.map(function(r){
+          return '<div style="display:flex;justify-content:space-between;gap:8px"><span>'+r[0]+'</span><span style="color:#333">'+r[1]+'</span></div>';
+        }).join('')
+      + '</div>';
+  }catch(e){ return ''; }
+}
+// v257：对「已标记为踢出、但浏览器仍挂着会话」的僵尸设备再发一次退出指令
+async function reKickDevice(deviceId, devType){
+  var label = devType === 'phone' ? '手机' : '电脑';
+  if(typeof wbConfirmAsync === 'function'){
+    if(!await wbConfirmAsync('该设备已标记为踢出，但可能仍挂着会话。\n再发一次退出指令？')) return;
+  }
+  try{
+    if(API_TOKEN){ try{ await api('/api/auth/device/revoke', 'POST', { deviceId: deviceId }); }catch(e){} }
+    var ok = await wbRTBroadcast(devType, deviceId);
+    toast(ok ? '✅ 已再次发送退出指令给该' + label : '⚠️ 实时通道未连接，指令未送达');
+    if(ok){ setTimeout(function(){ try{ showDeviceManager(); }catch(e){} }, 800); }
+  }catch(e){ toast('发送失败：' + ((e && e.message) || '未知错误')); }
 }
 // v210：踢出指定设备（带二次确认；踢出后广播让该设备秒级退出，轮询兜底）
 async function kickDevice(deviceId, devType){
@@ -17510,7 +17591,7 @@ async function kickDevice(deviceId, devType){
   try {
     var rev = await api('/api/auth/device/revoke', 'POST', { deviceId: deviceId });
     if(rev && rev.ok){
-      wbRTBroadcast(devType, deviceId);   // 精准广播：只有目标设备立即退出
+      await wbRTBroadcast(devType, deviceId);   // 精准广播：只有目标设备立即退出
       toast('✅ 已踢出该' + label + '设备');
       setTimeout(function(){ try{ showDeviceManager(); }catch(e){} }, 600);  // 刷新列表
     } else {
@@ -17557,25 +17638,27 @@ async function confirmLogout(target){
     return;
   }
 
-  // 远程退出另一设备：拉取设备列表，吊销该类型下的所有设备
+  // 远程退出另一设备：吊销云端记录 + Realtime 广播
   try {
-    if(!API_TOKEN){ toast('远程退出需联网登录后才可用'); return; }
-    var listRes = await wbApiDeviceList();
-    if(!listRes || !listRes.ok){ toast('获取设备列表失败'); return; }
+    if(!WB_SESSION){ toast('未登录'); return; }
     var wantType = (target === 'phone') ? 'phone' : 'desktop';
-    // v209：原实现用 find 只取第一台，多设备时会漏踢 → 改为 filter，踢掉该类型下所有未吊销设备
-    var targetDevs = (listRes.devices || []).filter(function(d){ return d.type === wantType && !d.revoked; });
-    if(!targetDevs.length){
-      toast('未找到可退出的' + targetLabel + '设备');
-      closeModal('clientModal');
-      return;
+    var targetDevs = [];
+    if(API_TOKEN){
+      var listRes = await wbApiDeviceList();
+      // v209：原实现用 find 只取第一台，多设备时会漏踢 → 改为 filter，踢掉该类型下所有未吊销设备
+      // v257：离线模式（无 API_TOKEN）的电脑端不会注册到云端，列表里本来就没有它——
+      //       此时不能报「未找到设备」就放弃，必须继续走下面的 Realtime 广播把它踢掉
+      targetDevs = ((listRes && listRes.devices) || []).filter(function(d){ return d.type === wantType && !d.revoked; });
     }
     // v209：原实现 wbConfirm 回调为空且 revoke 抢先执行 → 点「取消」也会被踢。改用 await 确认框，确认后才执行
+    var tip = targetDevs.length
+      ? '确定远程退出该' + targetLabel + '吗？\n共 ' + targetDevs.length + ' 台设备需要重新登录（你的数据不会丢失）。'
+      : '云端设备列表里没有该' + targetLabel + '（它可能处于离线账号模式）。\n仍要发送退出指令吗？只要它当前连着网就会被踢下线。';
     var confirmed = true;
-    if(typeof wbConfirmAsync === 'function'){
-      confirmed = await wbConfirmAsync('确定远程退出该' + targetLabel + '吗？\n共 ' + targetDevs.length + ' 台设备需要重新登录（你的数据不会丢失）。');
-    }
+    if(typeof wbConfirmAsync === 'function'){ confirmed = await wbConfirmAsync(tip); }
     if(!confirmed){ closeModal('clientModal'); return; }
+
+    // ① 吊销云端记录（有则吊销，无则跳过）
     var okCount = 0, failMsg = '';
     for(var ti = 0; ti < targetDevs.length; ti++){
       try {
@@ -17584,12 +17667,17 @@ async function confirmLogout(target){
         else failMsg = (rev && rev.error) || '未知错误';
       } catch(e2){ failMsg = (e2 && e2.message) || String(e2); }
     }
+    // ② v257：无论如何都广播——这是唯一能踢到「离线账号模式」设备的通道
+    //    （离线模式的电脑端没有 API_TOKEN→不会注册到云端，但它仍连着 Realtime，收得到广播）
+    var broadcast = await wbRTBroadcast(wantType);
     if(okCount){
-      // v209：revoke 成功后立即 Realtime 广播，电脑端秒级退出（Realtime 不可用时回退 3 秒轮询）
-      wbRTBroadcast(wantType);
-      toast('✅ 已远程退出' + targetLabel + '（' + okCount + ' 台）');
-    } else {
+      toast('✅ 已远程退出' + targetLabel + '（' + okCount + ' 台' + (broadcast ? '，已实时通知' : '') + '）');
+    } else if(broadcast){
+      toast('✅ 已发送退出指令给' + targetLabel + '（该设备为离线账号模式，云端无记录）');
+    } else if(failMsg){
       toast('远程退出失败：' + (failMsg || '未知错误'));
+    } else {
+      toast('已发送退出指令，但未能建立实时通道\n请确保' + targetLabel + '当前联网，或稍后重试');
     }
   } catch(e){
     toast('远程退出失败：' + ((e && e.message) || '网络异常'));
@@ -18043,13 +18131,15 @@ function boot(){
       wbApiDeviceCheck(wbGetDeviceId()).then(function(r){
         if(r && r.ok && r.revoked){ wbForceLogoutByRevoke(); return; }
         try{ wbRegisterDevice(); }catch(e){}
-        try{ wbStartDeviceWatch(); }catch(e){}
       }).catch(function(){
-        // 合并校验全失败时仍按原流程尝试注册 + 启动监听，避免网络抽风卡死登录
+        // 合并校验全失败时仍尝试注册，避免网络抽风卡死登录
         try{ wbRegisterDevice(); }catch(e){}
-        try{ wbStartDeviceWatch(); }catch(e){}
       });
     }
+    // v257：设备监听必须无条件启动——离线账号模式（无 API_TOKEN）的设备注册不到云端、
+    //       也不会走上面的分支，但它仍会连上 Realtime；只有连上才能收到其他设备发来的「退出」广播。
+    //       此前放在 if(API_TOKEN) 里，导致离线模式的电脑端永远收不到踢出指令。
+    try{ wbStartDeviceWatch(); }catch(e){}
     // 已登录 → 直接提示授权电脑端扫码登录
     if(slTicket){ doScanApprove(slTicket); }
   } else {
