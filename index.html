@@ -19,6 +19,7 @@
 <!-- v261-cachebust: 待办日历重做为图2 风格(每天最多 8 条彩色 chip + overflow + 自定义背景色)；新增「🗓 月维度」subtab(图3 风格:6×7 大格子每月统计+每格最多 6 条彩色 bar);待办新增 bg 字段(用户自定义背景色,空 = 跟随分类色);编辑弹窗加 8 色选盘；renderTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历 -->
 <!-- v265-cachebust: 待办月维度——①修复农历始终未显示的 bug（IIFE 包裹的 solar2lunar / LUNAR_DAY_CN / LUNAR_MONTH_CN 之前没暴露到 window，导致 IIFE 外的 tdLunarDay 永远拿到 ''），现在每个公历日下方真实显示农历；②跨月日期只保留第一周用上月尾巴对齐，最后一行自然停在当月最后一天，不再补下月日期撑成 6 行 42 格。版本号 265/185。 -->
 <!-- v266-cachebust: 「新增待办」下拉框随账号分区显隐——账号工作区被隐藏(work=false)时下拉只保留「生活」；生活功能区被隐藏(life=false)时下拉排除「生活」；其余情况（含默认/admin/分区未就绪）保持全部 7 项。新增 populateTodoCat()，在 applyPartitionUI() 末尾与 renderAppointmentsTodos() 起始各调一次，确保分区加载完成 + 用户进入待办页两个时点都生效。版本号 266/186。 -->
+<!-- v267-cachebust: 生活侧分类扩为「生活 + 学习提升」——新增共享常量 TD_LIFE_CATS / tdIsLifeCat()，下拉框、待办列表分组、筛选 tab 三处共用同一份定义。①下拉框：work=false 只显示「生活 + 学习提升」（生活排第一），life=false 排除这两项；②renderTodo() 分组同步改为按 tdIsLifeCat 拆分（含学习提升），否则工作分区关闭时新增的学习提升待办会落进被隐藏的工作组而看不见；③新增 applyTodoCatTabs() 同步隐藏对应的筛选 tab，当前选中项被隐藏时自动回落「全部」。版本号 267/187。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -6520,13 +6521,19 @@ function applyAccountPartition(){
   if(_accountPartition.fun === false){
     document.querySelectorAll('[data-page="fun"], [data-qpage="fun"]').forEach(function(el){ el.style.display = 'none'; });
   }
-  // v266：新增待办下拉框随分区显隐——账号工作区被隐藏时只显示「生活」；生活功能区被隐藏时排除「生活」；
+  // v267：新增待办下拉框随分区显隐——账号工作区被隐藏时只显示「生活 + 学习提升」；生活功能区被隐藏时排除这两项；
   // 两分区都隐藏或两分区都开放时保留全部 7 项（避免选项为 0）。
   try { if(typeof populateTodoCat === 'function') populateTodoCat(); } catch(e){}
+  try { if(typeof applyTodoCatTabs === 'function') applyTodoCatTabs(); } catch(e){}
   console.log('[partition] 已应用账号分区过滤，当前可见：work=' + _accountPartition.work + ' life=' + _accountPartition.life + ' fun=' + _accountPartition.fun);
 }
-// v266：按账号分区过滤「新增待办」下拉框
-// 规则：work=false → 只保留「生活」；life=false → 排除「生活」；其他情况（含默认/admin/分区未就绪）→ 全部 7 项。
+// ===== v267：「生活类」分类统一定义（下拉框 + 列表分组 + 筛选 tab 共用同一份，避免三处定义打架）=====
+// 规则：生活侧 = 生活 + 学习提升；其余（客户跟进/保单办理/保函业务/行政事务/佣金待结算）属工作侧。
+// 下拉框里「生活」排第一（符合用户直觉），列表分组按此集合拆分。
+var TD_LIFE_CATS = ['生活','学习提升'];
+function tdIsLifeCat(cat){ return TD_LIFE_CATS.indexOf(cat) >= 0; }
+// v267：按账号分区过滤「新增待办」下拉框
+// 规则：work=false → 只保留「生活 + 学习提升」；life=false → 排除这两项；其他情况（含默认/admin/分区未就绪）→ 全部 7 项。
 // 若 work 和 life 同时为 false（极少见），为避免空下拉框，回退到全部 7 项。
 function populateTodoCat(){
   var sel = document.getElementById('todoCat');
@@ -6539,10 +6546,10 @@ function populateTodoCat(){
   if(workOff && lifeOff){
     keep = allCats.slice(); // 双分区都隐藏时兜底显示全部，避免空下拉框
   } else if(workOff){
-    keep = ['生活'];        // 账号工作区被隐藏 → 只显示「生活」
+    keep = TD_LIFE_CATS.slice(); // 账号工作区被隐藏 → 只显示「生活 + 学习提升」（生活排第一，优先选中）
   } else if(lifeOff){
     keep = [];
-    for(var i=0;i<allCats.length;i++) if(allCats[i] !== '生活') keep.push(allCats[i]); // 生活功能区被隐藏 → 排除「生活」
+    for(var i=0;i<allCats.length;i++) if(!tdIsLifeCat(allCats[i])) keep.push(allCats[i]); // 生活功能区被隐藏 → 排除生活类
   } else {
     keep = allCats.slice(); // 默认/admin/分区未加载完 → 显示全部
   }
@@ -6554,13 +6561,37 @@ function populateTodoCat(){
   sel.innerHTML = html;
   if(keep.indexOf(cur) >= 0) sel.value = cur;
   else sel.value = keep[0];
-  // 同步：清空当前选中样式的高亮，避免「旧选中项」残留视觉
-  try {
-    var picker = document.getElementById('tdAddColorPicker');
-    if(picker && picker.getAttribute('data-bound') === '1'){
-      // 颜色选盘没有跟着分类联动，保留即可
+}
+// v267：筛选 tab（#catTabs）同步按分区显隐——与下拉框同一套 life 集合。
+// 当前选中的 tab 若被隐藏，自动回落到「全部」，避免筛选出一个永远为空的视图。
+function applyTodoCatTabs(){
+  var wrap = document.getElementById('catTabs');
+  if(!wrap) return;
+  var p = (typeof _accountPartition === 'object' && _accountPartition) ? _accountPartition : null;
+  var workOff = !!(p && p.work === false);
+  var lifeOff = !!(p && p.life === false);
+  wrap.querySelectorAll('.cat-tab').forEach(function(btn){
+    var cat = btn.getAttribute('data-cat');
+    if(cat === '全部'){ btn.style.display = ''; return; } // 「全部」永远保留
+    var isLife = tdIsLifeCat(cat);
+    // 只在这两个明确状态时收窄；其余（含双 off / 分区未就绪）保持原样，不误隐藏
+    var hide = false;
+    if(workOff && !lifeOff) hide = !isLife;        // 只剩生活侧
+    else if(lifeOff && !workOff) hide = isLife;    // 只剩工作侧
+    btn.style.display = hide ? 'none' : '';
+  });
+  // 选中项被隐藏了 → 回落到「全部」
+  if(typeof currentTodoCat !== 'undefined' && currentTodoCat && currentTodoCat !== '全部'){
+    var isLifeSel = tdIsLifeCat(currentTodoCat);
+    var selHidden = (workOff && !lifeOff && !isLifeSel) || (lifeOff && !workOff && isLifeSel);
+    if(selHidden){
+      currentTodoCat = '全部';
+      wrap.querySelectorAll('.cat-tab').forEach(function(b){ b.classList.remove('active'); });
+      var allBtn = wrap.querySelector('.cat-tab[data-cat="全部"]');
+      if(allBtn) allBtn.classList.add('active');
+      try { if(typeof applyTodoFilter === 'function') applyTodoFilter(); } catch(e){}
     }
-  } catch(e){}
+  }
 }
 // v259：分区加载/变更后，侧边栏+首页+待办列表一并刷新（待办已拆成工作/生活两个版本，需随分区显隐）
 function applyPartitionUI(){
@@ -6856,8 +6887,9 @@ function setApptRange(btn, range){
 }
 function renderAppointmentsTodos(){
   var box = document.getElementById('apptTodoBox'); if(!box) return;
-  // v266：每次渲染待办前刷新新增分类下拉框（与账号分区同步：work 隐藏时只显示生活；life 隐藏时排除生活）
+  // v267：每次渲染待办前刷新新增分类下拉框 + 筛选 tab（与账号分区同步：work 隐藏只显示生活+学习提升；life 隐藏排除这两项）
   try { if(typeof populateTodoCat === 'function') populateTodoCat(); } catch(e){}
+  try { if(typeof applyTodoCatTabs === 'function') applyTodoCatTabs(); } catch(e){}
   var list = getClients();
   var today = tdCalLocalToday();
   // 范围截止日期（本地时区）：逾期和今天都算「今日及逾期」；N 日内 = 含逾期到未来第 N 天
@@ -9986,13 +10018,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 266;                         // v266：「新增待办」分类下拉框随账号分区显隐——work 隐藏只保「生活」、life 隐藏排除「生活」，其余情况全显。
+const WB_VERSION = 267;                         // v267：生活侧分类扩为「生活 + 学习提升」，下拉框/列表分组/筛选 tab 三处共用 TD_LIFE_CATS 同一份定义。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 186;                 // v266 发版（186 不含4）
+const WB_DISPLAY_VERSION = 187;                 // v267 发版（187 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10521,8 +10553,10 @@ function ctx_ap(){
     '</div>';
   };
   // v259：拆成「工作待办 / 生活待办」两个独立版本，各自随账号分区显隐
-  var wItems=list.filter(function(t){ return t.cat!=='生活'; });
-  var lItems=list.filter(function(t){ return t.cat==='生活'; });
+  // v267：生活侧扩为「生活 + 学习提升」（与下拉框 TD_LIFE_CATS 同源），
+  //       否则工作分区关闭时新增的「学习提升」待办会落进被隐藏的工作组而彻底看不见。
+  var wItems=list.filter(function(t){ return !tdIsLifeCat(t.cat); });
+  var lItems=list.filter(function(t){ return tdIsLifeCat(t.cat); });
   var wHtml = wItems.length ? wItems.map(itemHtml).join('') : '<div class="todo-empty">💼 暂无工作待办</div>';
   var lHtml = lItems.length ? lItems.map(itemHtml).join('') : '<div class="todo-empty">🏠 暂无生活待办</div>';
   box.innerHTML =
