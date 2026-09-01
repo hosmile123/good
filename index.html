@@ -17,6 +17,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
 <!-- v261-cachebust: 待办日历重做为图2 风格(每天最多 8 条彩色 chip + overflow + 自定义背景色)；新增「🗓 月维度」subtab(图3 风格:6×7 大格子每月统计+每格最多 6 条彩色 bar);待办新增 bg 字段(用户自定义背景色,空 = 跟随分类色);编辑弹窗加 8 色选盘；renderTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历 -->
+<!-- v263-cachebust: 待办月维度所有单元格改为固定高度（不再随内容撑高），统一 145px 高、6 行 7 列完全等大；bars 区域 flex:1 + overflow:hidden 自动裁剪超出，溢出靠 "+N 更多" 表达，每格始终显示 "公历 + 农历" -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -941,15 +942,21 @@ body.sb-collapsed .sidebar-item:hover::after {
 
 .td-month-grid {
   display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 145px;
   gap: 4px;
 }
 .td-month-cell {
-  min-height: 92px; padding: 3px;
+  height: 145px; overflow: hidden;
+  padding: 3px;
   border-radius: 8px; background: #fcfcfe;
   position: relative; cursor: pointer;
   border: 1px solid #eef0f5;
   display: flex; flex-direction: column;
   transition: transform .12s, box-shadow .15s;
+}
+@media (max-width: 600px){
+  .td-month-grid { grid-auto-rows: 118px; }
+  .td-month-cell { height: 118px; }
 }
 .td-month-cell:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,.06); }
 .td-month-cell.other-month { opacity: .35; }
@@ -978,11 +985,15 @@ body.sb-collapsed .sidebar-item:hover::after {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
 .td-month-cell.other-month .td-month-cell-lunar { color: #bbb; }
-.td-month-cell-bars { display: flex; flex-direction: column; gap: 2px; }
+.td-month-cell-bars {
+  display: flex; flex-direction: column; gap: 2px;
+  flex: 1 1 auto; min-height: 0; overflow: hidden;
+}
 .td-month-bar {
-  font-size: 9px; line-height: 1.2; padding: 2px 4px;
+  font-size: 9px; line-height: 1.2; padding: 1px 4px;
   border-radius: 4px; font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 .td-month-bar.done { text-decoration: line-through; opacity: .45; }
 .td-month-bar-overflow {
@@ -995,6 +1006,7 @@ body.sb-collapsed .sidebar-item:hover::after {
   font-size: 9px; color: var(--text-light);
   display: flex; justify-content: space-between; align-items: center;
   border-top: 1px dashed #eef0f3;
+  flex-shrink: 0;
 }
 .td-month-cell-foot.done { color: #52C41A; font-weight: 700; }
 .td-month-cell-foot.undone { color: #fa541c; font-weight: 700; }
@@ -9882,13 +9894,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 262;                         // v262：删除原「📅 日历」页，待办仅保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期（含上月尾/下月头，可跨月浏览，点相邻月格自动跳月）+ 每格数字后显示农历；「📋 最近待办」移至月维度下方。
+const WB_VERSION = 263;                         // v263：待办月维度 6×7 单元格改为固定 145px 等高（不再随内容撑高），bars 区域 flex:1 + overflow:hidden 自动裁剪，溢出靠 "+N 更多" 表达，移动端 118px；每格始终 "公历 + 农历"。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 181;                 // v262 发版（181 不含4）
+const WB_DISPLAY_VERSION = 182;                 // v263 发版（182 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10574,8 +10586,8 @@ function renderTodoMonth(){
   for(var d=1;d<=daysInMonth;d++) cells.push(makeCell(y,m,d));
   var nextY=y, nextM=m+1; if(nextM>11){nextM=0;nextY++;}
   var ni=1; while(cells.length<42){ cells.push(makeCell(nextY,nextM,ni)); ni++; }
-  /* 每格最多 6 条彩色 bar + overflow；数字后附农历 */
-  var BAR_MAX = 6;
+  /* 每格最多 5 条彩色 bar + overflow；数字后附农历；格子固定高度，超出自动裁剪 */
+  var BAR_MAX = 5;
   var html=cells.map(function(c){
     var todos=(byDate[c.dateStr]||[]);
     var isToday=c.dateStr===todayStr;
