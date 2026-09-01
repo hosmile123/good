@@ -17,7 +17,7 @@
 <!-- v176-cachebust: 数据备份功能默认隐藏+管理账号开关控制；修复娱乐分区未勾选依然显示的bug(loadAccountPartition严格按后端返回===true判断，admin永久全开) -->
 <!-- v259-cachebust: 待办拆分为「工作待办/生活待办」两个版本，各自随账号分区显隐 -->
 <!-- v261-cachebust: 待办日历重做为图2 风格(每天最多 8 条彩色 chip + overflow + 自定义背景色)；新增「🗓 月维度」subtab(图3 风格:6×7 大格子每月统计+每格最多 6 条彩色 bar);待办新增 bg 字段(用户自定义背景色,空 = 跟随分类色);编辑弹窗加 8 色选盘；renderTodo/toggleTodo/deleteTodo/updateTodo 同步刷新两个日历 -->
-<!-- v264-cachebust: 待办月维度全面重做——①每格顶部公历数字字号放大到 19px 粗体，下面紧跟一行小号农历；②每个月表头（日/一/二/三/四/五/六）下方新增一行小农历，标记本视图第一行那 7 天对应的农历日；③BAR_MAX 由 5 升到 6（每天至少 6 条），单元格高度从 145px 同步抬到 170px；④chip 进一步压扁到 9px 字体 + 1px 上下 padding，让 6 条 + "+N 更多" 行稳定可点；⑤新增待办添加区颜色选盘（同编辑弹窗），所有待办都可以自定义背景色。 -->
+<!-- v265-cachebust: 待办月维度——①修复农历始终未显示的 bug（IIFE 包裹的 solar2lunar / LUNAR_DAY_CN / LUNAR_MONTH_CN 之前没暴露到 window，导致 IIFE 外的 tdLunarDay 永远拿到 ''），现在每个公历日下方真实显示农历；②跨月日期只保留第一周用上月尾巴对齐，最后一行自然停在当月最后一天，不再补下月日期撑成 6 行 42 格。版本号 265/185。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -5243,6 +5243,11 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     window.dmLunarTest = function(){
       return { solar2lunar_2026_2_17: solar2lunar(2026,2,17), lunar2solar_2026_1_1: lunar2solar(2026,1,1) };
     };
+    /* v265: 把农历引擎暴露到 window，让 IIFE 外的 tdLunarDay 能拿到——之前 solar2lunar 被 IIFE 包裹，
+       导致日历格子下面那行小农历一直空白（typeof solar2lunar !== 'function' → 返回 ''）。 */
+    window.solar2lunar = solar2lunar;
+    window.LUNAR_DAY_CN = LUNAR_DAY_CN;
+    window.LUNAR_MONTH_CN = LUNAR_MONTH_CN;
 
     dmLoad(); dmRender();
   })();
@@ -9938,13 +9943,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 264;                         // v264：待办月维度全面重做——顶部公历数字字号放大到 19px 粗体、下面紧跟一行小号农历；表头日/一/二/三/四/五/六下方各显示对应第一行那天的农历；BAR_MAX 5→6（每天至少 6 条）、单元格高度 145→170px；chip 进一步压缩（9px + 1px 上下 padding）；新增待办添加区的颜色选盘（同编辑弹窗），所有待办都可以自定义颜色。
+const WB_VERSION = 265;                         // v265：修复农历 IIFE 作用域 bug（solar2lunar/LUNAR_DAY_CN/LUNAR_MONTH_CN 暴露到 window）；跨月只保第一周，最后一行停在当月最后一天。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 183;                 // v264 发版（183 不含4）
+const WB_DISPLAY_VERSION = 185;                 // v265 发版（184 含4故取185）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10637,7 +10642,8 @@ function renderTodoMonth(){
       '<div class="td-month-stat-card delay"><div class="td-month-stat-num">'+monthDelay+'</div><div class="td-month-stat-label">延期</div></div>'+
       '<div class="td-month-stat-card days"><div class="td-month-stat-num">'+activeDays+'</div><div class="td-month-stat-label">活跃天数</div></div>';
   }
-  /* 6×7 = 42 格：含上月尾 + 当月 + 下月头，全部填真实日期，可跨月浏览 */
+  /* v264: 跨月只允许出现在第一周（首格对齐用上月尾巴补足）；
+       最后一行只保留当月剩余天数，不再用下月日期填满到 42 格——避免日历过满。 */
   function makeCell(yy,mm,dd){
     var ds=yy+'-'+String(mm+1).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
     var wkd=new Date(yy,mm,dd).getDay();
@@ -10648,8 +10654,7 @@ function renderTodoMonth(){
   var prevDays=new Date(prevY,prevM+1,0).getDate();
   for(var i=startDay-1;i>=0;i--) cells.push(makeCell(prevY,prevM,prevDays-i));
   for(var d=1;d<=daysInMonth;d++) cells.push(makeCell(y,m,d));
-  var nextY=y, nextM=m+1; if(nextM>11){nextM=0;nextY++;}
-  var ni=1; while(cells.length<42){ cells.push(makeCell(nextY,nextM,ni)); ni++; }
+  /* v265: 不再补下月日期——末尾自然停在当月最后一天，最后一周不满 7 格直接留空。 */
   /* v264: 表头加一行小农历（日 / 一 / 二 / 三 / 四 / 五 / 六 下方各自显示第一行对应那天的农历） */
   var wdHeader = document.querySelectorAll('#tdMonthWeekdays .tdWdLunar');
   if(wdHeader && wdHeader.length === 7){
