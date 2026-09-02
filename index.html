@@ -24,6 +24,7 @@
 <!-- v269-cachebust: 英语学习修复——①engMark 在词表为空时静默无反应（待复习清空后点按钮像失灵）→ 改为先 toast 提示「待复习已清空」并直接 return；②engDueList 只在 review deck 内稳定，当 engDecks[deck] undefined（旧快照残留）时 list.length 抛 TypeError 中断整页 JS → 新增统一 engList() 辅助函数永远返回数组；③review deck 空状态没有出口 → 新增「📚 去学新词」按钮 + engGoStudyNew() 切回 lastDeck；④renderEngCard 末尾三个 getElementById 缺一即抛错 + 计数器空状态不归零 → 全部加判空；⑤engStar 同样用 engList() 并加空表 toast 保护；⑥selectEngDeck 记录 lastDeck（排除 review/starred）；⑦普通 deck 循环回首页加 wbEngSave() 持久化。 -->
 <!-- v270-cachebust: 待办下拉框/筛选 tab 大改——①顺序重排：生活 + 学习提升 排前两位；②分类改名：保单办理→其他财险，保函业务→TOB业务；③配色与客户中心 CL_TYPE_COLOR 对齐：其他财险=财险蓝 #1890FF（关联财险/团险/TOC），TOB业务=TOB绿 #52C41A；④已存旧名 cat 通过 migrateTodoCats() 在 getTodos 时自动迁移，catColor 保留旧名别名兜底。版本号 270/190。 -->
 <!-- v271-cachebust: 英语学习「我的词库」`<details>` 默认折叠（去掉 open 属性），点 summary 才展开内容——减少首屏占位，让卡片更突出；同时落实 v270 的待办分类重排重命名 + 数据迁移 + 配色对齐。版本号 271/191。 -->
+<!-- v272-cachebust: 修复英语「点我认识/我不认识第二次起失效 + 页面跳到词库」——真凶是 engLibUpdateCounts() 末尾 `if(data-rendered==='1') renderEngLibrary()` 与 renderEngLibrary() 开头的 `engLibUpdateCounts()` 互相回调形成无限递归；第一次点击时 data-rendered 还是 null 侥幸跳过，从第二次起就栈溢出导致 JS 崩溃（表现为单词不切换、页面卡在词库）。修复：①engLibUpdateCounts() 职责收敛为「只更新角标数字」，列表刷新交给调用方显式触发；②engMark 前后保存/恢复 window 滚动位置（_engRestoreScroll），消除词库高度变化把下方按钮顶走的位移感。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -9173,12 +9174,16 @@ function toggleEngListen(){
 function flipEngCard(){ const el=document.getElementById('engCard'); if(el) el.classList.toggle('flipped'); }
 function engMark(known){
   engEnsureToday();
+  // v272：先记住滚动位置。「我的词库」在卡片正上方，renderEngLibrary() 改变列表高度后
+  // 会把下方的卡片和「我认识/我不认识」按钮整体顶走，用户就感觉「点一下页面乱跳到词库去了」。
+  var _sy = (window.pageYOffset || (document.documentElement && document.documentElement.scrollTop) || 0);
   const isReview = engState.deck==='review';
   const list = engList();
   // v269：词表为空时明确提示，而不是静默改 idx 再渲染空状态（原逻辑表现为「点了完全没反应」）
   if(!list.length){
     toast(engEmptyHint());
     renderEngCard();
+    _engRestoreScroll(_sy);
     return;
   }
   const c = list[engState.idx];
@@ -9202,10 +9207,15 @@ function engMark(known){
   engUpdateGoalUI();
   renderEngCard();
   renderEngLibrary();   // v141：标记完后立刻刷新我的词库
+  _engRestoreScroll(_sy);   // v272：抵消 DOM 高度变化带来的位移，视图保持不动
   // v269：复习模式下刚标记完最后一个待复习词 → 明确告知「清空了」，避免用户以为按钮失灵
   if(isReview && engDueList().length === 0){
     toast('🎉 待复习已全部完成，稍后会按遗忘曲线再排进来');
   }
+}
+// v272：把滚动位置恢复到渲染前，消除「点按钮后页面跳到词库」的位移感
+function _engRestoreScroll(y){
+  try{ window.scrollTo(0, y); }catch(e){}
 }
 function selectEngDeck(name, btn, force){
   engState.deck = name;
@@ -9267,9 +9277,12 @@ function engLibUpdateCounts(){
     const span = t.querySelector('.cnt');
     if(span) span.textContent = counts[n] || 0;
   });
-  // 如果当前已经渲染过列表，列表也要重新算（防止后台 srs 变化没刷新）
-  const wrap = document.getElementById('engLibList');
-  if(wrap && wrap.getAttribute('data-rendered') === '1') renderEngLibrary();
+  // v272：修复无限递归（英语「点我认识/我不认识第二次起失效」的真凶）。
+  // 原逻辑：if(data-rendered==='1') renderEngLibrary();
+  // 而 renderEngLibrary() 开头就调 engLibUpdateCounts() → 二者互相回调 → 无限递归 → 栈溢出。
+  // 第一次点击时 data-rendered 还是 null 所以侥幸跳过，第二次点击就死循环，
+  // 表现为「JS 崩溃 → 单词不切换 → 页面卡在词库区域」。
+  // 本函数职责收敛为「只更新角标数字」，列表内容刷新交给调用方显式调 renderEngLibrary()。
 }
 function engLibTab(name, btn){
   engLibTabName = name;
@@ -10034,13 +10047,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 271;                         // v271：英语学习「我的词库」默认折叠（去掉 details 的 open 属性），用户点 summary 才展开内容；同时落实 v270 的待办分类重排重命名 + 数据迁移 + 配色与客户中心 CL_TYPE_COLOR 对齐。
+const WB_VERSION = 272;                         // v272：修复英语「点我认识/我不认识第二次起失效、页面跳到词库」——根因是 engLibUpdateCounts() 与 renderEngLibrary() 互相回调造成无限递归（data-rendered==='1' 后每次触发），第一次点侥幸跳过、第二次起栈溢出 JS 崩溃。收敛 engLibUpdateCounts 只更新角标；另在 engMark 前后保存/恢复滚动位置，消除词库高度变化把按钮顶走的位移感。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 191;                 // v271 发版（191 不含4）
+const WB_DISPLAY_VERSION = 192;                 // v272 发版（192 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
