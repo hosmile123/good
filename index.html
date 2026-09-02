@@ -23,6 +23,7 @@
 <!-- v268-cachebust: 修复「生活组状态下点学习提升 tab 即消失」的回归 bug——根因不在 v267 新写的 applyTodoCatTabs，而在 applyTodoFilter() 内 10502 行的旧逻辑 `catAttr === '生活' ? !!ap.life : !!ap.work` 把「学习提升」硬绑到 !!ap.work 上，每次 filterCat() 调 applyTodoFilter() 就立即把学习提升 tab 设 display:none。修复：把这一行改成 `tdIsLifeCat(catAttr) ? !!ap.life : !!ap.work`，与下拉框/列表分组共用同一份生活侧定义。同时移除 v267 新增的 applyTodoCatTabs（被 applyTodoFilter 覆盖，无意义），两处触发点改为直接调 applyTodoFilter。版本号 268/188。 -->
 <!-- v269-cachebust: 英语学习修复——①engMark 在词表为空时静默无反应（待复习清空后点按钮像失灵）→ 改为先 toast 提示「待复习已清空」并直接 return；②engDueList 只在 review deck 内稳定，当 engDecks[deck] undefined（旧快照残留）时 list.length 抛 TypeError 中断整页 JS → 新增统一 engList() 辅助函数永远返回数组；③review deck 空状态没有出口 → 新增「📚 去学新词」按钮 + engGoStudyNew() 切回 lastDeck；④renderEngCard 末尾三个 getElementById 缺一即抛错 + 计数器空状态不归零 → 全部加判空；⑤engStar 同样用 engList() 并加空表 toast 保护；⑥selectEngDeck 记录 lastDeck（排除 review/starred）；⑦普通 deck 循环回首页加 wbEngSave() 持久化。 -->
 <!-- v270-cachebust: 待办下拉框/筛选 tab 大改——①顺序重排：生活 + 学习提升 排前两位；②分类改名：保单办理→其他财险，保函业务→TOB业务；③配色与客户中心 CL_TYPE_COLOR 对齐：其他财险=财险蓝 #1890FF（关联财险/团险/TOC），TOB业务=TOB绿 #52C41A；④已存旧名 cat 通过 migrateTodoCats() 在 getTodos 时自动迁移，catColor 保留旧名别名兜底。版本号 270/190。 -->
+<!-- v271-cachebust: 英语学习「我的词库」`<details>` 默认折叠（去掉 open 属性），点 summary 才展开内容——减少首屏占位，让卡片更突出；同时落实 v270 的待办分类重排重命名 + 数据迁移 + 配色对齐。版本号 271/191。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -4172,7 +4173,8 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:#fa8c16" id="engDue">0</div><div style="font-size:11px;color:var(--text-light)">今日待复习</div></div>
       <div style="flex:1"><div style="font-size:18px;font-weight:700;color:var(--primary)" id="engWaiting">0</div><div style="font-size:11px;color:var(--text-light)">复习中</div></div>
     </div>
-    <details class="eng-library" id="engLibrary" ontoggle="renderEngLibrary()" open>
+    <!-- v271：我的词库默认折叠（去掉 open），用户点 summary 才会展开内容 -->
+    <details class="eng-library" id="engLibrary" ontoggle="renderEngLibrary()">
       <summary>我的词库<small>点开查看学过的词 · 重点 / 掌握 / 复习 / 不熟练</small></summary>
       <div class="eng-lib-tabs">
         <button class="eng-lib-tab" data-tab="starred" onclick="engLibTab('starred',this)">⭐ 重点集<span class="cnt">0</span></button>
@@ -10032,13 +10034,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 270;                         // v270：①待办下拉框/筛选 tab 重排（生活+学习提升前两位），分类改名（保单办理→其他财险，保函业务→TOB业务），配色与客户中心 CL_TYPE_COLOR 对齐（其他财险=财险蓝 #1890FF，TOB业务=TOB绿 #52C41A）；②已存旧名 cat 自动迁移；③合并 v269 英语修复（待复习清空给 toast+去学新词出口，engList 安全取词，engStar 健壮性，循环回首页持久化）。
+const WB_VERSION = 271;                         // v271：英语学习「我的词库」默认折叠（去掉 details 的 open 属性），用户点 summary 才展开内容；同时落实 v270 的待办分类重排重命名 + 数据迁移 + 配色与客户中心 CL_TYPE_COLOR 对齐。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 190;                 // v270 发版（190 不含4）
+const WB_DISPLAY_VERSION = 191;                 // v271 发版（191 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
