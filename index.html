@@ -21,6 +21,8 @@
 <!-- v266-cachebust: 「新增待办」下拉框随账号分区显隐——账号工作区被隐藏(work=false)时下拉只保留「生活」；生活功能区被隐藏(life=false)时下拉排除「生活」；其余情况（含默认/admin/分区未就绪）保持全部 7 项。新增 populateTodoCat()，在 applyPartitionUI() 末尾与 renderAppointmentsTodos() 起始各调一次，确保分区加载完成 + 用户进入待办页两个时点都生效。版本号 266/186。 -->
 <!-- v267-cachebust: 生活侧分类扩为「生活 + 学习提升」——新增共享常量 TD_LIFE_CATS / tdIsLifeCat()，下拉框、待办列表分组、筛选 tab 三处共用同一份定义。①下拉框：work=false 只显示「生活 + 学习提升」（生活排第一），life=false 排除这两项；②renderTodo() 分组同步改为按 tdIsLifeCat 拆分（含学习提升），否则工作分区关闭时新增的学习提升待办会落进被隐藏的工作组而看不见；③新增 applyTodoCatTabs() 同步隐藏对应的筛选 tab，当前选中项被隐藏时自动回落「全部」。版本号 267/187。 -->
 <!-- v268-cachebust: 修复「生活组状态下点学习提升 tab 即消失」的回归 bug——根因不在 v267 新写的 applyTodoCatTabs，而在 applyTodoFilter() 内 10502 行的旧逻辑 `catAttr === '生活' ? !!ap.life : !!ap.work` 把「学习提升」硬绑到 !!ap.work 上，每次 filterCat() 调 applyTodoFilter() 就立即把学习提升 tab 设 display:none。修复：把这一行改成 `tdIsLifeCat(catAttr) ? !!ap.life : !!ap.work`，与下拉框/列表分组共用同一份生活侧定义。同时移除 v267 新增的 applyTodoCatTabs（被 applyTodoFilter 覆盖，无意义），两处触发点改为直接调 applyTodoFilter。版本号 268/188。 -->
+<!-- v269-cachebust: 英语学习修复——①engMark 在词表为空时静默无反应（待复习清空后点按钮像失灵）→ 改为先 toast 提示「待复习已清空」并直接 return；②engDueList 只在 review deck 内稳定，当 engDecks[deck] undefined（旧快照残留）时 list.length 抛 TypeError 中断整页 JS → 新增统一 engList() 辅助函数永远返回数组；③review deck 空状态没有出口 → 新增「📚 去学新词」按钮 + engGoStudyNew() 切回 lastDeck；④renderEngCard 末尾三个 getElementById 缺一即抛错 + 计数器空状态不归零 → 全部加判空；⑤engStar 同样用 engList() 并加空表 toast 保护；⑥selectEngDeck 记录 lastDeck（排除 review/starred）；⑦普通 deck 循环回首页加 wbEngSave() 持久化。 -->
+<!-- v270-cachebust: 待办下拉框/筛选 tab 大改——①顺序重排：生活 + 学习提升 排前两位；②分类改名：保单办理→其他财险，保函业务→TOB业务；③配色与客户中心 CL_TYPE_COLOR 对齐：其他财险=财险蓝 #1890FF（关联财险/团险/TOC），TOB业务=TOB绿 #52C41A；④已存旧名 cat 通过 migrateTodoCats() 在 getTodos 时自动迁移，catColor 保留旧名别名兜底。版本号 270/190。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -3009,7 +3011,7 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
       <div class="todo-add-row">
         <input type="datetime-local" id="todoTime" class="todo-time" title="需要处理的时间">
         <select id="todoCat">
-          <option>客户跟进</option><option>保单办理</option><option>保函业务</option><option>学习提升</option><option>行政事务</option><option>佣金待结算</option><option>生活</option>
+          <option>生活</option><option>学习提升</option><option>客户跟进</option><option>其他财险</option><option>TOB业务</option><option>行政事务</option><option>佣金待结算</option>
         </select>
       </div>
       <div class="form-group" style="margin-top:8px;margin-bottom:0">
@@ -3031,13 +3033,13 @@ function closeAdminPanel(){ var m=document.getElementById('adminPanelModal'); if
     <div style="margin-bottom:10px;font-size:13px;font-weight:500;color:var(--text-secondary)">选择分类</div>
     <div class="category-tabs" id="catTabs">
       <button class="cat-tab active" data-cat="全部" onclick="filterCat(this,'全部')">全部</button>
-      <button class="cat-tab" data-cat="客户跟进" onclick="filterCat(this,'客户跟进')">👤 客户跟进</button>
-      <button class="cat-tab" data-cat="保单办理" onclick="filterCat(this,'保单办理')">📋 保单办理</button>
-      <button class="cat-tab" data-cat="保函业务" onclick="filterCat(this,'保函业务')">📜 保函业务</button>
+      <button class="cat-tab" data-cat="生活" onclick="filterCat(this,'生活')">🏠 生活</button>
       <button class="cat-tab" data-cat="学习提升" onclick="filterCat(this,'学习提升')">📚 学习提升</button>
+      <button class="cat-tab" data-cat="客户跟进" onclick="filterCat(this,'客户跟进')">👤 客户跟进</button>
+      <button class="cat-tab" data-cat="其他财险" onclick="filterCat(this,'其他财险')">📋 其他财险</button>
+      <button class="cat-tab" data-cat="TOB业务" onclick="filterCat(this,'TOB业务')">📜 TOB业务</button>
       <button class="cat-tab" data-cat="行政事务" onclick="filterCat(this,'行政事务')">📌 行政事务</button>
       <button class="cat-tab" data-cat="佣金待结算" onclick="filterCat(this,'佣金待结算')">💰 佣金待结算</button>
-      <button class="cat-tab" data-cat="生活" onclick="filterCat(this,'生活')">🏠 生活</button>
       <button class="cat-tab" data-cat="预约回访" onclick="filterCat(this,'预约回访')">📞 预约回访</button>
     </div>
     <div class="filter-row">
@@ -6528,9 +6530,9 @@ function applyAccountPartition(){
   try { if(typeof populateTodoCat === 'function') populateTodoCat(); } catch(e){}
   console.log('[partition] 已应用账号分区过滤，当前可见：work=' + _accountPartition.work + ' life=' + _accountPartition.life + ' fun=' + _accountPartition.fun);
 }
-// ===== v267：「生活类」分类统一定义（下拉框 + 列表分组 + 筛选 tab 共用同一份，避免三处定义打架）=====
-// 规则：生活侧 = 生活 + 学习提升；其余（客户跟进/保单办理/保函业务/行政事务/佣金待结算）属工作侧。
-// 下拉框里「生活」排第一（符合用户直觉），列表分组按此集合拆分。
+// ===== v270：「生活类」分类统一定义（下拉框 + 列表分组 + 筛选 tab 共用同一份，避免三处定义打架）=====
+// 规则：生活侧 = 生活 + 学习提升；其余（客户跟进/其他财险/TOB业务/行政事务/佣金待结算）属工作侧。
+// 顺序：生活 / 学习提升 排前两位（用户偏好），其余按业务重要性排列。
 var TD_LIFE_CATS = ['生活','学习提升'];
 function tdIsLifeCat(cat){ return TD_LIFE_CATS.indexOf(cat) >= 0; }
 // v267：按账号分区过滤「新增待办」下拉框
@@ -6543,7 +6545,8 @@ function populateTodoCat(){
   var p = (typeof _accountPartition === 'object' && _accountPartition) ? _accountPartition : null;
   var workOff = !!(p && p.work === false);
   var lifeOff = !!(p && p.life === false);
-  var allCats = ['客户跟进','保单办理','保函业务','学习提升','行政事务','佣金待结算','生活'];
+  // v270：分类改名——保单办理→其他财险、保函业务→TOB业务；顺序也按用户偏好重排（生活/学习提升在前两位）
+  var allCats = ['生活','学习提升','客户跟进','其他财险','TOB业务','行政事务','佣金待结算'];
   var keep;
   if(workOff && lifeOff){
     keep = allCats.slice(); // 双分区都隐藏时兜底显示全部，避免空下拉框
@@ -8753,6 +8756,22 @@ function engDueList(){
   });
   return out;
 }
+// v269：统一取当前词表——永远返回数组。
+// 原代码各处直接写 engDecks[engState.deck]，deck 名失效/旧快照残留时会拿到 undefined，
+// 随后 list.length / list[idx] 抛 TypeError，导致整页 JS 中断（表现为点了按钮完全没反应）。
+function engList(){
+  var d = engState.deck;
+  if(d === 'review') return engDueList();
+  if(d === 'starred') return engState.starred || [];
+  return engDecks[d] || [];
+}
+// v269：当前词表为空时给用户的明确提示文案（原逻辑静默无反应，用户以为卡死）
+function engEmptyHint(){
+  var d = engState.deck;
+  if(d === 'review') return '待复习已清空 🎉 点下方「去学新词」继续';
+  if(d === 'starred') return '重点集还是空的，先去背单词点「⭐ 加入重点」';
+  return '这组词背完啦！点「🔄 再来一遍」';
+}
 function engMastery(){
   let mastered=0, waiting=0, due=0;
   const now = Date.now();
@@ -8850,7 +8869,7 @@ function renderEngCard(){
   engEnsureToday();
   const isStar = engState.deck==='starred';
   const isReview = engState.deck==='review';
-  const list = isReview ? engDueList() : (isStar ? engState.starred : engDecks[engState.deck]);
+  const list = engList();   // v269：安全取词表（不会是 undefined）
   const wrap = document.getElementById('engCardWrap');
   const total = list.length;
   engUpdateGoalUI();
@@ -8867,15 +8886,20 @@ function renderEngCard(){
       <div style="font-size:34px">${icon}</div>
       <div style="font-weight:700;font-size:16px;margin:8px 0">${title}</div>
       <div style="font-size:13px;color:var(--text-light)">${sub}</div>
-      ${isStar||isReview?'':'<button class="btn-primary" style="margin-top:14px" onclick="selectEngDeck(engState.deck,null,true)">🔄 再来一遍</button>'}
+      ${isReview?'<button class="btn-primary" style="margin-top:14px" onclick="engGoStudyNew()">📚 去学新词</button>':''}
+      ${(!isStar&&!isReview)?'<button class="btn-primary" style="margin-top:14px" onclick="selectEngDeck(engState.deck,null,true)">🔄 再来一遍</button>':''}
     </div>`;
-    document.getElementById('engBar').style.width = (isStar||isReview)?'0':'100%';
+    var _bar = document.getElementById('engBar'); if(_bar) _bar.style.width = (isStar||isReview)?'0':'100%';
+    // v269：空状态时把计数器归零，避免残留上一组的「已学 12 · 共 20 词」造成误解
+    var _ct = document.getElementById('engCounter'); if(_ct) _ct.textContent = '已学 0 · 认识 0';
+    var _tt = document.getElementById('engTotal'); if(_tt) _tt.textContent = '共 0 词';
     return;
   }
   let c = list[engState.idx];
   if(!c){
     // 本组已学完：回到开头循环学习，避免卡在最后一张点击「我认识 / 我不认识」无反应
     engState.idx = 0;
+    wbEngSave();   // v269：循环回第一张时一并持久化，否则刷新后会跳回旧的越界索引
     renderEngCard();
     return;
   }
@@ -8909,11 +8933,18 @@ function renderEngCard(){
       <button class="btn-primary" style="margin-top:10px" onclick="engKeepGoing=true;renderEngCard()">继续多学一会儿</button>
     </div>` + wrap.innerHTML;
   }
-  document.getElementById('engBar').style.width = Math.round(engState.idx/total*100)+'%';
-  document.getElementById('engCounter').textContent = `已学 ${engState.idx} · 认识 ${engState.known}`;
-  document.getElementById('engTotal').textContent = `共 ${total} 词`;
+  // v269：逐个判空——任一元素缺失都会抛错并中断整个渲染（表现为卡片不刷新、按钮像失灵）
+  var _bar2 = document.getElementById('engBar'); if(_bar2) _bar2.style.width = Math.round(engState.idx/total*100)+'%';
+  var _c2 = document.getElementById('engCounter'); if(_c2) _c2.textContent = `已学 ${engState.idx} · 认识 ${engState.known}`;
+  var _t2 = document.getElementById('engTotal'); if(_t2) _t2.textContent = `共 ${total} 词`;
   _ttsPrefetchCard(c, list, engState.idx);   // 后台预取：本卡单词/例句 + 下一张，点击时几乎零等待
   if(engState.auto || engState.listen) speakEng(c.w);
+}
+// v269：待复习清空后的出口——切回上次学的普通词库继续学新词
+function engGoStudyNew(){
+  var target = (engState.lastDeck && engDecks[engState.lastDeck]) ? engState.lastDeck : 'daily';
+  selectEngDeck(target, null, true);
+  toast('已切到「' + (ENG_DECK_LABEL[target] || target) + '」，继续学新词 📚');
 }
 // ===== 语音朗读（移动端增强版）=====
 var _engVoices = [];
@@ -9141,7 +9172,13 @@ function flipEngCard(){ const el=document.getElementById('engCard'); if(el) el.c
 function engMark(known){
   engEnsureToday();
   const isReview = engState.deck==='review';
-  const list = isReview ? engDueList() : (engState.deck==='starred' ? engState.starred : engDecks[engState.deck]);
+  const list = engList();
+  // v269：词表为空时明确提示，而不是静默改 idx 再渲染空状态（原逻辑表现为「点了完全没反应」）
+  if(!list.length){
+    toast(engEmptyHint());
+    renderEngCard();
+    return;
+  }
   const c = list[engState.idx];
   if(c){
     // 间隔复习：认识→升盒、推后复习；不认识→回盒1、10分钟后再现；v141 顺手累计 wrong（不认识次数）
@@ -9163,10 +9200,16 @@ function engMark(known){
   engUpdateGoalUI();
   renderEngCard();
   renderEngLibrary();   // v141：标记完后立刻刷新我的词库
+  // v269：复习模式下刚标记完最后一个待复习词 → 明确告知「清空了」，避免用户以为按钮失灵
+  if(isReview && engDueList().length === 0){
+    toast('🎉 待复习已全部完成，稍后会按遗忘曲线再排进来');
+  }
 }
 function selectEngDeck(name, btn, force){
   engState.deck = name;
   engState.idx = 0; engState.known = 0;
+  // v269：记住最后学的「普通词库」，待复习清空后可一键切回继续学新词
+  if(name !== 'review' && name !== 'starred') engState.lastDeck = name;
   if(btn){ document.querySelectorAll('.eng-deck').forEach(d=>d.classList.remove('active')); btn.classList.add('active'); }
   else if(!force){ document.querySelectorAll('.eng-deck').forEach(d=>d.classList.remove('active')); const t=document.querySelector(`.eng-deck[onclick*="${name}"]`); if(t) t.classList.add('active'); }
   wbEngSave();
@@ -9342,9 +9385,9 @@ function engGoalStep(d){
 }
 function engStar(){
   const isStar = engState.deck==='starred';
-  const list = isStar ? engState.starred : engDecks[engState.deck];
+  const list = engList();   // v269：安全取词表，避免 undefined 抛错中断整页 JS
   const c = list[engState.idx];
-  if(!c) return;
+  if(!c){ toast(engEmptyHint()); return; }
   if(isStar){
     engState.starred.splice(engState.idx,1);
     if(engState.idx >= engState.starred.length) engState.idx = Math.max(0, engState.starred.length-1);
@@ -9989,13 +10032,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 268;                         // v268：修复 v267 引入的回归 bug——applyTodoFilter 内旧逻辑把「学习提升」绑到 ap.work 上，工作分区关闭时点学习提升 tab 即消失。改为走 tdIsLifeCat()，与下拉框/列表分组共用同一份生活侧定义。
+const WB_VERSION = 270;                         // v270：①待办下拉框/筛选 tab 重排（生活+学习提升前两位），分类改名（保单办理→其他财险，保函业务→TOB业务），配色与客户中心 CL_TYPE_COLOR 对齐（其他财险=财险蓝 #1890FF，TOB业务=TOB绿 #52C41A）；②已存旧名 cat 自动迁移；③合并 v269 英语修复（待复习清空给 toast+去学新词出口，engList 安全取词，engStar 健壮性，循环回首页持久化）。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 188;                 // v268 发版（188 不含4）
+const WB_DISPLAY_VERSION = 190;                 // v270 发版（190 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -10334,7 +10377,21 @@ var escHtml = esc; // 别名：v240 专注时刻等模块使用 escHtml（与 es
 function setText(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; }
 function setHTML(id,v){ var e=document.getElementById(id); if(e) e.innerHTML=v; }
 function catColor(cat){
-  var m={ '客户跟进':'background:#E6F7FF;color:#1890FF', '保单办理':'background:#F6FFED;color:#52C41A', '保函业务':'background:#FFF7E6;color:#FA8C16', '学习提升':'background:#F9F0FF;color:#722ED1', '行政事务':'background:#F0F5FF;color:#2F54EB', '佣金待结算':'background:#FFF1F0;color:#FF4D4F', '生活':'background:#F5F5F5;color:#666' };
+  // v270：分类改名 + 配色与客户中心 CL_TYPE_COLOR 对齐——
+  //  - 「其他财险」（原保单办理）→ 财险的蓝（#1890FF），代表「财险、团险、TOC」这一类
+  //  - 「TOB业务」（原保函业务） → TOB 的绿（#52C41A）
+  // 旧名「保单办理 / 保函业务」保留为别名映射，避免老数据 catColor 失效显示默认色
+  var m={
+    '客户跟进':'background:#E6F7FF;color:#1890FF',
+    '其他财险':'background:#E6F7FF;color:#1890FF',
+    'TOB业务':'background:#F6FFED;color:#52C41A',
+    '保单办理':'background:#E6F7FF;color:#1890FF',     // v270 别名：迁移期兼容
+    '保函业务':'background:#F6FFED;color:#52C41A',     // v270 别名：迁移期兼容
+    '学习提升':'background:#F9F0FF;color:#722ED1',
+    '行政事务':'background:#F0F5FF;color:#2F54EB',
+    '佣金待结算':'background:#FFF1F0;color:#FF4D4F',
+    '生活':'background:#F5F5F5;color:#666'
+  };
   return m[cat]||m['生活'];
 }
 /* v261: 待办 chip 实际背景色——优先用 t.bg（用户自定义），回退 catColor(t.cat) */
@@ -10429,16 +10486,42 @@ function ymMatch(date,yearId,monthId){
 function setDateDefault(id){ var e=document.getElementById(id); if(e && !e.value) e.value=_today(); }
 
 /* ---------- 待办 ---------- */
-function getTodos(){ var a=_load('todo',null); if(a===null){ a=_migrateTodos(); _save('todo',a); } return Array.isArray(a)?a:[]; }
+// v270：分类改名迁移——保单办理→其他财险、保函业务→TOB业务。
+// 已存在 localStorage 里的旧 cat 必须改名，否则 UI 上会显示成「未分类」。
+// 在 wbEngSave/getTodos 之外的入口也要兜底，所以放一个全局自启函数。
+var _TD_CAT_MIGRATION = { '保单办理':'其他财险', '保函业务':'TOB业务' };
+function migrateTodoCats(){
+  try{
+    var list = _load('todo', null);
+    if(!Array.isArray(list)) return false;
+    var changed = false;
+    for(var i=0; i<list.length; i++){
+      var t = list[i];
+      if(t && _TD_CAT_MIGRATION[t.cat]){
+        t.cat = _TD_CAT_MIGRATION[t.cat];
+        changed = true;
+      }
+    }
+    if(changed) _save('todo', list);
+    return changed;
+  }catch(e){ return false; }
+}
+function getTodos(){
+  var a=_load('todo',null);
+  if(a===null){ a=_migrateTodos(); _save('todo',a); }
+  // v270：每次读取也做一次改名迁移（幂等），保证任意入口都拿到新名字
+  if(Array.isArray(a)){ migrateTodoCats(); a=_load('todo',null); }
+  return Array.isArray(a)?a:[];
+}
 function _migrateTodos(){
   var out=[]; _qa('#todoList .todo-item').forEach(function(el){
     out.push({ id:_uid(), text:(el.querySelector('.todo-text')||{}).textContent||'', cat:el.getAttribute('data-cat')||'生活', date:(el.querySelector('.todo-meta')||{}).textContent||_today(), done: el.getAttribute('data-done')==='true' });
   });
   if(out.length===0){
     out.push({id:_uid(),text:'联系张总确认企财险续保方案',cat:'客户跟进',date:'2026-08-03',done:false});
-    out.push({id:_uid(),text:'准备中建三局投标保函材料',cat:'保函业务',date:'2026-08-03',done:false});
+    out.push({id:_uid(),text:'准备中建三局投标保函材料',cat:'TOB业务',date:'2026-08-03',done:false});
     out.push({id:_uid(),text:'研读建工险附加条款',cat:'学习提升',date:'2026-08-02',done:true});
-    out.push({id:_uid(),text:'提交华为企财险投保资料',cat:'保单办理',date:'2026-08-02',done:true});
+    out.push({id:_uid(),text:'提交华为企财险投保资料',cat:'其他财险',date:'2026-08-02',done:true});
     out.push({id:_uid(),text:'核对 7 月佣金明细，提交流水结算申请',cat:'佣金待结算',date:'2026-08-05',done:false});
     out.push({id:_uid(),text:'给家人打个电话问周末安排',cat:'生活',date:_today(),done:false});
   }
@@ -10590,7 +10673,8 @@ function nowLocalDatetime(){
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
 }
 function todoCatOptions(sel){
-  var cats=['客户跟进','保单办理','保函业务','学习提升','行政事务','佣金待结算','生活'];
+  // v270：分类改名（保单办理→其他财险、保函业务→TOB业务）+ 顺序按用户偏好重排
+  var cats=['生活','学习提升','客户跟进','其他财险','TOB业务','行政事务','佣金待结算'];
   return cats.map(function(c){ return '<option'+(c===sel?' selected':'')+'>'+c+'</option>'; }).join('');
 }
 function editTodo(id){
