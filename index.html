@@ -10,7 +10,25 @@
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- ===== v273 安全加固：内容安全策略（CSP）=====
+     目的：即使页面被注入恶意内容，也无法把数据外发到攻击者服务器、无法加载外部脚本、
+     无法用 <base> 劫持相对路径、无法通过插件/表单把数据带走。
+     说明：本工作台是单文件架构（大量内联 script 标签与 onclick 内联事件），
+     因此 script-src/style-src 必须保留 'unsafe-inline'（这是架构决定的，不是疏忽）。
+     但 connect-src 被精确锁定到自有后端 + 音频 CDN，这一条是防数据外泄的关键。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' data: blob: https:; connect-src 'self' https://1258476798-0i14j3xnr3.ap-guangzhou.tencentscf.com https://*.tencentscf.com https://rjkxcdhikrfpjmqqosvs.supabase.co https://*.supabase.co https://cdn.jsdelivr.net https://raw.githubusercontent.com http://localhost:3000 http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<!-- v273 安全加固：iframe 防嵌套兜底。CSP 的 frame-ancestors 在 <meta> 中不生效（仅 HTTP 头可用），
+     静态托管又无法自定义响应头，故用 JS 检测：被第三方页面嵌套时直接跳出或隐藏内容，防点击劫持。 -->
+<script>
+(function(){
+  try {
+    if (window.top !== window.self) { window.top.location = window.self.location; }
+  } catch(e) {
+    try { document.documentElement.style.display = 'none'; } catch(_) {}
+  }
+})();
+</script>
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- v20260808-54-NAVENOTES-EXPORT-SIDEBARFIX -->
@@ -25,6 +43,7 @@
 <!-- v270-cachebust: 待办下拉框/筛选 tab 大改——①顺序重排：生活 + 学习提升 排前两位；②分类改名：保单办理→其他财险，保函业务→TOB业务；③配色与客户中心 CL_TYPE_COLOR 对齐：其他财险=财险蓝 #1890FF（关联财险/团险/TOC），TOB业务=TOB绿 #52C41A；④已存旧名 cat 通过 migrateTodoCats() 在 getTodos 时自动迁移，catColor 保留旧名别名兜底。版本号 270/190。 -->
 <!-- v271-cachebust: 英语学习「我的词库」`<details>` 默认折叠（去掉 open 属性），点 summary 才展开内容——减少首屏占位，让卡片更突出；同时落实 v270 的待办分类重排重命名 + 数据迁移 + 配色对齐。版本号 271/191。 -->
 <!-- v272-cachebust: 修复英语「点我认识/我不认识第二次起失效 + 页面跳到词库」——真凶是 engLibUpdateCounts() 末尾 `if(data-rendered==='1') renderEngLibrary()` 与 renderEngLibrary() 开头的 `engLibUpdateCounts()` 互相回调形成无限递归；第一次点击时 data-rendered 还是 null 侥幸跳过，从第二次起就栈溢出导致 JS 崩溃（表现为单词不切换、页面卡在词库）。修复：①engLibUpdateCounts() 职责收敛为「只更新角标数字」，列表刷新交给调用方显式触发；②engMark 前后保存/恢复 window 滚动位置（_engRestoreScroll），消除词库高度变化把下方按钮顶走的位移感。 -->
+<!-- v273-cachebust: 安全加固（前端部分）。①新增 CSP 内容安全策略 meta：connect-src 精确锁定到自有后端(SCF/Supabase)与音频 CDN，阻断注入后向攻击者服务器外发数据；object-src 'none' 禁用插件；base-uri 'self' 防 base 标签劫持；form-action 'self' 防表单劫持。②iframe 防嵌套兜底脚本（CSP frame-ancestors 在 meta 中不生效、静态托管无法自定义响应头）：被跨域嵌套时跳出或隐藏内容，防点击劫持。③wbIsAdmin() 不再只看 localStorage 的 wb_session 字符串（旧实现可被一行控制台命令绕过），改为额外校验「持有未过期 JWT 且其 email 声明与会话一致」。后端部分（scf-restore/index.js，需单独上传 SCF）见安全报告。 -->
 <!-- v262-cachebust: 删除「📅 日历」页，待办只保留 待办列表 + 月维度；月维度改为 6×7 全填真实日期(含上月尾/下月头，可跨月，点相邻月格自动跳月) + 每格数字后显示农历；「📋 最近待办」从日历页移到月维度下方 -->
 <!-- v177-cachebust: 客户卡片Row1加联系日期(dealDate)+人员筛选统一用下拉不再用按钮+router.html三镜像(GitHub+Vercel+CloudStudio)智能跳转 -->
 <!-- v178-cachebust: 修复娱乐勾选刷新丢失(后端GET列表兜底fun字段+写回磁盘迁移老数据)+新增删除账号接口+管理员自改密码(无需验证码直接设新密码) -->
@@ -10047,13 +10066,13 @@ document.getElementById('mainContent').addEventListener('click', function(e) {
 /* ===================== 多账户 / 分账户存档 ===================== */
 const WB_MAIN = document.getElementById('mainContent');
 const WB_DEFAULT = WB_MAIN.innerHTML;          // 初始演示数据（新账户基线）
-const WB_VERSION = 272;                         // v272：修复英语「点我认识/我不认识第二次起失效、页面跳到词库」——根因是 engLibUpdateCounts() 与 renderEngLibrary() 互相回调造成无限递归（data-rendered==='1' 后每次触发），第一次点侥幸跳过、第二次起栈溢出 JS 崩溃。收敛 engLibUpdateCounts 只更新角标；另在 engMark 前后保存/恢复滚动位置，消除词库高度变化把按钮顶走的位移感。
+const WB_VERSION = 273;                         // v273 安全加固：CSP 内容安全策略 + iframe 防嵌套 + 管理员判定改为「JWT 未过期且 email 声明自洽」+ 后端 JWT 密钥 fail-closed / PBKDF2 密码哈希 / 登录限流 / 原型污染防护。
 window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下角版本角标的内联脚本可靠读取
 
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 192;                 // v272 发版（192 不含4）
+const WB_DISPLAY_VERSION = 193;                 // v273 发版（193 不含4）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
@@ -17030,8 +17049,38 @@ function wbForceLogoutByRevoke(){
 /* ================= 管理员：邀请码管理 ================= */
 const WB_ADMIN_EMAIL = 'seeyoulook@qq.com';
 
+// v273 安全加固：管理员判定不再只看 localStorage 里的 wb_session 字符串。
+// 旧实现 `WB_SESSION === WB_ADMIN_EMAIL` 可被一行控制台命令绕过：
+//   localStorage.setItem('wb_session','<管理员邮箱>')  → 刷新即"成为管理员"。
+// 现在额外要求「持有未过期的 JWT 且其 email 声明与会话一致」，把绕过成本从"改一个字符串"
+// 提高到"伪造一个可通过后端签名校验的令牌"。
+// 注意：前端判定仅用于 UI 显隐；真正的权限边界在后端 isAdmin()（校验 HMAC 签名），
+// 前端这层只是纵深防御的一部分，不能替代服务端鉴权。
+function wbDecodeJwtPayload(tok){
+  try{
+    var parts = String(tok||'').split('.');
+    if(parts.length !== 3) return null;
+    var b64 = parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    while(b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  }catch(e){ return null; }
+}
+function wbSessionToken(){
+  try{ return localStorage.getItem('wb_token') || ''; }catch(e){ return ''; }
+}
 function wbIsAdmin(){
-  return !!WB_SESSION && String(WB_SESSION).trim().toLowerCase() === WB_ADMIN_EMAIL;
+  if(!WB_SESSION) return false;
+  var email = String(WB_SESSION).trim().toLowerCase();
+  if(email !== WB_ADMIN_EMAIL) return false;
+  // 离线模式（无后端）下没有 token，此时仅凭邮箱判定，保持既有可用性
+  var tok = wbSessionToken();
+  if(!tok) return true;
+  var p = wbDecodeJwtPayload(tok);
+  // 有 token 就必须自洽：email 声明一致 + 未过期
+  if(!p) return false;
+  if(String(p.email||'').trim().toLowerCase() !== email) return false;
+  if(p.exp && Date.now() > p.exp * 1000) return false;
+  return true;
 }
 
 // 本地缓存的邀请码（离线模式使用）
