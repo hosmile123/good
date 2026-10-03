@@ -54,6 +54,9 @@
 <!-- v199-cachebust: 移除下拉回主页手势——下拉不再触发任何导航，恢复 v197 行为；返回栈仍保留 -->
 <!-- v246-cachebust: 关闭登录页「微信登录」空入口——appid 未配置时原本照常显示 tab(点了只显示"通道已就位"引导)，现 WX_LOGIN_CFG.autoMount=false + showWhenUnconfigured=false，登录页只剩邮箱/验证码登录；自有服务器 + GitHub Pages 两平台同步 (2026-10-03) -->
 <!-- v247-cachebust: ①删首页看板 KPI 卡片区与「模块构成」块(只留问候+常用功能宫格) ②修「改密码误报当前密码错误」——SCF 无 change-pw 路由时先拿真实存在的 /api/auth/login 验当前密码，云端认就如实告知走管理员重置、不再误用本地旧 hash 下结论 (2026-10-03) -->
+<!-- v248-cachebust: 按用户要求整体关闭「Aurora 概览看板」注入（window.__AX.dash=false，模块自带的官方总开关 ax-dash-src:3401）——
+     该看板把问候/KPI/常用功能宫格额外插进首页，电脑端和原生「首页·工作与生活驾驶舱」叠在一起导致版面错乱；
+     关掉后首页回到以前的样貌（原生驾驶舱），手机端同样回退。要重新启用：把 dash:false 改回 true 并恢复 heroChips/kpis/insight 配置 (2026-10-04) -->
 <!-- v242-cachebust: 专注时刻任务卡 ⋮ 菜单——修正 items 字段名 text→label（wbRowMenu 实际读 label 不读 text，修正前两行都 fallback 显示成「操作」） -->
 <!-- v243-cachebust: 专注时刻音乐引擎重构——5 档扩展到 23 档 × 3 tab（自然音 13+氛围 5+轻音乐 4+URL 自定义），全部程序化 WebAudio 合成（粉/白/棕噪+滤波+LFO+事件层+旋律层），零外链、可离线、文件不爆；URL tab 走 Audio() 元素支持用户粘贴网络音频 -->
 <!-- v245-cachebust: 专注时刻 4 大升级——①音乐全部改真实音频(Wikimedia Commons 环境音 + SoundHelix 12 首轻音乐/钢琴/Chill/Jazz 系列)，synth 仅作 fallback；②音量提升至 60% 可调；③关闭/暂停 1 分钟强制冷却弹窗 (02:52 → 00:00 继续) 可设置关闭；④自定义上传背景图(自动压缩 1280px JPEG q80，最多 12 张) + 全屏点切换循环覆盖；⑤统计饼图重做：环形 + 引导线引出标签(任务/时长/百分比) + 中心总计时长；⑥倒计时字号 88→74 适配 360px 圆环完整包裹；⑦设置面板新增「结束前强制 1 分钟冷却」「音乐音量」「背景图」三块 -->
@@ -3386,7 +3389,7 @@ tbody tr:last-child td{ border-bottom:0 !important; }
      如需恢复，把下面 window.__AX 的 "kpis":[] 换回：
      "kpis":[{"label":"本地账号","lsLen":"wb_accounts","unit":"个","icon":"users","color":"blue"},{"label":"车险线索","textOf":"#heroCx","icon":"cart","color":"green"},{"label":"保函商机","textOf":"#heroBh","icon":"shield","color":"indigo"},{"label":"团险商机","textOf":"#heroQt","icon":"doc","color":"teal"},{"label":"快捷入口","domCount":".quick-item","unit":"个","icon":"bolt","color":"orange"}]
      并补回 "insight":{"title":"模块构成","barsFrom":[{"n":"快捷入口","sel":".quick-item","c":"var(--ax-g-indigo)"},{"n":"云端表格","sel":".cloud-sheet-card","c":"var(--ax-g-blue)"},{"n":"客户卡片","sel":".client-card","c":"var(--ax-g-teal)"},{"n":"列表项","sel":".list-item","c":"var(--ax-g-orange)"},{"n":"指标卡","sel":".ss-item","c":"var(--ax-g-green)"}]}  (2026-10-03) -->
-<script id="ax-config">window.__AX={"project":"个人工作台","greet":"四条业务线 · 今日概览","heroChips":[{"t":"线索池","b":"车险 / 保函 / 团险"}],"kpis":[]};(function(){try{document.documentElement.setAttribute("data-ax","work");}catch(e){}})();</script>
+<script id="ax-config">window.__AX={"project":"个人工作台","greet":"四条业务线 · 今日概览","dash":false};(function(){try{document.documentElement.setAttribute("data-ax","work");}catch(e){}})();</script>
 <script id="ax-dash-src">
 /* ============================================================================
    Aurora 概览看板 · aurora-dash.js
@@ -12059,7 +12062,7 @@ window.WB_VERSION = WB_VERSION;                 // 暴露到 window，供右下�
 // ===== 展示版本号（与内部 WB_VERSION 解耦） =====
 // 用户要求右下角从 1 重新开始计数，且自动跳过任何含数字 "4" 的版本（4/14/24/34/40-49/54…）。
 // WB_DISPLAY_VERSION 为本版展示号；下次发版时调用 nextDisplayVersion(WB_DISPLAY_VERSION) 即可拿到下一个合法号。
-const WB_DISPLAY_VERSION = 196;                 // v273 发版 + 关闭微信空入口 + 删首页看板统计块 + 修改密码误报（196 不含4，2026-10-03）
+const WB_DISPLAY_VERSION = 197;                 // v273 发版 + 关微信空入口 + 删看板统计 + 修改密码误报 + 整体关闭Aurora概览看板（197 不含4，2026-10-04）
 window.WB_DISPLAY_VERSION = WB_DISPLAY_VERSION;
 function nextDisplayVersion(v){
   let n = (typeof v === 'number' ? v : 0) + 1;
